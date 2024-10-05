@@ -1,17 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Phaser from 'phaser';
-import grassImage from './assets/grass.png'; // Replace with your image path
-import whiteflagImage from './assets/whiteFlag.png'; // Replace with your white flag image path
-import getContract, { getSignerContract } from './contract'; // Import contract functions
+import grassImage from './assets/grass.png';
+import whiteflagImage from './assets/whiteFlag.png';
+import getContract, { getSignerContract } from './contract';
 
 function App() {
-  const gameRef = useRef(null); // To store the Phaser game instance
-  const [tileCoords, setTileCoords] = useState({ x: null, y: null, occupied: null }); // Store the clicked tile coordinates and occupancy status
-  const [isMetaMaskConnected, setIsMetaMaskConnected] = useState(false); // To check if MetaMask is connected
-  const tilesRef = useRef([]); // Store the occupancy status of all tiles in a ref
-  const mapSize = 20; // 20x20 map
+  const gameRef = useRef(null);
+  const [tileCoords, setTileCoords] = useState({ x: null, y: null, occupied: null, occupant: null });
+  const [isMetaMaskConnected, setIsMetaMaskConnected] = useState(false);
+  const tilesRef = useRef([]);
+  const mapSize = 20;
 
-  // Check if MetaMask is connected
   useEffect(() => {
     const checkMetaMaskConnection = async () => {
       if (window.ethereum) {
@@ -28,14 +27,13 @@ function App() {
     checkMetaMaskConnection();
   }, []);
 
-  // Fetch occupancy data for all tiles at the start
   useEffect(() => {
     const fetchAllOccupiedTiles = async () => {
       try {
         const contract = await getContract();
         const occupiedTiles = await contract.getAllOccupiedTiles();
-        tilesRef.current = occupiedTiles; // Update ref directly
-        updateTileMap(); // Update the tilemap with the new data
+        tilesRef.current = occupiedTiles;
+        updateTileMap();
       } catch (error) {
         console.error('Error fetching all occupied tiles:', error);
       }
@@ -43,7 +41,6 @@ function App() {
     fetchAllOccupiedTiles();
   }, []);
 
-  // Function to update the tilemap after the occupancy data is loaded
   const updateTileMap = () => {
     if (gameRef.current) {
       const scene = gameRef.current.scene.keys.default;
@@ -53,35 +50,47 @@ function App() {
       const halfTileWidth = tileWidth / 2;
       const offsetX = window.innerWidth / 2;
 
-      // Function to convert tile coordinates to world coordinates
       function tileToWorldPosition(x, y) {
         const worldX = (x - y) * halfTileWidth + offsetX;
         const worldY = (x + y) * overlap;
         return { worldX, worldY };
       }
 
-      // Update the tilemap
       for (let y = 0; y < mapSize; y++) {
         for (let x = 0; x < mapSize; x++) {
           const { worldX, worldY } = tileToWorldPosition(x, y);
 
-          // Check if the tile is occupied and render the flag on top if it is
           if (tilesRef.current.length > 0 && tilesRef.current[x][y]) {
-            scene.add.image(worldX, worldY, 'whiteflag').setDepth(worldY + 1);
+            const flag = scene.add.image(worldX, worldY, 'whiteflag').setDepth(worldY + 1);
+            
+            // Enable pixel-perfect hit detection
+            flag.setInteractive({
+              pixelPerfect: true, // Only detect opaque areas
+              useHandCursor: true  // Shows a hand cursor when hovering
+            });
+
+            // Add right-click event listener to the white flag
+            flag.on('pointerdown', async (pointer) => {
+              if (pointer.rightButtonDown()) {
+                const contract = await getContract();
+                const occupant = await contract.getTileOccupant(x, y); // Fetch the occupant address
+                setTileCoords({ x: x + 1, y: y + 1, occupied: true, occupant }); // Update the state with occupant info
+              }
+            });
           }
         }
       }
     }
   };
 
-  // Occupy tile function to call the smart contract
+
   const occupyTile = async (x, y) => {
     try {
       const contract = await getSignerContract();
-      await contract.occupyTile(x - 1, y - 1); // Use 0-based indexing for Solidity
+      await contract.occupyTile(x - 1, y - 1);
       setTileCoords((prev) => ({ ...prev, occupied: true }));
-      tilesRef.current[x - 1][y - 1] = true; // Update the tile as occupied in the ref
-      updateTileMap(); // Update the tilemap
+      tilesRef.current[x - 1][y - 1] = true;
+      updateTileMap();
     } catch (error) {
       console.error('Error occupying tile:', error);
     }
@@ -92,11 +101,9 @@ function App() {
       return;
     }
 
-    // Set overflow hidden to prevent scrollbars
     document.body.style.overflow = 'hidden';
     document.documentElement.style.overflow = 'hidden';
 
-    // Disable right-click context menu
     const disableContextMenu = (e) => {
       e.preventDefault();
     };
@@ -104,28 +111,28 @@ function App() {
 
     const config = {
       type: Phaser.AUTO,
-      width: window.innerWidth, // Dynamically set width
-      height: window.innerHeight, // Dynamically set height
+      width: window.innerWidth,
+      height: window.innerHeight,
       parent: 'phaser-container',
       scene: {
         preload: preload,
         create: create,
-        update: update
+        update: update,
       },
       scale: {
-        mode: Phaser.Scale.RESIZE, // Rescale the game automatically
-        autoCenter: Phaser.Scale.CENTER_BOTH, // Automatically center the game
+        mode: Phaser.Scale.RESIZE,
+        autoCenter: Phaser.Scale.CENTER_BOTH,
       },
       audio: {
-        disableWebAudio: true, // Disables Phaser's Web Audio to avoid AudioContext issues
+        disableWebAudio: true,
       },
-      transparent: true, // Ensure the canvas is transparent
-      banner: false, // Disable the Phaser banner in the console
+      transparent: true,
+      banner: false,
     };
 
-    gameRef.current = new Phaser.Game(config); // Store the Phaser game instance
+    gameRef.current = new Phaser.Game(config);
 
-    let zoomLevel = 0.24; // Set the initial zoom level here
+    let zoomLevel = 0.24;
 
     function preload() {
       this.load.image('grass', grassImage);
@@ -133,35 +140,29 @@ function App() {
     }
 
     async function create() {
-      const tileWidth = 386; // Full width of the tile
-      const visibleTileHeight = 193; // Only the bottom visible half of the tile is counted
-      const overlap = visibleTileHeight / 2; // For isometric depth, tiles overlap vertically
-
+      const tileWidth = 386;
+      const visibleTileHeight = 193;
+      const overlap = visibleTileHeight / 2;
       const halfTileWidth = tileWidth / 2;
 
-      const totalMapHeight =
-        ((mapSize - 1) * overlap + visibleTileHeight / 2) * 2; // Total height of the map considering vertical overlap
-
+      const totalMapHeight = ((mapSize - 1) * overlap + visibleTileHeight / 2) * 2;
       const offsetX = window.innerWidth / 2;
 
       this.lights.enable();
       this.lights.setAmbientColor(0x9999);
-
       this.lights.addLight(window.innerWidth * 2.5, -1500, 800).setColor(0xfff8e1).setIntensity(2.5);
 
       const sunGraphics = this.add.graphics();
-      sunGraphics.setScrollFactor(0); 
+      sunGraphics.setScrollFactor(0);
       sunGraphics.fillStyle(0xfff8e1, 1);
       sunGraphics.fillCircle(window.innerWidth * 2.5, -1500, 500);
 
-      // Function to convert tile coordinates to world coordinates
       function tileToWorldPosition(x, y) {
         const worldX = (x - y) * halfTileWidth + offsetX;
         const worldY = (x + y) * overlap;
         return { worldX, worldY };
       }
 
-      // Function to convert world coordinates to tile coordinates
       function worldToTilePosition(worldX, worldY) {
         const adjustedWorldX = worldX - offsetX;
         const x = Math.floor((worldY / overlap + adjustedWorldX / halfTileWidth) / 2);
@@ -169,12 +170,10 @@ function App() {
         return { x, y };
       }
 
-      // Set up the tiles in the scene
       for (let y = 0; y < mapSize; y++) {
         for (let x = 0; x < mapSize; x++) {
           const { worldX, worldY } = tileToWorldPosition(x, y);
 
-          // Render the grass tile
           const tile = this.add.image(worldX, worldY, 'grass').setDepth(worldY);
           tile.setPipeline('Light2D');
         }
@@ -190,56 +189,43 @@ function App() {
       let cameraStartX = 0;
       let cameraStartY = 0;
 
-      this.input.on(
-        'pointerdown',
-        function (pointer) {
-          // Prevent default behavior to avoid page refresh
-          pointer.event.preventDefault();
+      this.input.on('pointerdown', function (pointer) {
+        pointer.event.preventDefault();
 
-          if (pointer.button === 0) {
-            isDragging = true;
-            dragStartX = pointer.x;
-            dragStartY = pointer.y;
-            cameraStartX = this.cameras.main.scrollX;
-            cameraStartY = this.cameras.main.scrollY;
-          } else if (pointer.button === 2) {
-            const worldX = pointer.worldX;
-            const worldY = pointer.worldY;
-            const { x, y } = worldToTilePosition(worldX, worldY);
+        if (pointer.button === 0) {
+          isDragging = true;
+          dragStartX = pointer.x;
+          dragStartY = pointer.y;
+          cameraStartX = this.cameras.main.scrollX;
+          cameraStartY = this.cameras.main.scrollY;
+        } else if (pointer.button === 2) {
+          const worldX = pointer.worldX;
+          const worldY = pointer.worldY;
+          const { x, y } = worldToTilePosition(worldX, worldY);
 
-            if (x + 1 >= 1 && x + 1 <= 20 && y + 1 >= 1 && y + 1 <= 20) {
-              setTileCoords({ x: x + 1, y: y + 1, occupied: tilesRef.current[x][y] });
-            } else {
-              setTileCoords({ x: null, y: null, occupied: null }); // Clear if outside the range
-            }
+          if (x + 1 >= 1 && x + 1 <= 20 && y + 1 >= 1 && y + 1 <= 20) {
+            setTileCoords({ x: x + 1, y: y + 1, occupied: tilesRef.current[x][y] });
+          } else {
+            setTileCoords({ x: null, y: null, occupied: null });
           }
-        },
-        this
-      );
+        }
+      }, this);
 
-      this.input.on(
-        'pointermove',
-        function (pointer) {
-          if (isDragging) {
-            const zoom = this.cameras.main.zoom;
-            const dragX = (dragStartX - pointer.x) / zoom;
-            const dragY = (dragStartY - pointer.y) / zoom;
-            this.cameras.main.scrollX = cameraStartX + dragX;
-            this.cameras.main.scrollY = cameraStartY + dragY;
-          }
-        },
-        this
-      );
+      this.input.on('pointermove', function (pointer) {
+        if (isDragging) {
+          const zoom = this.cameras.main.zoom;
+          const dragX = (dragStartX - pointer.x) / zoom;
+          const dragY = (dragStartY - pointer.y) / zoom;
+          this.cameras.main.scrollX = cameraStartX + dragX;
+          this.cameras.main.scrollY = cameraStartY + dragY;
+        }
+      }, this);
 
-      this.input.on(
-        'pointerup',
-        function (pointer) {
-          if (pointer.button === 0) {
-            isDragging = false;
-          }
-        },
-        this
-      );
+      this.input.on('pointerup', function (pointer) {
+        if (pointer.button === 0) {
+          isDragging = false;
+        }
+      }, this);
 
       this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
         if (deltaY > 0) {
@@ -291,6 +277,9 @@ function App() {
             <br />
             {tileCoords.occupied !== null && (
               <span>Occupied: {tileCoords.occupied ? 'Yes' : 'No'}</span>
+            )}
+            {tileCoords.occupant && (
+              <span><br />Occupant: {tileCoords.occupant}</span>
             )}
           </p>
         )}
