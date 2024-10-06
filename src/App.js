@@ -4,6 +4,7 @@ import grassImage from './assets/grass.png';
 import whiteflagImage from './assets/whiteFlag.png';
 import getContract, { getSignerContract } from './contract';
 import { Circles } from 'react-loader-spinner';
+import './App.css';
 
 function App() {
   const gameRef = useRef(null);
@@ -12,6 +13,24 @@ function App() {
   const tilesRef = useRef([]);
   const mapSize = 20;
   const [loading, setLoading] = useState(true); // New state for loading
+
+
+  const loginMetaMask = async () => {
+    if (window.ethereum) {
+      try {
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        if (accounts.length > 0) {
+          setIsMetaMaskConnected(true); // Update state when MetaMask is connected
+        }
+      } catch (error) {
+        console.error('MetaMask login failed', error);
+      }
+    } else {
+      alert('MetaMask not detected');
+    }
+  };
+
+  
 
   useEffect(() => {
     const checkMetaMaskConnection = async () => {
@@ -247,18 +266,12 @@ function App() {
 
     function update() {}
 
-    const handleResize = () => {
-      gameRef.current.scale.resize(window.innerWidth, window.innerHeight);
-    };
-
-    window.addEventListener('resize', handleResize);
-
     return () => {
       if (gameRef.current) {
         gameRef.current.destroy(true);
         gameRef.current = null;
       }
-      window.removeEventListener('resize', handleResize);
+
       window.removeEventListener('contextmenu', disableContextMenu);
 
       document.body.style.overflow = '';
@@ -314,32 +327,57 @@ function App() {
         id="phaser-container"
         style={{ width: '100%', height: '100%', position: 'relative', zIndex: 0 }}
       ></div>
-      <div style={{ position: 'absolute', top: 10, left: 10, color: 'white', zIndex: 100 }}>
-        {tileCoords.x !== null && tileCoords.y !== null && (
-          <p>
-            Tile X: {tileCoords.x}, Tile Y: {tileCoords.y}
-            <br />
-            {tileCoords.occupied !== null && (
-              <span>Occupied: {tileCoords.occupied ? 'Yes' : 'No'}</span>
-            )}
-            {tileCoords.occupant && (
-              <span><br />Occupant: {tileCoords.occupant}</span>
-            )}
-          </p>
-        )}
-        {tileCoords.x !== null && tileCoords.y !== null && !tileCoords.occupied && (
-          <div>
-            {isMetaMaskConnected ? (
-              <div>
-                <p>Occupy this tile?</p>
-                <button type="button" onClick={() => occupyTile(tileCoords.x, tileCoords.y)}>Yes</button>
-              </div>
-            ) : (
-              <p>Login MetaMask to occupy this tile</p>
-            )}
-          </div>
-        )}
-      </div>
+      <div
+  className="message-card"
+  style={{
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    padding: '15px',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)', // Slightly transparent white background
+    borderRadius: '10px',
+    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)', // Add a soft shadow
+    color: '#333', // Darker text color for contrast
+    zIndex: 100,
+    width: '250px',
+  }}
+>
+  {tileCoords.x !== null && tileCoords.y !== null && (
+    <div>
+      <p>
+        <strong>Tile Coordinates</strong>:<br />
+        X: {tileCoords.x}, Y: {tileCoords.y}
+      </p>
+      {tileCoords.occupied !== null && (
+        <p>
+          <strong>Occupied</strong>: {tileCoords.occupied ? 'Yes' : 'No'}
+        </p>
+      )}
+      {tileCoords.occupant && (
+        <p>
+          <strong>Occupant</strong>: {tileCoords.occupant}
+        </p>
+      )}
+    </div>
+  )}
+  {tileCoords.x !== null && tileCoords.y !== null && !tileCoords.occupied && (
+    <div>
+      {isMetaMaskConnected ? (
+        <div>
+          <p>Occupy this tile?</p>
+          <button type="button" onClick={() => occupyTile(tileCoords.x, tileCoords.y)}>
+            Yes
+          </button>
+        </div>
+      ) : (
+        <div>
+          <p>Login MetaMask to occupy this tile</p>
+          <button type="button" onClick={loginMetaMask}>Login MetaMask</button>
+        </div>
+      )}
+    </div>
+  )}
+</div>
     </div>
   );
 }
