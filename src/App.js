@@ -5,6 +5,8 @@ import whiteflagImage from './assets/whiteFlag.png';
 import getContract, { getSignerContract } from './contract';
 import { Circles } from 'react-loader-spinner';
 import './App.css';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function App() {
   const gameRef = useRef(null);
@@ -13,6 +15,48 @@ function App() {
   const tilesRef = useRef([]);
   const mapSize = 20;
   const [loading, setLoading] = useState(true); // New state for loading
+  const [metaMaskAccount, setMetaMaskAccount] = useState(null);
+
+
+  useEffect(() => {
+    const checkMetaMaskConnection = async () => {
+      if (window.ethereum) {
+        try {
+          const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+          if (accounts.length > 0) {
+            setIsMetaMaskConnected(true);
+            setMetaMaskAccount(accounts[0]); // Set the account when MetaMask is already connected
+          }
+        } catch (error) {
+          console.error('Error connecting to MetaMask', error);
+        }
+      }
+    };
+    checkMetaMaskConnection();
+
+    // Add event listener for account change
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', (accounts) => {
+        if (accounts.length > 0) {
+          setMetaMaskAccount(accounts[0]); // Update to the new account
+          setIsMetaMaskConnected(true);
+        } else {
+          setIsMetaMaskConnected(false); // If no accounts, user is disconnected
+          setMetaMaskAccount(null);
+        }
+      });
+    }
+
+    // Cleanup event listener on component unmount
+    return () => {
+      if (window.ethereum) {
+        window.ethereum.removeListener('accountsChanged', () => {});
+      }
+    };
+
+
+
+  }, []);
 
 
   const loginMetaMask = async () => {
@@ -21,6 +65,7 @@ function App() {
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
         if (accounts.length > 0) {
           setIsMetaMaskConnected(true); // Update state when MetaMask is connected
+          setMetaMaskAccount(accounts[0]);
         }
       } catch (error) {
         console.error('MetaMask login failed', error);
@@ -105,23 +150,103 @@ function App() {
     }
   };
 
+  const fetchAllOccupiedTiles = async () => {
+    try {
+      const contract = await getContract();
+      const occupiedTiles = await contract.getAllOccupiedTiles();
+      tilesRef.current = occupiedTiles;
+      updateTileMap();
+      setLoading(false);  // End loading when done
+    } catch (error) {
+      console.error('Error fetching all occupied tiles:', error);
+    }
+  };
+
+
+
+  const showWarning = () => {
+    toast.warn(
+      <div style={{ textAlign: 'center' }}>
+        🚧 <strong>You already have a Land!</strong>
+        <br />
+        <button
+          style={{
+            backgroundColor: '#007bff',
+            color: '#fff',
+            padding: '8px 15px',
+            marginTop: '10px',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            fontSize: '14px',
+          }}
+          onClick={() => toast.dismiss()}
+        >
+          OK
+        </button>
+      </div>,
+      {
+        position: "bottom-center",
+        autoClose: false,
+        hideProgressBar: true,
+        closeOnClick: false,
+        draggable: false,
+        style: {
+          padding: '20px',
+          background: 'rgba(255, 255, 255, 0.9)', // Softer white background
+          boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)', // Soft shadow
+          borderRadius: '15px', // Rounded corners
+          border: '1px solid #007bff', // Border to match the blue button
+          textAlign: 'center',
+          maxWidth: '350px',
+          zIndex: 110, // Ensure it's on top
+          fontSize: '16px',
+          color: '#333', // Match the text color from your other elements
+        },
+        icon: false,
+        theme: "light", // Matching light theme
+      }
+    );
+  };
+  
+  
+  
+  
+  
+  
+
 
   const occupyTile = async (x, y) => {
     setLoading(true);
     try {
-      
-      const contract = await getSignerContract();
-      const tx = await contract.occupyTile(x - 1, y - 1);
-      await tx.wait();
-      setTileCoords((prev) => ({ ...prev, occupied: true }));
-      tilesRef.current[x - 1][y - 1] = true;
-      updateTileMap();
+
+      const contract = await getContract();
+      const alreadyHasTile = await contract.hasOccupiedTile(metaMaskAccount);
+
+
+      if (alreadyHasTile) {
+        showWarning(); // Show the warning toast
+      } else {
+
+        const contractSigner = await getSignerContract();
+        const tx = await contractSigner.occupyTile(x - 1, y - 1);
+        await tx.wait();
+
+        await fetchAllOccupiedTiles();
+
+        setTileCoords((prev) => ({ ...prev, occupied: true }));
+      }
+
+
+
+
     } catch (error) {
-      console.error('Error occupying tile:', error);
+        console.error('Error occupying tile:', error);
     } finally {
       setLoading(false);
     }
   };
+  
 
   useEffect(() => {
     if (gameRef.current) {
@@ -288,6 +413,10 @@ function App() {
       }}
     >
 
+<ToastContainer limit={1} closeButton={false} />
+
+
+
 {loading && (
   <>
     {/* Dark background overlay */}
@@ -341,11 +470,21 @@ function App() {
     zIndex: 100,
     width: '250px',
   }}
->
+><strong>Info Box</strong>
+
+{metaMaskAccount ? (
+          <p>
+            <strong>Logged in:</strong> {`${metaMaskAccount.slice(0, 4)}...${metaMaskAccount.slice(-3)}`} {/* Display logged in address */}
+          </p>
+        ) : (
+          <p>
+          <button type="button" onClick={loginMetaMask}>Connect</button>
+          </p>
+        )}
   {tileCoords.x !== null && tileCoords.y !== null && (
     <div>
       <p>
-        <strong>Tile Coordinates</strong>:<br />
+        <strong>Land Coordinates</strong>:<br />
         X: {tileCoords.x}, Y: {tileCoords.y}
       </p>
       {tileCoords.occupied !== null && (
@@ -354,24 +493,25 @@ function App() {
         </p>
       )}
       {tileCoords.occupant && (
-        <p>
-          <strong>Occupant</strong>: {tileCoords.occupant}
-        </p>
-      )}
+  <p>
+    <strong>Occupant</strong>: 
+    {`${tileCoords.occupant.slice(0, 4)}...${tileCoords.occupant.slice(-3)}`} {/* Show first 4 and last 3 characters */}
+  </p>
+)}
     </div>
   )}
   {tileCoords.x !== null && tileCoords.y !== null && !tileCoords.occupied && (
     <div>
       {isMetaMaskConnected ? (
         <div>
-          <p>Occupy this tile?</p>
+          <p>Occupy this land?</p>
           <button type="button" onClick={() => occupyTile(tileCoords.x, tileCoords.y)}>
             Yes
           </button>
         </div>
       ) : (
         <div>
-          <p>Login MetaMask to occupy this tile</p>
+          <p>Login MetaMask to occupy this land</p>
           <button type="button" onClick={loginMetaMask}>Login MetaMask</button>
         </div>
       )}

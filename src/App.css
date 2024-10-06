@@ -1,8 +1,8 @@
-
 .message-card {
   font-family: 'Arial', sans-serif;
   line-height: 1.5;
   transition: transform 0.2s ease-in-out;
+  text-align: center; /* Center-align text */
 }
 
 .message-card button {
@@ -18,5 +18,7 @@
 .message-card button:hover {
   background-color: #0056b3;
 }
+
+
 
 
