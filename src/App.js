@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Phaser from 'phaser';
 import grassImage from './assets/grass.png';
 import whiteflagImage from './assets/whiteFlag.png';
@@ -241,6 +241,7 @@ function App() {
         await tx.wait();
 
         await fetchAllOccupiedTiles();
+        await checkIfAccountOccupiedTile();
         setTileCoords((prev) => ({ ...prev, occupied: true }));
       }
     } catch (error) {
@@ -252,25 +253,24 @@ function App() {
 
 
 
-  useEffect(() => {
-    const checkIfAccountOccupiedTile = async () => {
-      if (metaMaskAccount) {
-        const contract = await getContract();
-        const hasTile = await contract.hasOccupiedTile(metaMaskAccount);
-    
-        if (hasTile) {
-          // Fetch the coordinates of the occupied tile
-          const coords = await contract.getOccupiedTileByAddress(metaMaskAccount);
-          const [x, y] = coords.map(coord => Number(coord)); // Convert BigInt to regular numbers
-          setTileCoords({ x: x + 1, y: y + 1, occupied: true });
-          updateTileImage(x, y); // Update the tile image to skyflag
-        }
+  const checkIfAccountOccupiedTile = useCallback(async () => {
+    if (metaMaskAccount) {
+      const contract = await getContract();
+      const hasTile = await contract.hasOccupiedTile(metaMaskAccount);
+
+      if (hasTile) {
+        // Fetch the coordinates of the occupied tile
+        const coords = await contract.getOccupiedTileByAddress(metaMaskAccount);
+        const [x, y] = coords.map(coord => Number(coord)); // Convert BigInt to regular numbers
+        setTileCoords({ x: x + 1, y: y + 1, occupied: true });
+        updateTileImage(x, y); // Update the tile image to skyflag
       }
-    };
-    
-  
+    }
+  }, [metaMaskAccount]); // Now it depends only on metaMaskAccount
+
+  useEffect(() => {
     checkIfAccountOccupiedTile();
-  }, [metaMaskAccount]);
+  }, [metaMaskAccount, checkIfAccountOccupiedTile]);
 
   
 
