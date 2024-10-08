@@ -17,6 +17,7 @@ function App() {
   const mapSize = 20;
   const [loading, setLoading] = useState(true); // New state for loading
   const [metaMaskAccount, setMetaMaskAccount] = useState(null);
+  const [referrer, setReferrer] = useState('');
 
 
   useEffect(() => {
@@ -149,7 +150,13 @@ function App() {
         }
       }
     }
-  };
+  }
+
+
+  useEffect(() => {
+  
+  updateTileMap();
+  }, [metaMaskAccount]);
 
   const fetchAllOccupiedTiles = async () => {
     try {
@@ -220,29 +227,24 @@ function App() {
   const occupyTile = async (x, y) => {
     setLoading(true);
     try {
-
       const contract = await getContract();
       const alreadyHasTile = await contract.hasOccupiedTile(metaMaskAccount);
 
-
       if (alreadyHasTile) {
-        showWarning(); // Show the warning toast
+        showWarning();
       } else {
-
         const contractSigner = await getSignerContract();
-        const tx = await contractSigner.occupyTile(x - 1, y - 1);
+
+        // Pass the referrer to the occupyTile function in the smart contract
+        const referrerAddress = referrer || '0x0000000000000000000000000000000000000000'; // Default to address(0) if no referrer
+        const tx = await contractSigner.occupyTile(x - 1, y - 1, referrerAddress);
         await tx.wait();
 
         await fetchAllOccupiedTiles();
-
         setTileCoords((prev) => ({ ...prev, occupied: true }));
       }
-
-
-
-
     } catch (error) {
-        console.error('Error occupying tile:', error);
+      console.error('Error occupying tile:', error);
     } finally {
       setLoading(false);
     }
@@ -560,6 +562,18 @@ function App() {
       {isMetaMaskConnected ? (
         <div>
           <p>Occupy this land?</p>
+
+          <div className="input-container">
+                  <input
+                    type="text"
+                    placeholder="Enter referrer address (optional)"
+                    value={referrer}
+                    onChange={(e) => setReferrer(e.target.value)}
+                    className="fancy-input" // Applying the fancy style
+                  />
+                </div>
+
+
           <button type="button" onClick={() => occupyTile(tileCoords.x, tileCoords.y)}>
             Yes
           </button>

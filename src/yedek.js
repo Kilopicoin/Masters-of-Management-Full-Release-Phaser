@@ -17,6 +17,7 @@ function App() {
   const mapSize = 20;
   const [loading, setLoading] = useState(true); // New state for loading
   const [metaMaskAccount, setMetaMaskAccount] = useState(null);
+  const [referrer, setReferrer] = useState('');
 
 
   useEffect(() => {
@@ -149,7 +150,13 @@ function App() {
         }
       }
     }
-  };
+  }
+
+
+  useEffect(() => {
+  
+  updateTileMap();
+  }, [metaMaskAccount]);
 
   const fetchAllOccupiedTiles = async () => {
     try {
@@ -220,33 +227,81 @@ function App() {
   const occupyTile = async (x, y) => {
     setLoading(true);
     try {
-
       const contract = await getContract();
       const alreadyHasTile = await contract.hasOccupiedTile(metaMaskAccount);
 
-
       if (alreadyHasTile) {
-        showWarning(); // Show the warning toast
+        showWarning();
       } else {
-
         const contractSigner = await getSignerContract();
-        const tx = await contractSigner.occupyTile(x - 1, y - 1);
+
+        // Pass the referrer to the occupyTile function in the smart contract
+        const referrerAddress = referrer || '0x0000000000000000000000000000000000000000'; // Default to address(0) if no referrer
+        const tx = await contractSigner.occupyTile(x - 1, y - 1, referrerAddress);
         await tx.wait();
 
         await fetchAllOccupiedTiles();
-
         setTileCoords((prev) => ({ ...prev, occupied: true }));
       }
-
-
-
-
     } catch (error) {
-        console.error('Error occupying tile:', error);
+      console.error('Error occupying tile:', error);
     } finally {
       setLoading(false);
     }
   };
+
+
+
+  useEffect(() => {
+    const checkIfAccountOccupiedTile = async () => {
+      if (metaMaskAccount) {
+        const contract = await getContract();
+        const hasTile = await contract.hasOccupiedTile(metaMaskAccount);
+    
+        if (hasTile) {
+          // Fetch the coordinates of the occupied tile
+          const coords = await contract.getOccupiedTileByAddress(metaMaskAccount);
+          const [x, y] = coords.map(coord => Number(coord)); // Convert BigInt to regular numbers
+          setTileCoords({ x: x + 1, y: y + 1, occupied: true });
+          updateTileImage(x, y); // Update the tile image to skyflag
+        }
+      }
+    };
+    
+  
+    checkIfAccountOccupiedTile();
+  }, [metaMaskAccount]);
+
+  
+
+  const updateTileImage = (x, y) => {
+    if (gameRef.current) {
+      const scene = gameRef.current.scene.keys.default;
+      const tileWidth = 386;
+      const visibleTileHeight = 193;
+      const overlap = visibleTileHeight / 2;
+      const halfTileWidth = tileWidth / 2;
+      const offsetX = window.innerWidth / 2;
+  
+      function tileToWorldPosition(x, y) {
+        const worldX = (x - y) * halfTileWidth + offsetX;
+        const worldY = (x + y) * overlap;
+        return { worldX, worldY };
+      }
+  
+      const { worldX, worldY } = tileToWorldPosition(x, y);
+  
+      // Remove the current whiteflag image (if any) and add the skyflag image
+      const currentFlag = scene.children.getByName(`flag-${x}-${y}`);
+      if (currentFlag) {
+        currentFlag.destroy(); // Remove the whiteflag image
+      }
+  
+      const skyFlag = scene.add.image(worldX, worldY, 'skyflag').setDepth(worldY + 1);
+      skyFlag.setName(`flag-${x}-${y}`); // Name it so it can be referenced later
+    }
+  };
+  
   
 
   useEffect(() => {
@@ -507,6 +562,18 @@ function App() {
       {isMetaMaskConnected ? (
         <div>
           <p>Occupy this land?</p>
+
+          <div className="input-container">
+                  <input
+                    type="text"
+                    placeholder="Enter referrer address (optional)"
+                    value={referrer}
+                    onChange={(e) => setReferrer(e.target.value)}
+                    className="fancy-input" // Applying the fancy style
+                  />
+                </div>
+
+
           <button type="button" onClick={() => occupyTile(tileCoords.x, tileCoords.y)}>
             Yes
           </button>
