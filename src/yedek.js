@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Phaser from 'phaser';
 import grassImage from './assets/grass.png';
 import whiteflagImage from './assets/whiteFlag.png';
+import skyflagImage from './assets/skyFlag.png';
 import getContract, { getSignerContract } from './contract';
 import { Circles } from 'react-loader-spinner';
 import './App.css';
@@ -289,6 +290,7 @@ function App() {
     function preload() {
       this.load.image('grass', grassImage);
       this.load.image('whiteflag', whiteflagImage);
+      this.load.image('skyflag', skyflagImage);
     }
 
     async function create() {

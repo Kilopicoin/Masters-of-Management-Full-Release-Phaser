@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Phaser from 'phaser';
 import grassImage from './assets/grass.png';
 import whiteflagImage from './assets/whiteFlag.png';
+import skyflagImage from './assets/skyFlag.png';
 import getContract, { getSignerContract } from './contract';
 import { Circles } from 'react-loader-spinner';
 import './App.css';
@@ -246,6 +247,59 @@ function App() {
       setLoading(false);
     }
   };
+
+
+
+  useEffect(() => {
+    const checkIfAccountOccupiedTile = async () => {
+      if (metaMaskAccount) {
+        const contract = await getContract();
+        const hasTile = await contract.hasOccupiedTile(metaMaskAccount);
+    
+        if (hasTile) {
+          // Fetch the coordinates of the occupied tile
+          const coords = await contract.getOccupiedTileByAddress(metaMaskAccount);
+          const [x, y] = coords.map(coord => Number(coord)); // Convert BigInt to regular numbers
+          setTileCoords({ x: x + 1, y: y + 1, occupied: true });
+          updateTileImage(x, y); // Update the tile image to skyflag
+        }
+      }
+    };
+    
+  
+    checkIfAccountOccupiedTile();
+  }, [metaMaskAccount]);
+
+  
+
+  const updateTileImage = (x, y) => {
+    if (gameRef.current) {
+      const scene = gameRef.current.scene.keys.default;
+      const tileWidth = 386;
+      const visibleTileHeight = 193;
+      const overlap = visibleTileHeight / 2;
+      const halfTileWidth = tileWidth / 2;
+      const offsetX = window.innerWidth / 2;
+  
+      function tileToWorldPosition(x, y) {
+        const worldX = (x - y) * halfTileWidth + offsetX;
+        const worldY = (x + y) * overlap;
+        return { worldX, worldY };
+      }
+  
+      const { worldX, worldY } = tileToWorldPosition(x, y);
+  
+      // Remove the current whiteflag image (if any) and add the skyflag image
+      const currentFlag = scene.children.getByName(`flag-${x}-${y}`);
+      if (currentFlag) {
+        currentFlag.destroy(); // Remove the whiteflag image
+      }
+  
+      const skyFlag = scene.add.image(worldX, worldY, 'skyflag').setDepth(worldY + 1);
+      skyFlag.setName(`flag-${x}-${y}`); // Name it so it can be referenced later
+    }
+  };
+  
   
 
   useEffect(() => {
@@ -289,6 +343,7 @@ function App() {
     function preload() {
       this.load.image('grass', grassImage);
       this.load.image('whiteflag', whiteflagImage);
+      this.load.image('skyflag', skyflagImage);
     }
 
     async function create() {
