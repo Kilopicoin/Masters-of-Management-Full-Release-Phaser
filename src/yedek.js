@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Phaser from 'phaser';
 import grassImage from './assets/grass.png';
 import whiteflagImage from './assets/whiteFlag.png';
@@ -18,9 +18,22 @@ function App() {
   const [loading, setLoading] = useState(true); // New state for loading
   const [metaMaskAccount, setMetaMaskAccount] = useState(null);
   const [referrer, setReferrer] = useState('');
+  const [referralLink, setReferralLink] = useState('');
+
+  const getReferralFromUrl = () => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('ref');
+  };
 
 
   useEffect(() => {
+
+    const referralFromUrl = getReferralFromUrl();
+    if (referralFromUrl) {
+      setReferrer(referralFromUrl); // Set the referrer state from the URL
+    }
+
+
     const checkMetaMaskConnection = async () => {
       if (window.ethereum) {
         try {
@@ -241,6 +254,7 @@ function App() {
         await tx.wait();
 
         await fetchAllOccupiedTiles();
+        await checkIfAccountOccupiedTile();
         setTileCoords((prev) => ({ ...prev, occupied: true }));
       }
     } catch (error) {
@@ -252,25 +266,24 @@ function App() {
 
 
 
-  useEffect(() => {
-    const checkIfAccountOccupiedTile = async () => {
-      if (metaMaskAccount) {
-        const contract = await getContract();
-        const hasTile = await contract.hasOccupiedTile(metaMaskAccount);
-    
-        if (hasTile) {
-          // Fetch the coordinates of the occupied tile
-          const coords = await contract.getOccupiedTileByAddress(metaMaskAccount);
-          const [x, y] = coords.map(coord => Number(coord)); // Convert BigInt to regular numbers
-          setTileCoords({ x: x + 1, y: y + 1, occupied: true });
-          updateTileImage(x, y); // Update the tile image to skyflag
-        }
+  const checkIfAccountOccupiedTile = useCallback(async () => {
+    if (metaMaskAccount) {
+      const contract = await getContract();
+      const hasTile = await contract.hasOccupiedTile(metaMaskAccount);
+
+      if (hasTile) {
+        // Fetch the coordinates of the occupied tile
+        const coords = await contract.getOccupiedTileByAddress(metaMaskAccount);
+        const [x, y] = coords.map(coord => Number(coord)); // Convert BigInt to regular numbers
+        setTileCoords({ x: x + 1, y: y + 1, occupied: true });
+        updateTileImage(x, y); // Update the tile image to skyflag
       }
-    };
-    
-  
+    }
+  }, [metaMaskAccount]); // Now it depends only on metaMaskAccount
+
+  useEffect(() => {
     checkIfAccountOccupiedTile();
-  }, [metaMaskAccount]);
+  }, [metaMaskAccount, checkIfAccountOccupiedTile]);
 
   
 
@@ -301,6 +314,19 @@ function App() {
       skyFlag.setName(`flag-${x}-${y}`); // Name it so it can be referenced later
     }
   };
+
+  const generateReferralLink = () => {
+    const link = `${window.location.origin}/?ref=${metaMaskAccount}`;
+    setReferralLink(link);
+    toast.success("Referral link created successfully!");
+  };
+
+  const copyToClipboard = () => {
+    if (referralLink) {
+      navigator.clipboard.writeText(referralLink);
+      toast.info("Referral link copied to clipboard!");
+    }
+  };
   
   
 
@@ -313,9 +339,14 @@ function App() {
     document.documentElement.style.overflow = 'hidden';
 
     const disableContextMenu = (e) => {
+      // Allow the context menu only for the referral input
+      if (e.target.tagName === 'INPUT' && e.target.type === 'text') {
+        return;
+      }
       e.preventDefault();
     };
     window.addEventListener('contextmenu', disableContextMenu);
+    
 
     const config = {
       type: Phaser.AUTO,
@@ -347,6 +378,8 @@ function App() {
       this.load.image('whiteflag', whiteflagImage);
       this.load.image('skyflag', skyflagImage);
     }
+
+    
 
     async function create() {
       const tileWidth = 386;
@@ -530,9 +563,32 @@ function App() {
 ><strong>Info Box</strong>
 
 {metaMaskAccount ? (
+<>
           <p>
             <strong>Logged in:</strong> {`${metaMaskAccount.slice(0, 4)}...${metaMaskAccount.slice(-3)}`} {/* Display logged in address */}
           </p>
+<button onClick={generateReferralLink} style={{ marginBottom: '10px' }}>
+              Create Referral Link
+            </button>
+
+            {/* Display the referral link if created */}
+            {referralLink && (
+              <p>
+                <strong>Referral Link:</strong>
+                <br />
+                <span
+                  style={{ cursor: 'pointer', color: '#007bff', textDecoration: 'underline', fontSize: '9px' }}
+                  onClick={copyToClipboard}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    copyToClipboard();
+                  }}
+                >
+                  {referralLink}
+                </span>
+              </p>
+            )}
+          </>
         ) : (
           <p>
           <button type="button" onClick={loginMetaMask}>Connect</button>
