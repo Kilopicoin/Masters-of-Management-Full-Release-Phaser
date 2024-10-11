@@ -3,6 +3,7 @@ import Phaser from 'phaser';
 import grassImage from './assets/grass.png';
 import whiteflagImage from './assets/whiteFlag.png';
 import skyflagImage from './assets/skyFlag.png';
+import largemapImage from './assets/file.png';
 import getContract, { getSignerContract } from './contract';
 import { Circles } from 'react-loader-spinner';
 import './App.css';
@@ -377,11 +378,18 @@ function App() {
       this.load.image('grass', grassImage);
       this.load.image('whiteflag', whiteflagImage);
       this.load.image('skyflag', skyflagImage);
+      this.load.image('largemap', largemapImage);
+      
     }
 
     
 
     async function create() {
+
+      const mapImage = this.add.image((window.innerWidth / 2) - 80, (window.innerHeight * 2) + 190, 'largemap');
+    mapImage.setDisplaySize(8400, 4400); // Set the map image size
+
+
       const tileWidth = 386;
       const visibleTileHeight = 193;
       const overlap = visibleTileHeight / 2;
@@ -416,10 +424,14 @@ function App() {
         for (let x = 0; x < mapSize; x++) {
           const { worldX, worldY } = tileToWorldPosition(x, y);
 
-          const tile = this.add.image(worldX, worldY, 'grass').setDepth(worldY);
-          tile.setPipeline('Light2D');
+          this.add.image(worldX, worldY, 'grass').setDepth(worldY);
+          
+          // const tile = this.add.image(worldX, worldY, 'grass').setDepth(worldY);
+          // tile.setPipeline('Light2D');
         }
       }
+
+      
 
       this.cameras.main.setZoom(zoomLevel);
       const mapCenterY = totalMapHeight / 2;
@@ -471,9 +483,9 @@ function App() {
 
       this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
         if (deltaY > 0) {
-          zoomLevel = Phaser.Math.Clamp(zoomLevel - 0.04, 0.24, 1);
+          zoomLevel = Phaser.Math.Clamp(zoomLevel - 0.04, 0.24, 0.4);
         } else {
-          zoomLevel = Phaser.Math.Clamp(zoomLevel + 0.04, 0.24, 1);
+          zoomLevel = Phaser.Math.Clamp(zoomLevel + 0.04, 0.24, 0.4);
         }
         this.cameras.main.setZoom(zoomLevel);
       });
