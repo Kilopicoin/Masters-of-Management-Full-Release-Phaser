@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Phaser from 'phaser';
 import grassImage from './assets/grass.png';
+import oceanImage from './assets/ocean.png';
 import whiteflagImage from './assets/whiteFlag.png';
 import skyflagImage from './assets/skyFlag.png';
 import largemapImage from './assets/file.png';
@@ -376,6 +377,7 @@ function App() {
 
     function preload() {
       this.load.image('grass', grassImage);
+      this.load.image('ocean', oceanImage);
       this.load.image('whiteflag', whiteflagImage);
       this.load.image('skyflag', skyflagImage);
       this.load.image('largemap', largemapImage);
@@ -386,8 +388,12 @@ function App() {
 
     async function create() {
 
-      const mapImage = this.add.image((window.innerWidth / 2) - 80, (window.innerHeight * 2) + 190, 'largemap');
-    mapImage.setDisplaySize(8400, 4400); // Set the map image size
+
+       // const oceanImage = this.add.image((window.innerWidth / 2) - 80, (window.innerHeight * 2) + 190, 'ocean');
+        //  oceanImage.setDisplaySize(19200, 10800); // Set the map image size
+
+       const mapImage = this.add.image((window.innerWidth / 2) , (window.innerHeight * 2) + 150, 'largemap');
+     mapImage.setDisplaySize(8000, 4600); // Set the map image size
 
 
       const tileWidth = 386;
@@ -420,6 +426,13 @@ function App() {
         return { x, y };
       }
 
+
+
+
+      
+
+
+
       for (let y = 0; y < mapSize; y++) {
         for (let x = 0; x < mapSize; x++) {
           const { worldX, worldY } = tileToWorldPosition(x, y);
@@ -430,6 +443,19 @@ function App() {
           // tile.setPipeline('Light2D');
         }
       }
+
+
+
+
+     
+
+          
+          
+
+
+     
+
+
 
       
 
