@@ -10,6 +10,11 @@ import { Circles } from 'react-loader-spinner';
 import './App.css';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import backgroundMusicFile from './assets/background.mp3';
+import playIcon from './assets/play-icon.png';
+import stopIcon from './assets/stop-icon.png';
+
+
 
 function App() {
   const gameRef = useRef(null);
@@ -21,11 +26,14 @@ function App() {
   const [metaMaskAccount, setMetaMaskAccount] = useState(null);
   const [referrer, setReferrer] = useState('');
   const [referralLink, setReferralLink] = useState('');
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const musicRef = useRef(null);
 
   const getReferralFromUrl = () => {
     const params = new URLSearchParams(window.location.search);
     return params.get('ref');
   };
+
 
 
   useEffect(() => {
@@ -381,6 +389,7 @@ function App() {
       this.load.image('whiteflag', whiteflagImage);
       this.load.image('skyflag', skyflagImage);
       this.load.image('largemap', largemapImage);
+      this.load.audio('backgroundMusic', backgroundMusicFile);
       
     }
 
@@ -418,6 +427,12 @@ function App() {
         const worldY = (x + y) * overlap;
         return { worldX, worldY };
       }
+
+
+      musicRef.current = this.sound.add('backgroundMusic', {
+        loop: true,
+        volume: 0.5,
+      });
 
       function worldToTilePosition(worldX, worldY) {
         const adjustedWorldX = worldX - offsetX;
@@ -532,6 +547,21 @@ function App() {
     };
   }, []);
 
+
+
+  const toggleMusic = () => {
+    if (musicRef.current) {
+      if (isMusicPlaying) {
+        musicRef.current.pause();
+      } else {
+        musicRef.current.play();
+      }
+      setIsMusicPlaying(!isMusicPlaying);
+    }
+  };
+
+
+
   return (
     <div
       style={{
@@ -583,7 +613,32 @@ function App() {
       <div
         id="phaser-container"
         style={{ width: '100%', height: '100%', position: 'relative', zIndex: 0 }}
-      ></div>
+      >
+      
+      <button
+  onClick={toggleMusic}
+  style={{
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: '10px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    zIndex: 101,
+  }}
+>
+  <img
+    src={isMusicPlaying ? stopIcon : playIcon}
+    alt={isMusicPlaying ? 'Stop Music' : 'Play Music'}
+    style={{ width: '24px', height: '24px' }}
+  />
+</button>
+
+
+
+      
+      </div>
       <div
   className="message-card"
   style={{
