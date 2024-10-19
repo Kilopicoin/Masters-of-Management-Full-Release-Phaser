@@ -393,6 +393,45 @@ function App() {
       
     }
 
+    const getTileBonus = async (x, y) => {
+      try {
+        const contract = await getContract();
+        const bonus = await contract.bonuses(x, y); // Fetch the bonus for the tile (x, y)
+        return parseInt(bonus);
+      } catch (error) {
+        console.error('Error fetching bonus:', error);
+        return null; // Handle error by returning null or some default value
+      }
+    };
+
+
+    const handleRightClick = async (x, y) => {
+      const bonus = await getTileBonus(x, y);
+    
+      let bonusType = '';
+      switch (bonus) {
+        case 1:
+          bonusType = 'Food';
+          break;
+        case 2:
+          bonusType = 'Wood';
+          break;
+        case 3:
+          bonusType = 'Stone';
+          break;
+        case 4:
+          bonusType = 'Iron';
+          break;
+        default:
+          bonusType = 'None';
+      }
+    
+      if (x + 1 >= 1 && x + 1 <= 20 && y + 1 >= 1 && y + 1 <= 20) {
+        setTileCoords({ x: x + 1, y: y + 1, occupied: tilesRef.current[x][y], bonusType });
+      } else {
+        setTileCoords({ x: null, y: null, occupied: null, bonusType });
+      }
+    };
     
 
     async function create() {
@@ -486,7 +525,7 @@ function App() {
 
       this.input.on('pointerdown', function (pointer) {
         pointer.event.preventDefault();
-
+      
         if (pointer.button === 0) {
           isDragging = true;
           dragStartX = pointer.x;
@@ -497,14 +536,11 @@ function App() {
           const worldX = pointer.worldX;
           const worldY = pointer.worldY;
           const { x, y } = worldToTilePosition(worldX, worldY);
-
-          if (x + 1 >= 1 && x + 1 <= 20 && y + 1 >= 1 && y + 1 <= 20) {
-            setTileCoords({ x: x + 1, y: y + 1, occupied: tilesRef.current[x][y] });
-          } else {
-            setTileCoords({ x: null, y: null, occupied: null });
-          }
+      
+          handleRightClick(x, y);  // Call the async function to fetch the bonus
         }
       }, this);
+      
 
       this.input.on('pointermove', function (pointer) {
         if (isDragging) {
@@ -693,6 +729,11 @@ function App() {
         <strong>Land Coordinates</strong>:<br />
         X: {tileCoords.x}, Y: {tileCoords.y}
       </p>
+      {tileCoords.bonusType && (
+      <p>
+        <strong>Bonus</strong>: {tileCoords.bonusType}
+      </p>
+    )}
       {tileCoords.occupied !== null && (
         <p>
           <strong>Occupied</strong>: {tileCoords.occupied ? 'Yes' : 'No'}
