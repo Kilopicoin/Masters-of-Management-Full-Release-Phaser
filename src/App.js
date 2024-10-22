@@ -798,15 +798,26 @@ function App() {
 
 
 
-{tileCoords.occupied && 
- getAddress(metaMaskAccount) === tileCoords.occupant && (
-   <div>
-     <p>This tile is {tileCoords.isOnSale ? 'on sale' : 'not on sale'}.</p>
-     <button onClick={() => setTileForSale(tileCoords.x, tileCoords.y, !tileCoords.isOnSale)}>
-       {tileCoords.isOnSale ? 'Remove from Sale' : 'Put on Sale'}
-     </button>
-   </div>
+{tileCoords.occupied && (
+  metaMaskAccount ? (
+    getAddress(metaMaskAccount) === tileCoords.occupant && (
+      <div>
+        <p>This tile is {tileCoords.isOnSale ? 'on sale' : 'not on sale'}.</p>
+        <button onClick={() => setTileForSale(tileCoords.x, tileCoords.y, !tileCoords.isOnSale)}>
+          {tileCoords.isOnSale ? 'Remove from Sale' : 'Put on Sale'}
+        </button>
+      </div>
+    )
+  ) : (
+    <div>
+      <p>Login MetaMask to manage or buy this land.</p>
+      <button type="button" onClick={loginMetaMask}>Login MetaMask</button>
+    </div>
+  )
 )}
+
+
+
 
 
 
