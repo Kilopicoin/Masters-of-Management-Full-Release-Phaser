@@ -29,6 +29,9 @@ function App() {
   const [referralLink, setReferralLink] = useState('');
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const musicRef = useRef(null);
+  const [referralNetwork, setReferralNetwork] = useState(null); // To store referrer and referrals
+  const [showReferralNetwork, setShowReferralNetwork] = useState(false); // To show/hide the referral network info
+
 
   
 
@@ -136,6 +139,18 @@ function App() {
     }
   };
 
+  const fetchReferralNetwork = async () => {
+    if (metaMaskAccount) {
+      try {
+        const contract = await getContract();
+        const [referrer, referrals] = await contract.getReferralNetwork(metaMaskAccount); // Fetch referral data
+        setReferralNetwork({ referrer, referrals });
+        setShowReferralNetwork(true); // Show the referral info card
+      } catch (error) {
+        console.error('Error fetching referral network:', error);
+      }
+    }
+  };
   
 
   useEffect(() => {
@@ -805,7 +820,10 @@ function App() {
         <p>This tile is {tileCoords.isOnSale ? 'on sale' : 'not on sale'}.</p>
         <button onClick={() => setTileForSale(tileCoords.x, tileCoords.y, !tileCoords.isOnSale)}>
           {tileCoords.isOnSale ? 'Remove from Sale' : 'Put on Sale'}
-        </button>
+        </button> <p>
+        <button onClick={fetchReferralNetwork} style={{ marginTop: '10px' }}>
+    My Referral Network
+  </button></p>
       </div>
     )
   ) : (
@@ -823,7 +841,7 @@ function App() {
 
            
 
-            {tileCoords.isOnSale && tileCoords.occupied && metaMaskAccount !== tileCoords.occupant && (
+            {tileCoords.isOnSale && tileCoords.occupied && getAddress(metaMaskAccount) !== tileCoords.occupant && (
               <div>
                 <p>This tile is on sale. Do you want to buy it?</p>
                 <button onClick={() => buyTile(tileCoords.x, tileCoords.y)}>Buy Tile</button>
@@ -833,6 +851,39 @@ function App() {
 
     </div>
   )}
+
+{showReferralNetwork && referralNetwork && (
+  <div
+    style={{
+      position: 'absolute',
+      top: '100px',
+      left: '20px',
+      padding: '15px',
+      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      borderRadius: '10px',
+      boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
+      color: '#333',
+      zIndex: 100,
+      width: '250px',
+    }}
+  >
+    <strong>Referral Network</strong>
+    <p><strong>Referrer:</strong> {referralNetwork.referrer ? `${referralNetwork.referrer.slice(0, 6)}...${referralNetwork.referrer.slice(-4)}` : 'None'}</p>
+    <p><strong>Referrals:</strong></p>
+    <ul>
+      {referralNetwork.referrals.length > 0 ? (
+        referralNetwork.referrals.map((referral, index) => (
+          <li key={index}>{`${referral.slice(0, 6)}...${referral.slice(-4)}`}</li>
+        ))
+      ) : (
+        <p>No referrals</p>
+      )}
+    </ul>
+    <button onClick={() => setShowReferralNetwork(false)} style={{ marginTop: '10px' }}>Close</button>
+  </div>
+)}
+
+
   {tileCoords.x !== null && tileCoords.y !== null && !tileCoords.occupied && (
     <div>
       {isMetaMaskConnected ? (

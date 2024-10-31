@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Phaser from 'phaser';
 import grassImage from './assets/grass.png';
+import oceanImage from './assets/ocean.png';
 import whiteflagImage from './assets/whiteFlag.png';
 import skyflagImage from './assets/skyFlag.png';
 import largemapImage from './assets/file.png';
@@ -9,6 +10,12 @@ import { Circles } from 'react-loader-spinner';
 import './App.css';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import backgroundMusicFile from './assets/background.mp3';
+import playIcon from './assets/play-icon.png';
+import stopIcon from './assets/stop-icon.png';
+import { getAddress } from 'ethers';
+
+
 
 function App() {
   const gameRef = useRef(null);
@@ -20,11 +27,49 @@ function App() {
   const [metaMaskAccount, setMetaMaskAccount] = useState(null);
   const [referrer, setReferrer] = useState('');
   const [referralLink, setReferralLink] = useState('');
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const musicRef = useRef(null);
+
+  
+
+  const setTileForSale = async (x, y, isOnSale) => {
+    try {
+      const contractSigner = await getSignerContract();
+      const tx = await contractSigner.setTileOnSale(x - 1, y - 1, isOnSale);
+      await tx.wait();
+
+      toast.success(`Tile is now ${isOnSale ? 'on' : 'off'} sale`);
+
+    } catch (error) {
+      console.error('Error setting tile sale status:', error);
+      toast.error('Failed to set tile on sale');
+    }
+  };
+
+  const buyTile = async (x, y) => {
+    setLoading(true);
+    try {
+      const contractSigner = await getSignerContract();
+      const tx = await contractSigner.buyTile(x - 1, y - 1 ); // Set tile price here
+      await tx.wait();
+
+      toast.success('Tile purchased successfully!');
+      setTileCoords((prev) => ({ ...prev, occupied: true, occupant: metaMaskAccount }));
+    } catch (error) {
+      console.error('Error buying tile:', error);
+      toast.error('Failed to purchase tile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
 
   const getReferralFromUrl = () => {
     const params = new URLSearchParams(window.location.search);
     return params.get('ref');
   };
+
 
 
   useEffect(() => {
@@ -145,7 +190,7 @@ function App() {
 
           if (tilesRef.current.length > 0 && tilesRef.current[x][y]) {
             const flag = scene.add.image(worldX, worldY, 'whiteflag').setDepth(worldY + 1);
-            
+
             // Enable pixel-perfect hit detection
             flag.setInteractive({
               pixelPerfect: true, // Only detect opaque areas
@@ -155,9 +200,15 @@ function App() {
             // Add right-click event listener to the white flag
             flag.on('pointerdown', async (pointer) => {
               if (pointer.rightButtonDown()) {
+                pointer.flagClicked = true;
                 const contract = await getContract();
                 const occupant = await contract.getTileOccupant(x, y); // Fetch the occupant address
-                setTileCoords({ x: x + 1, y: y + 1, occupied: true, occupant }); // Update the state with occupant info
+
+
+      const tile = await contract.tiles(x, y);
+
+
+                setTileCoords({ x: x + 1, y: y + 1, occupied: true, occupant, isOnSale: tile.isOnSale, }); // Update the state with occupant info
               }
             });
           }
@@ -376,18 +427,63 @@ function App() {
 
     function preload() {
       this.load.image('grass', grassImage);
+      this.load.image('ocean', oceanImage);
       this.load.image('whiteflag', whiteflagImage);
       this.load.image('skyflag', skyflagImage);
       this.load.image('largemap', largemapImage);
+      this.load.audio('backgroundMusic', backgroundMusicFile);
       
     }
 
+    const getTileBonus = async (x, y) => {
+      try {
+        const contract = await getContract();
+        const bonus = await contract.bonuses(x, y); // Fetch the bonus for the tile (x, y)
+        return parseInt(bonus);
+      } catch (error) {
+        console.error('Error fetching bonus:', error);
+        return null; // Handle error by returning null or some default value
+      }
+    };
+
+
+    const handleRightClick = async (x, y) => {
+      const bonus = await getTileBonus(x, y);
+      
+      let bonusType = '';
+      switch (bonus) {
+        case 1:
+          bonusType = 'Food';
+          break;
+        case 2:
+          bonusType = 'Wood';
+          break;
+        case 3:
+          bonusType = 'Stone';
+          break;
+        case 4:
+          bonusType = 'Iron';
+          break;
+        default:
+          bonusType = 'None';
+      }
+    
+      if (x + 1 >= 1 && x + 1 <= 20 && y + 1 >= 1 && y + 1 <= 20) {
+        setTileCoords({ x: x + 1, y: y + 1, occupied: tilesRef.current[x][y], bonusType });
+      } else {
+        setTileCoords({ x: null, y: null, occupied: null, bonusType });
+      }
+    };
     
 
     async function create() {
 
-      const mapImage = this.add.image((window.innerWidth / 2) - 80, (window.innerHeight * 2) + 190, 'largemap');
-    mapImage.setDisplaySize(8400, 4400); // Set the map image size
+
+       // const oceanImage = this.add.image((window.innerWidth / 2) - 80, (window.innerHeight * 2) + 190, 'ocean');
+        //  oceanImage.setDisplaySize(19200, 10800); // Set the map image size
+
+       const mapImage = this.add.image((window.innerWidth / 2) , (window.innerHeight * 2) + 150, 'largemap');
+      mapImage.setDisplaySize(8000, 4600); // Set the map image size
 
 
       const tileWidth = 386;
@@ -413,12 +509,25 @@ function App() {
         return { worldX, worldY };
       }
 
+
+      musicRef.current = this.sound.add('backgroundMusic', {
+        loop: true,
+        volume: 0.5,
+      });
+
       function worldToTilePosition(worldX, worldY) {
         const adjustedWorldX = worldX - offsetX;
         const x = Math.floor((worldY / overlap + adjustedWorldX / halfTileWidth) / 2);
         const y = Math.floor((worldY / overlap - adjustedWorldX / halfTileWidth) / 2);
         return { x, y };
       }
+
+
+
+
+      
+
+
 
       for (let y = 0; y < mapSize; y++) {
         for (let x = 0; x < mapSize; x++) {
@@ -430,6 +539,19 @@ function App() {
           // tile.setPipeline('Light2D');
         }
       }
+
+
+
+
+     
+
+          
+          
+
+
+     
+
+
 
       
 
@@ -453,17 +575,22 @@ function App() {
           cameraStartX = this.cameras.main.scrollX;
           cameraStartY = this.cameras.main.scrollY;
         } else if (pointer.button === 2) {
+
+          if (pointer.flagClicked) {
+            // Reset the flag and skip global handling since it was already handled by the flag
+            pointer.flagClicked = false;
+            return;
+          }
+
+
           const worldX = pointer.worldX;
           const worldY = pointer.worldY;
           const { x, y } = worldToTilePosition(worldX, worldY);
-
-          if (x + 1 >= 1 && x + 1 <= 20 && y + 1 >= 1 && y + 1 <= 20) {
-            setTileCoords({ x: x + 1, y: y + 1, occupied: tilesRef.current[x][y] });
-          } else {
-            setTileCoords({ x: null, y: null, occupied: null });
-          }
+      
+          handleRightClick(x, y);  // Call the async function to fetch the bonus
         }
       }, this);
+      
 
       this.input.on('pointermove', function (pointer) {
         if (isDragging) {
@@ -505,6 +632,21 @@ function App() {
       document.documentElement.style.overflow = '';
     };
   }, []);
+
+
+
+  const toggleMusic = () => {
+    if (musicRef.current) {
+      if (isMusicPlaying) {
+        musicRef.current.pause();
+      } else {
+        musicRef.current.play();
+      }
+      setIsMusicPlaying(!isMusicPlaying);
+    }
+  };
+
+
 
   return (
     <div
@@ -557,7 +699,32 @@ function App() {
       <div
         id="phaser-container"
         style={{ width: '100%', height: '100%', position: 'relative', zIndex: 0 }}
-      ></div>
+      >
+      
+      <button
+  onClick={toggleMusic}
+  style={{
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: '10px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    zIndex: 101,
+  }}
+>
+  <img
+    src={isMusicPlaying ? stopIcon : playIcon}
+    alt={isMusicPlaying ? 'Stop Music' : 'Play Music'}
+    style={{ width: '24px', height: '24px' }}
+  />
+</button>
+
+
+
+      
+      </div>
       <div
   className="message-card"
   style={{
@@ -612,6 +779,11 @@ function App() {
         <strong>Land Coordinates</strong>:<br />
         X: {tileCoords.x}, Y: {tileCoords.y}
       </p>
+      {tileCoords.bonusType && (
+      <p>
+        <strong>Bonus</strong>: {tileCoords.bonusType}
+      </p>
+    )}
       {tileCoords.occupied !== null && (
         <p>
           <strong>Occupied</strong>: {tileCoords.occupied ? 'Yes' : 'No'}
@@ -622,9 +794,47 @@ function App() {
     <strong>Occupant</strong>: 
     {`${tileCoords.occupant.slice(0, 4)}...${tileCoords.occupant.slice(-3)}`} {/* Show first 4 and last 3 characters */}
   </p>
+      )}
+
+
+
+{tileCoords.occupied && (
+  metaMaskAccount ? (
+    getAddress(metaMaskAccount) === tileCoords.occupant && (
+      <div>
+        <p>This tile is {tileCoords.isOnSale ? 'on sale' : 'not on sale'}.</p>
+        <button onClick={() => setTileForSale(tileCoords.x, tileCoords.y, !tileCoords.isOnSale)}>
+          {tileCoords.isOnSale ? 'Remove from Sale' : 'Put on Sale'}
+        </button>
+      </div>
+    )
+  ) : (
+    <div>
+      <p>Login MetaMask to manage or buy this land.</p>
+      <button type="button" onClick={loginMetaMask}>Login MetaMask</button>
+    </div>
+  )
 )}
+
+
+
+
+
+
+           
+
+            {tileCoords.isOnSale && tileCoords.occupied && getAddress(metaMaskAccount) !== tileCoords.occupant && (
+              <div>
+                <p>This tile is on sale. Do you want to buy it?</p>
+                <button onClick={() => buyTile(tileCoords.x, tileCoords.y)}>Buy Tile</button>
+              </div>
+            )}
+
+
     </div>
   )}
+
+  
   {tileCoords.x !== null && tileCoords.y !== null && !tileCoords.occupied && (
     <div>
       {isMetaMaskConnected ? (
