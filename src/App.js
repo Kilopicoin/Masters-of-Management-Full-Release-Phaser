@@ -5,7 +5,8 @@ import oceanImage from './assets/ocean.png';
 import whiteflagImage from './assets/whiteFlag.png';
 import skyflagImage from './assets/skyFlag.png';
 import largemapImage from './assets/file.png';
-import getContract, { getSignerContract } from './contract';
+import getContract, { getSignerContract, contractAddress } from './contract';
+import getTokenContract, { getTokenSignerContract } from './Tokencontract';
 import { Circles } from 'react-loader-spinner';
 import './App.css';
 import { toast, ToastContainer } from 'react-toastify';
@@ -31,6 +32,7 @@ function App() {
   const musicRef = useRef(null);
   const [referralNetwork, setReferralNetwork] = useState(null); // To store referrer and referrals
   const [showReferralNetwork, setShowReferralNetwork] = useState(false); // To show/hide the referral network info
+  const occupationCost = 100000 * 10**6;
 
 
   
@@ -299,10 +301,10 @@ function App() {
   
   
   
-  
-  
-  
-
+  const getLOPBalance = async (account) => {
+    const contract = await getTokenContract();
+    return await contract.balanceOf(account);
+  };
 
   const occupyTile = async (x, y) => {
     setLoading(true);
@@ -313,10 +315,27 @@ function App() {
       if (alreadyHasTile) {
         showWarning();
       } else {
+        // Fetch the user's LOP token balance
+        const lopBalance = await getLOPBalance(metaMaskAccount);
+        
+        if (lopBalance < occupationCost) {
+          toast.warn("Insufficient LOP tokens. You need 100,000 LOP tokens to occupy this land.");
+          return;
+        }
+
+        const TokencontractSigner = await getTokenSignerContract();
+
+        const Allowancetx = await TokencontractSigner.increaseAllowance(
+          contractAddress,
+          occupationCost
+        );
+        await Allowancetx.wait();
+
+
         const contractSigner = await getSignerContract();
 
         // Pass the referrer to the occupyTile function in the smart contract
-        const referrerAddress = referrer || '0x0000000000000000000000000000000000000000'; // Default to address(0) if no referrer
+        const referrerAddress = referrer || '0x0000000000000000000000000000000000000000';
         const tx = await contractSigner.occupyTile(x - 1, y - 1, referrerAddress);
         await tx.wait();
 
@@ -889,7 +908,7 @@ function App() {
       {isMetaMaskConnected ? (
         <div>
           <p>Occupy this land?</p>
-
+          <p>Requires 100,000.00 LOP tokens</p>
           <div className="input-container">
                   <input
                     type="text"

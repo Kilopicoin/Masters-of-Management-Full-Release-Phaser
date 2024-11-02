@@ -1,24 +1,24 @@
 // contract.js
 import { BrowserProvider, Contract, JsonRpcProvider } from 'ethers';
-import contractABI from './contractABI.json'; // Import the ABI JSON file
+import TokencontractABI from './TokencontractABI.json'; // Import the ABI JSON file
 
-export const contractAddress = '0x96d53cdA5d47a541eFED26d7De3ae9C2D0111245';
+const TokencontractAddress = '0x46b60ceBf9D7BA26676122276EC96426F4cee46a';
 const RPC = 'https://api.s0.b.hmny.io';
 
-const getContract = async () => {
+const getTokenContract = async () => {
   const provider = new JsonRpcProvider(RPC);
-  return new Contract(contractAddress, contractABI.abi, provider);
+  return new Contract(TokencontractAddress, TokencontractABI.abi, provider);
 };
 
-export const getSignerContract = async () => {
+export const getTokenSignerContract = async () => {
   if (typeof window !== 'undefined' && typeof window.ethereum !== 'undefined') {
     await window.ethereum.request({ method: 'eth_requestAccounts' });
     const provider = new BrowserProvider(window.ethereum);
     const signer = await provider.getSigner();
-    return new Contract(contractAddress, contractABI.abi, signer);
+    return new Contract(TokencontractAddress, TokencontractABI.abi, signer);
   } else {
     throw new Error('Ethereum wallet is not installed');
   }
 };
 
-export default getContract;
+export default getTokenContract;
