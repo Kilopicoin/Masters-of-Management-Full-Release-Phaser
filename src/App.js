@@ -33,18 +33,27 @@ function App() {
   const [referralNetwork, setReferralNetwork] = useState(null); // To store referrer and referrals
   const [showReferralNetwork, setShowReferralNetwork] = useState(false); // To show/hide the referral network info
   const occupationCost = 100000 * 10**6;
+  const [salePrice, setSalePrice] = useState(null);
 
 
   
 
   const setTileForSale = async (x, y, isOnSale) => {
     try {
+      if (isOnSale && !salePrice) {
+        toast.error('Please enter a sale price.');
+        return;
+      }
+  
+      const salePriceX = salePrice * 10 ** 6;
       const contractSigner = await getSignerContract();
-      const tx = await contractSigner.setTileOnSale(x - 1, y - 1, isOnSale);
+      const tx = await contractSigner.setTileOnSale(x - 1, y - 1, isOnSale, salePriceX);
       await tx.wait();
-
-      toast.success(`Tile is now ${isOnSale ? 'on' : 'off'} sale`);
-
+  
+      toast.success(`Tile is now ${isOnSale ? 'on' : 'off'} sale at ${salePrice} LOP tokens`);
+  
+      // Reset sale price after setting the tile for sale
+      setSalePrice('');
     } catch (error) {
       console.error('Error setting tile sale status:', error);
       toast.error('Failed to set tile on sale');
@@ -836,10 +845,24 @@ function App() {
   metaMaskAccount ? (
     getAddress(metaMaskAccount) === tileCoords.occupant && (
       <div>
-        <p>This tile is {tileCoords.isOnSale ? 'on sale' : 'not on sale'}.</p>
-        <button onClick={() => setTileForSale(tileCoords.x, tileCoords.y, !tileCoords.isOnSale)}>
-          {tileCoords.isOnSale ? 'Remove from Sale' : 'Put on Sale'}
-        </button> <p>
+        {tileCoords.isOnSale ? (
+      <button onClick={() => setTileForSale(tileCoords.x, tileCoords.y, false)}>
+        Remove from Sale
+      </button>
+    ) : (
+      <>
+        <input
+          type="number"
+          placeholder="Enter sale price in LOP"
+          value={salePrice}
+          onChange={(e) => setSalePrice(e.target.value)}
+          style={{ marginBottom: '10px', width: '100%' }}
+        />
+        <button onClick={() => setTileForSale(tileCoords.x, tileCoords.y, true)}>
+          Put on Sale
+        </button>
+      </>
+    )} <p>
         <button onClick={fetchReferralNetwork} style={{ marginTop: '10px' }}>
     My Referral Network
   </button></p>
