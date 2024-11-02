@@ -33,12 +33,27 @@ function App() {
   const [referralNetwork, setReferralNetwork] = useState(null); // To store referrer and referrals
   const [showReferralNetwork, setShowReferralNetwork] = useState(false); // To show/hide the referral network info
   const occupationCost = 100000 * 10**6;
-  const [salePrice, setSalePrice] = useState(null);
+  const [salePrice, setSalePrice] = useState("");
 
+
+  const updateTileSaleInfo = async (x, y) => {
+    try {
+      const contract = await getContract();
+      const tile = await contract.tiles(x - 1, y - 1); // Fetch the latest tile information
+      setTileCoords(prev => ({
+        ...prev,
+        isOnSale: tile.isOnSale,
+        salePrice: Number(tile.salePrice + tile.saleBurnAmount),
+      }));
+    } catch (error) {
+      console.error('Error fetching updated tile info:', error);
+    }
+  };
 
   
 
   const setTileForSale = async (x, y, isOnSale) => {
+    setLoading(true);
     try {
       if (isOnSale && !salePrice) {
         toast.error('Please enter a sale price.');
@@ -54,21 +69,46 @@ function App() {
   
       // Reset sale price after setting the tile for sale
       setSalePrice('');
+
+      await updateTileSaleInfo(x, y);
     } catch (error) {
       console.error('Error setting tile sale status:', error);
       toast.error('Failed to set tile on sale');
+    } finally {
+      setLoading(false);
     }
   };
 
   const buyTile = async (x, y) => {
     setLoading(true);
     try {
+
+      // Get the sale price (already in the tileCoords state in LOP units)
+    const salePriceLOP = tileCoords.salePrice; 
+    if (!salePriceLOP) {
+      toast.error('Sale price not available');
+      setLoading(false);
+      return;
+    }
+
+    const salePriceInWei = salePriceLOP; // Convert to smallest unit if required
+
+    // Increase allowance for the sale price
+    const tokenContractSigner = await getTokenSignerContract();
+    const allowanceTx = await tokenContractSigner.increaseAllowance(contractAddress, salePriceInWei);
+    await allowanceTx.wait();
+
+
       const contractSigner = await getSignerContract();
       const tx = await contractSigner.buyTile(x - 1, y - 1 ); // Set tile price here
       await tx.wait();
 
       toast.success('Tile purchased successfully!');
       setTileCoords((prev) => ({ ...prev, occupied: true, occupant: metaMaskAccount }));
+
+      await updateTileSaleInfo(x, y);
+      await checkIfAccountOccupiedTile();
+
     } catch (error) {
       console.error('Error buying tile:', error);
       toast.error('Failed to purchase tile');
@@ -234,7 +274,7 @@ function App() {
       const tile = await contract.tiles(x, y);
 
 
-                setTileCoords({ x: x + 1, y: y + 1, occupied: true, occupant, isOnSale: tile.isOnSale, }); // Update the state with occupant info
+                setTileCoords({ x: x + 1, y: y + 1, occupied: true, occupant, isOnSale: tile.isOnSale, salePrice: Number(tile.salePrice + tile.saleBurnAmount)}); // Update the state with occupant info
               }
             });
           }
@@ -846,9 +886,12 @@ function App() {
     getAddress(metaMaskAccount) === tileCoords.occupant && (
       <div>
         {tileCoords.isOnSale ? (
+          <>
+          <p>Sale Price: {tileCoords.salePrice / 10 ** 6} LOP</p>
       <button onClick={() => setTileForSale(tileCoords.x, tileCoords.y, false)}>
         Remove from Sale
       </button>
+      </>
     ) : (
       <>
         <input
@@ -885,7 +928,7 @@ function App() {
 
             {tileCoords.isOnSale && tileCoords.occupied && getAddress(metaMaskAccount) !== tileCoords.occupant && (
               <div>
-                <p>This tile is on sale. Do you want to buy it?</p>
+                <p>This tile is on sale for {tileCoords.salePrice / 10 ** 6} LOP tokens. Do you want to buy it?</p>
                 <button onClick={() => buyTile(tileCoords.x, tileCoords.y)}>Buy Tile</button>
               </div>
             )}
