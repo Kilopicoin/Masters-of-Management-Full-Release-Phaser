@@ -83,6 +83,14 @@ function App() {
     setLoading(true);
     try {
 
+      const contract = await getContract();
+        const alreadyHasTile = await contract.hasOccupiedTile(metaMaskAccount);
+
+        if (alreadyHasTile) {
+            showWarning();
+            return;
+        }
+
       // Get the sale price (already in the tileCoords state in LOP units)
     const salePriceLOP = tileCoords.salePrice; 
     if (!salePriceLOP) {
@@ -92,6 +100,16 @@ function App() {
     }
 
     const salePriceInWei = salePriceLOP; // Convert to smallest unit if required
+
+
+    // Fetch the user's LOP token balance
+    const lopBalance = await getLOPBalance(metaMaskAccount);
+        
+    if (lopBalance < salePriceInWei) {
+        toast.warn("Insufficient LOP tokens. You need more LOP tokens to buy this land.");
+        setLoading(false);
+        return;
+    }
 
     // Increase allowance for the sale price
     const tokenContractSigner = await getTokenSignerContract();
