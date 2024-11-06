@@ -47,3 +47,16 @@
 }
 
 
+.journal-card {
+  text-align: center;
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  padding: 15px;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  color: #333;
+  z-index: 100;
+  width: 250px;
+}

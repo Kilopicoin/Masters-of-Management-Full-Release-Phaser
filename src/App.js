@@ -34,7 +34,14 @@ function App() {
   const [showReferralNetwork, setShowReferralNetwork] = useState(false); // To show/hide the referral network info
   const occupationCost = 100000 * 10**6;
   const [salePrice, setSalePrice] = useState("");
+  const [journalEntries, setJournalEntries] = useState([]);
 
+
+
+  
+  
+
+  
 
   const updateTileSaleInfo = async (x, y) => {
     try {
@@ -748,6 +755,60 @@ function App() {
   };
 
 
+  useEffect(() => {
+    const setupEventListener = async () => {
+      try {
+        const contract = await getContract();
+  
+        // Clear existing listeners for "TileUpdated" to prevent duplicates
+        contract.removeAllListeners("TileUpdated");
+  
+        // Set up the event listener with a single instance
+        contract.on("TileUpdated", (x, y, isOccupied, occupant) => {
+          console.log("Event received:", x, y, isOccupied, occupant); // Debugging log
+  
+          // Convert BigInt coordinates to regular numbers
+          const xCoord = Number(x);
+          const yCoord = Number(y);
+  
+          const formattedOccupant = `${occupant.slice(0, 4)}...${occupant.slice(-4)}`;
+          const newEntry = `${formattedOccupant} has occupied the land at coordinates (${xCoord + 1}, ${yCoord + 1})`;
+
+  
+          setJournalEntries((prevEntries) => {
+            if (!prevEntries.includes(newEntry)) {
+              let newEntries = [newEntry, ...prevEntries];
+              if (newEntries.length > 3) {
+                prevEntries.pop(); // Remove the oldest entry if we have more than 3
+                newEntries = [newEntry, ...prevEntries];
+              }
+              return newEntries;
+            }
+            return prevEntries;
+          });
+
+        });
+      } catch (error) {
+        console.error("Error setting up event listener:", error);
+      }
+    };
+  
+    if (!loading) {
+      setupEventListener();
+    }
+  
+    // Cleanup listener on unmount
+    return () => {
+      getContract().then((contract) => {
+        contract.removeAllListeners("TileUpdated");
+      });
+    };
+  }, [loading]);
+  
+  
+  
+
+
 
   return (
     <div
@@ -1017,6 +1078,15 @@ function App() {
     </div>
   )}
 </div>
+<div className="journal-card">
+  <strong>Journal</strong>
+  <ul>
+    {journalEntries.map((entry, index) => (
+      <li key={index}>{entry}</li>
+    ))}
+  </ul>
+</div>
+
     </div>
   );
 }
