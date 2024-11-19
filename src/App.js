@@ -476,7 +476,7 @@ function App() {
   };
 
   const generateReferralLink = () => {
-    const link = `${window.location.origin}/?ref=${metaMaskAccount}`;
+    const link = `${window.location.href}/?ref=${metaMaskAccount}`;
     setReferralLink(link);
     toast.success("Referral link created successfully!");
   };
@@ -1004,13 +1004,16 @@ function App() {
 
 
            
-
+        {metaMaskAccount && (
+          <>
             {tileCoords.isOnSale && tileCoords.occupied && getAddress(metaMaskAccount) !== tileCoords.occupant && (
               <div>
                 <p>This tile is on sale for {tileCoords.salePrice / 10 ** 6} LOP tokens. Do you want to buy it?</p>
                 <button onClick={() => buyTile(tileCoords.x, tileCoords.y)}>Buy Tile</button>
               </div>
             )}
+          </>
+          )}
 
 
     </div>
@@ -1066,7 +1069,7 @@ function App() {
 
 
           <button type="button" onClick={() => occupyTile(tileCoords.x, tileCoords.y)}>
-            Yes
+            Occupy
           </button>
         </div>
       ) : (
