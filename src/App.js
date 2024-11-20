@@ -755,6 +755,33 @@ function App() {
   };
 
 
+  const showUnderDevelopmentWarning = () => {
+    toast.warn(
+      <div>
+        <p>
+          🚧 This part of the game is under development. Follow the Twitter account to stay updated:
+          <a
+            href="https://x.com/kilopicoin" // Replace with your Twitter URL
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline' }}
+          >
+            @kilopicoin
+          </a>
+        </p>
+      </div>,
+      {
+        position: 'bottom-center',
+        autoClose: false,
+        hideProgressBar: false,
+        closeOnClick: true,
+        draggable: false,
+      }
+    );
+  };
+  
+
+
   useEffect(() => {
     const setupEventListener = async () => {
       try {
@@ -964,6 +991,12 @@ function App() {
   metaMaskAccount ? (
     getAddress(metaMaskAccount) === tileCoords.occupant && (
       <div>
+<p>
+<button onClick={showUnderDevelopmentWarning}>
+        Enter the Land
+      </button>
+      </p>
+
         {tileCoords.isOnSale ? (
           <>
           <p>Sale Price: {tileCoords.salePrice / 10 ** 6} LOP</p>
@@ -988,6 +1021,11 @@ function App() {
         <button onClick={fetchReferralNetwork} style={{ marginTop: '10px' }}>
     My Referral Network
   </button></p>
+
+
+     
+
+
       </div>
     )
   ) : (
