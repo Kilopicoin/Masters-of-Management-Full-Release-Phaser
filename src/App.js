@@ -68,6 +68,17 @@ function App() {
       }
   
       const salePriceX = salePrice * 10 ** 6;
+
+      if (salePrice < 10 || salePrice > 1000000) {
+        toast.warn(
+          `Sale price must be between 10 and 1,000,000 LOP tokens`
+
+        );
+        setLoading(false); // Ensure loading state resets
+        return;
+      }
+
+      
       const contractSigner = await getSignerContract();
       const tx = await contractSigner.setTileOnSale(x - 1, y - 1, isOnSale, salePriceX);
       await tx.wait();
@@ -94,7 +105,7 @@ function App() {
         const alreadyHasTile = await contract.hasOccupiedTile(metaMaskAccount);
 
         if (alreadyHasTile) {
-            showWarning();
+          showWarning("You already occupy a tile!");
             return;
         }
 
@@ -328,10 +339,10 @@ function App() {
 
 
 
-  const showWarning = () => {
+  const showWarning = (message) => {
     toast.warn(
       <div style={{ textAlign: 'center' }}>
-        🚧 <strong>You already have a Land!</strong>
+        🚧 <strong>{message}</strong>
         <br />
         <button
           style={{
@@ -375,6 +386,7 @@ function App() {
   
   
   
+  
   const getLOPBalance = async (account) => {
     const contract = await getTokenContract();
     return await contract.balanceOf(account);
@@ -386,8 +398,18 @@ function App() {
       const contract = await getContract();
       const alreadyHasTile = await contract.hasOccupiedTile(metaMaskAccount);
 
+      if (referrer && referrer !== '0x0000000000000000000000000000000000000000') {
+        const referrals = await contract.referredBy(referrer);
+        if (referrals.length >= 30) {
+          showWarning("Your Referrer Address already has 30 (Max) Referrals.");
+          setLoading(false);
+          return;
+        }
+      }
+
+
       if (alreadyHasTile) {
-        showWarning();
+        showWarning("You already occupy a tile!");
       } else {
         // Fetch the user's LOP token balance
         const lopBalance = await getLOPBalance(metaMaskAccount);
@@ -1011,7 +1033,8 @@ function App() {
           placeholder="Enter sale price in LOP"
           value={salePrice}
           onChange={(e) => setSalePrice(e.target.value)}
-          style={{ marginBottom: '10px', width: '100%' }}
+         
+          className="fancy-inputX"
         />
         <button onClick={() => setTileForSale(tileCoords.x, tileCoords.y, true)}>
           Put on Sale
