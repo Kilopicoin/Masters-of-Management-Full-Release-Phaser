@@ -62,6 +62,15 @@ function App() {
   const setTileForSale = async (x, y, isOnSale) => {
     setLoading(true);
     try {
+
+      const paused = await isContractPaused(); // Check the paused state
+    if (paused) {
+      showWarning("Game is in PAUSE mode, please contact the management");
+      setLoading(false);
+      return; // Exit early if the contract is paused
+    }
+
+    
       if (isOnSale && !salePrice) {
         toast.error('Please enter a sale price.');
         return;
@@ -100,6 +109,13 @@ function App() {
   const buyTile = async (x, y) => {
     setLoading(true);
     try {
+
+      const paused = await isContractPaused(); // Check the paused state
+    if (paused) {
+      showWarning("Game is in PAUSE mode, please contact the management");
+      setLoading(false);
+      return; // Exit early if the contract is paused
+    }
 
       const contract = await getContract();
         const alreadyHasTile = await contract.hasOccupiedTile(metaMaskAccount);
@@ -392,9 +408,29 @@ function App() {
     return await contract.balanceOf(account);
   };
 
+  const isContractPaused = async () => {
+    try {
+      const contract = await getContract();
+      return await contract.paused(); // Call the `paused` state variable
+    } catch (error) {
+      console.error("Error checking contract pause status:", error);
+      return false; // Default to not paused if there's an error
+    }
+  };
+  
+
   const occupyTile = async (x, y) => {
     setLoading(true);
     try {
+
+      const paused = await isContractPaused(); // Check the paused state
+    if (paused) {
+      showWarning("Game is in PAUSE mode, please contact the management");
+      setLoading(false);
+      return; // Exit early if the contract is paused
+    }
+
+
       const contract = await getContract();
       const alreadyHasTile = await contract.hasOccupiedTile(metaMaskAccount);
 
