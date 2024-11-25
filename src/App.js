@@ -35,6 +35,7 @@ function App() {
   const occupationCost = 100000 * 10**6;
   const [salePrice, setSalePrice] = useState("");
   const [journalEntries, setJournalEntries] = useState([]);
+  const [hasTileG, sethasTileG] = useState(false);
 
 
 
@@ -434,8 +435,20 @@ function App() {
       const contract = await getContract();
       const alreadyHasTile = await contract.hasOccupiedTile(metaMaskAccount);
 
+
+
       if (referrer && referrer !== '0x0000000000000000000000000000000000000000') {
-        const referrals = await contract.referredBy(referrer);
+
+        const referrerHasTile = await contract.hasOccupiedTile(referrer);
+
+            if (!referrerHasTile) {
+                showWarning("Referrer should have a land occupied.");
+                setLoading(false);
+                return; // Exit if the referrer has no occupied tile
+            }
+
+            
+        const referrals = await contract.getReferredBy(referrer);
         if (referrals.length >= 30) {
           showWarning("Your Referrer Address already has 30 (Max) Referrals.");
           setLoading(false);
@@ -488,14 +501,13 @@ function App() {
     if (metaMaskAccount) {
       const contract = await getContract();
       const hasTile = await contract.hasOccupiedTile(metaMaskAccount);
-
       if (hasTile) {
         // Fetch the coordinates of the occupied tile
         const coords = await contract.getOccupiedTileByAddress(metaMaskAccount);
         const [x, y] = coords.map(coord => Number(coord)); // Convert BigInt to regular numbers
-        setTileCoords({ x: x + 1, y: y + 1, occupied: true });
         updateTileImage(x, y); // Update the tile image to skyflag
       }
+      sethasTileG(hasTile);
     }
   }, [metaMaskAccount]); // Now it depends only on metaMaskAccount
 
@@ -993,6 +1005,17 @@ function App() {
           <p>
             <strong>Logged in:</strong> {`${metaMaskAccount.slice(0, 4)}...${metaMaskAccount.slice(-3)}`} {/* Display logged in address */}
           </p>
+
+          </>
+        ) : (
+          <p>
+          <button type="button" onClick={loginMetaMask}>Connect</button>
+          </p>
+        )}
+
+        {metaMaskAccount && hasTileG && (
+          <>
+
 <button onClick={generateReferralLink} style={{ marginBottom: '10px' }}>
               Create Referral Link
             </button>
@@ -1014,11 +1037,10 @@ function App() {
                 </span>
               </p>
             )}
-          </>
-        ) : (
-          <p>
-          <button type="button" onClick={loginMetaMask}>Connect</button>
-          </p>
+            </>
+
+
+
         )}
   {tileCoords.x !== null && tileCoords.y !== null && (
     <div>
