@@ -79,6 +79,10 @@ function App() {
   
       const salePriceX = salePrice * 10 ** 6;
 
+
+      if (isOnSale) {
+
+      
       if (salePrice < 10 || salePrice > 1000000) {
         toast.warn(
           `Sale price must be between 10 and 1,000,000 LOP tokens`
@@ -87,6 +91,7 @@ function App() {
         setLoading(false); // Ensure loading state resets
         return;
       }
+    }
 
       
       const contractSigner = await getSignerContract();
