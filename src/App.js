@@ -15,6 +15,7 @@ import backgroundMusicFile from './assets/background.mp3';
 import playIcon from './assets/play-icon.png';
 import stopIcon from './assets/stop-icon.png';
 import { getAddress } from 'ethers';
+import TheLand from './theLand';
 
 
 
@@ -36,7 +37,16 @@ function App() {
   const [salePrice, setSalePrice] = useState("");
   const [journalEntries, setJournalEntries] = useState([]);
   const [hasTileG, sethasTileG] = useState(false);
+  const [showTheLand, setShowTheLand] = useState(false);
 
+  const handleEnterLand = () => {
+    if (gameRef.current) {
+      gameRef.current.destroy(true); // Destroy the current Phaser game instance
+      gameRef.current = null; // Reset the reference
+    }
+    setShowTheLand(true); // Show the new content
+  };
+  
 
 
   
@@ -830,30 +840,7 @@ function App() {
   };
 
 
-  const showUnderDevelopmentWarning = () => {
-    toast.warn(
-      <div>
-        <p>
-          🚧 This part of the game is under development. Follow the Twitter account to stay updated:
-          <a
-            href="https://x.com/kilopicoin" // Replace with your Twitter URL
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: '#1DA1F2', textDecoration: 'underline' }}
-          >
-            @kilopicoin
-          </a>
-        </p>
-      </div>,
-      {
-        position: 'bottom-center',
-        autoClose: false,
-        hideProgressBar: false,
-        closeOnClick: true,
-        draggable: false,
-      }
-    );
-  };
+  
   
 
 
@@ -909,7 +896,9 @@ function App() {
   
   
   
-
+  if (showTheLand) {
+    return <TheLand />;
+  } else {
 
 
   return (
@@ -1077,9 +1066,7 @@ function App() {
     getAddress(metaMaskAccount) === tileCoords.occupant && (
       <div>
 <p>
-<button onClick={showUnderDevelopmentWarning}>
-        Enter the Land
-      </button>
+<button onClick={handleEnterLand}>Enter the Land</button>
       </p>
 
         {tileCoords.isOnSale ? (
@@ -1216,6 +1203,7 @@ function App() {
 
     </div>
   );
+}
 }
 
 export default App;
