@@ -38,13 +38,24 @@ function App() {
   const [journalEntries, setJournalEntries] = useState([]);
   const [hasTileG, sethasTileG] = useState(false);
   const [showTheLand, setShowTheLand] = useState(false);
+  const [selectedTile, setSelectedTile] = useState(null);
+  const [appKey, setAppKey] = useState(Date.now());
+
+
+
+
 
   const handleEnterLand = () => {
-    if (gameRef.current) {
-      gameRef.current.destroy(true); // Destroy the current Phaser game instance
-      gameRef.current = null; // Reset the reference
+    if (tileCoords.x !== null && tileCoords.y !== null) {
+      setSelectedTile({ x: tileCoords.x, y: tileCoords.y }); // Pass selected tile coordinates
+      if (gameRef.current) {
+        gameRef.current.destroy(true); // Destroy the current Phaser game instance
+        gameRef.current = null; // Reset the reference
+      }
+      setShowTheLand(true); // Show the new content
+    } else {
+      toast.warn("Please select a tile before entering the land.");
     }
-    setShowTheLand(true); // Show the new content
   };
   
 
@@ -239,7 +250,7 @@ function App() {
 
 
 
-  }, []);
+  }, [appKey]);
 
 
   const loginMetaMask = async () => {
@@ -286,7 +297,7 @@ function App() {
       }
     };
     checkMetaMaskConnection();
-  }, []);
+  }, [appKey]);
 
   useEffect(() => {
     const fetchAllOccupiedTiles = async () => {
@@ -301,7 +312,7 @@ function App() {
       }
     };
     fetchAllOccupiedTiles();
-  }, []);
+  }, [appKey]);
 
   const updateTileMap = () => {
     if (gameRef.current) {
@@ -355,7 +366,7 @@ function App() {
   useEffect(() => {
   
   updateTileMap();
-  }, [metaMaskAccount]);
+  }, [metaMaskAccount, appKey]);
 
   const fetchAllOccupiedTiles = async () => {
     try {
@@ -528,7 +539,7 @@ function App() {
 
   useEffect(() => {
     checkIfAccountOccupiedTile();
-  }, [metaMaskAccount, checkIfAccountOccupiedTile]);
+  }, [metaMaskAccount, checkIfAccountOccupiedTile, appKey]);
 
   
 
@@ -824,7 +835,7 @@ function App() {
       document.body.style.overflow = '';
       document.documentElement.style.overflow = '';
     };
-  }, []);
+  }, [appKey]);
 
 
 
@@ -892,13 +903,28 @@ function App() {
         contract.removeAllListeners("TileUpdated");
       });
     };
-  }, [loading]);
+  }, [loading, appKey]);
+  
+  const handleGoBackToApp = () => {
+    setShowTheLand(false);
+    setAppKey(Date.now()); // Force a full re-render of App.js
+  };
+  
+  
   
   
   
   if (showTheLand) {
-    return <TheLand />;
-  } else {
+    return (
+      <TheLand
+        tileCoords={selectedTile} // Pass the selected tile coordinates
+        goBackToApp={handleGoBackToApp} // Pass the go-back function
+      />
+    );
+  }
+  
+  
+
 
 
   return (
@@ -1203,7 +1229,7 @@ function App() {
 
     </div>
   );
-}
+
 }
 
 export default App;
