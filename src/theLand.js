@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ToastContainer } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
 import Phaser from 'phaser';
 import grassXImage from './assets/grassX.png';
 import eldersImage from './assets/elders.png';
@@ -11,6 +11,7 @@ import houseImage from './assets/buildings/house.png';
 import marketImage from './assets/buildings/market.png';
 import towerImage from './assets/buildings/tower.png';
 import workshopImage from './assets/buildings/workshop.png';
+import { getTheLandSignerContract } from './TheLandContract';
 import './App.css';
 
 const TheLand = ({ tileCoords, goBackToApp }) => {
@@ -19,6 +20,7 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     const [metaMaskAccount, setMetaMaskAccount] = useState(null); // Kept for loginMetaMask logic
     const [isMetaMaskConnected, setIsMetaMaskConnected] = useState(false); // Kept for MetaMask state tracking
     const [selectedBuilding, setSelectedBuilding] = useState(null);
+    const [interactionMenuType, setinteractionMenuType] = useState("home");
     const buildingPreviewRef = useRef(null);
     const mapSize = 9;
 
@@ -142,7 +144,7 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
                       elders.on('pointerdown', (pointer) => {
                           if (pointer.button === 2) {
                               // Show the "Select Building Type" menu
-                              document.getElementById('building-menu').style.display = 'block';
+                              setinteractionMenuType("buildings");
                           }
                       });
                   }
@@ -264,6 +266,27 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
   }, [selectedBuilding]);
 
 
+  const executeUseTurns = async (turns, tileCoords, toast) => {
+    if (!tileCoords.x || !tileCoords.y) {
+        toast.error("Please select a tile first");
+        return;
+    }
+
+    try {
+        const contract = await getTheLandSignerContract(); // Replace with your function to get a signer instance
+        const tx = await contract.useTurns(turns, tileCoords.x - 1, tileCoords.y - 1);
+        await tx.wait();
+
+        toast.success(`Successfully used ${turns} turn(s)!`);
+    } catch (error) {
+        console.error("Error using turns:", error);
+        toast.error("Failed to use turns. Please try again.");
+    }
+};
+
+
+
+
 
     return (
         <div
@@ -280,13 +303,13 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
             />
 
 <div
-    id="building-menu"
+    id="interaction-menu"
     style={{
         position: 'absolute',
         top: 50,
         left: '50%',
         transform: 'translateX(-50%)',
-        display: 'none', // Initially hidden
+        display: 'block', // Initially hidden
         zIndex: 200,
         padding: '10px',
         backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -294,6 +317,67 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
         boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
     }}
 >
+
+
+
+{interactionMenuType === "home" && (
+    <>
+        <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <input
+                type="number"
+                min="1"
+                max="300"
+                className="fancy-inputX"
+                placeholder="Enter a number (1-300)"
+                style={{ flex: '1' }}
+            />
+            <button
+    style={{
+        padding: '10px 20px',
+        backgroundColor: '#007bff',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        cursor: 'pointer',
+    }}
+    onClick={() => {
+        const turns = document.querySelector(".fancy-inputX").value; // Get input value
+        if (turns && turns > 0) {
+            executeUseTurns(parseInt(turns), tileCoords, toast); // Pass necessary arguments
+        } else {
+            toast.error("Please enter a valid number of turns");
+        }
+    }}
+>
+    Use Turn(s)
+</button>
+
+
+        </div>
+    </>
+)}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    {interactionMenuType === "buildings" && (
+        <>
     <strong>Select Building Type:</strong>
     <div style={{ marginTop: '10px' }}>
         {buildingTypes.map((building) => (
@@ -310,13 +394,14 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
                 }}
                 onClick={() => {
                     setSelectedBuilding(building.image);
-                    document.getElementById('building-menu').style.display = 'none';
                 }}
             >
                 {building.label}
             </button>
         ))}
     </div>
+    </>
+)}
 </div>
 
 

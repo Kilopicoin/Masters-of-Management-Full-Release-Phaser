@@ -15,6 +15,7 @@ import backgroundMusicFile from './assets/background.mp3';
 import playIcon from './assets/play-icon.png';
 import stopIcon from './assets/stop-icon.png';
 import { getAddress } from 'ethers';
+import TheLand from './theLand';
 
 
 
@@ -35,7 +36,28 @@ function App() {
   const occupationCost = 100000 * 10**6;
   const [salePrice, setSalePrice] = useState("");
   const [journalEntries, setJournalEntries] = useState([]);
+  const [hasTileG, sethasTileG] = useState(false);
+  const [showTheLand, setShowTheLand] = useState(false);
+  const [selectedTile, setSelectedTile] = useState(null);
+  const [appKey, setAppKey] = useState(Date.now());
 
+
+
+
+
+  const handleEnterLand = () => {
+    if (tileCoords.x !== null && tileCoords.y !== null) {
+      setSelectedTile({ x: tileCoords.x, y: tileCoords.y }); // Pass selected tile coordinates
+      if (gameRef.current) {
+        gameRef.current.destroy(true); // Destroy the current Phaser game instance
+        gameRef.current = null; // Reset the reference
+      }
+      setShowTheLand(true); // Show the new content
+    } else {
+      toast.warn("Please select a tile before entering the land.");
+    }
+  };
+  
 
 
   
@@ -62,12 +84,37 @@ function App() {
   const setTileForSale = async (x, y, isOnSale) => {
     setLoading(true);
     try {
+
+      const paused = await isContractPaused(); // Check the paused state
+    if (paused) {
+      showWarning("Game is in PAUSE mode, please contact the management");
+      setLoading(false);
+      return; // Exit early if the contract is paused
+    }
+
+    
       if (isOnSale && !salePrice) {
         toast.error('Please enter a sale price.');
         return;
       }
   
       const salePriceX = salePrice * 10 ** 6;
+
+
+      if (isOnSale) {
+
+      
+      if (salePrice < 10 || salePrice > 1000000) {
+        toast.warn(
+          `Sale price must be between 10 and 1,000,000 LOP tokens`
+
+        );
+        setLoading(false); // Ensure loading state resets
+        return;
+      }
+    }
+
+      
       const contractSigner = await getSignerContract();
       const tx = await contractSigner.setTileOnSale(x - 1, y - 1, isOnSale, salePriceX);
       await tx.wait();
@@ -90,11 +137,18 @@ function App() {
     setLoading(true);
     try {
 
+      const paused = await isContractPaused(); // Check the paused state
+    if (paused) {
+      showWarning("Game is in PAUSE mode, please contact the management");
+      setLoading(false);
+      return; // Exit early if the contract is paused
+    }
+
       const contract = await getContract();
         const alreadyHasTile = await contract.hasOccupiedTile(metaMaskAccount);
 
         if (alreadyHasTile) {
-            showWarning();
+          showWarning("You already occupy a tile!");
             return;
         }
 
@@ -196,7 +250,7 @@ function App() {
 
 
 
-  }, []);
+  }, [appKey]);
 
 
   const loginMetaMask = async () => {
@@ -243,7 +297,7 @@ function App() {
       }
     };
     checkMetaMaskConnection();
-  }, []);
+  }, [appKey]);
 
   useEffect(() => {
     const fetchAllOccupiedTiles = async () => {
@@ -258,7 +312,7 @@ function App() {
       }
     };
     fetchAllOccupiedTiles();
-  }, []);
+  }, [appKey]);
 
   const updateTileMap = () => {
     if (gameRef.current) {
@@ -312,7 +366,7 @@ function App() {
   useEffect(() => {
   
   updateTileMap();
-  }, [metaMaskAccount]);
+  }, [metaMaskAccount, appKey]);
 
   const fetchAllOccupiedTiles = async () => {
     try {
@@ -328,10 +382,10 @@ function App() {
 
 
 
-  const showWarning = () => {
+  const showWarning = (message) => {
     toast.warn(
       <div style={{ textAlign: 'center' }}>
-        🚧 <strong>You already have a Land!</strong>
+        🚧 <strong>{message}</strong>
         <br />
         <button
           style={{
@@ -375,19 +429,62 @@ function App() {
   
   
   
+  
   const getLOPBalance = async (account) => {
     const contract = await getTokenContract();
     return await contract.balanceOf(account);
   };
 
+  const isContractPaused = async () => {
+    try {
+      const contract = await getContract();
+      return await contract.paused(); // Call the `paused` state variable
+    } catch (error) {
+      console.error("Error checking contract pause status:", error);
+      return false; // Default to not paused if there's an error
+    }
+  };
+  
+
   const occupyTile = async (x, y) => {
     setLoading(true);
     try {
+
+      const paused = await isContractPaused(); // Check the paused state
+    if (paused) {
+      showWarning("Game is in PAUSE mode, please contact the management");
+      setLoading(false);
+      return; // Exit early if the contract is paused
+    }
+
+
       const contract = await getContract();
       const alreadyHasTile = await contract.hasOccupiedTile(metaMaskAccount);
 
+
+
+      if (referrer && referrer !== '0x0000000000000000000000000000000000000000') {
+
+        const referrerHasTile = await contract.hasOccupiedTile(referrer);
+
+            if (!referrerHasTile) {
+                showWarning("Referrer should have a land occupied.");
+                setLoading(false);
+                return; // Exit if the referrer has no occupied tile
+            }
+
+            
+        const referrals = await contract.getReferredBy(referrer);
+        if (referrals.length >= 30) {
+          showWarning("Your Referrer Address already has 30 (Max) Referrals.");
+          setLoading(false);
+          return;
+        }
+      }
+
+
       if (alreadyHasTile) {
-        showWarning();
+        showWarning("You already occupy a tile!");
       } else {
         // Fetch the user's LOP token balance
         const lopBalance = await getLOPBalance(metaMaskAccount);
@@ -430,20 +527,19 @@ function App() {
     if (metaMaskAccount) {
       const contract = await getContract();
       const hasTile = await contract.hasOccupiedTile(metaMaskAccount);
-
       if (hasTile) {
         // Fetch the coordinates of the occupied tile
         const coords = await contract.getOccupiedTileByAddress(metaMaskAccount);
         const [x, y] = coords.map(coord => Number(coord)); // Convert BigInt to regular numbers
-        setTileCoords({ x: x + 1, y: y + 1, occupied: true });
         updateTileImage(x, y); // Update the tile image to skyflag
       }
+      sethasTileG(hasTile);
     }
   }, [metaMaskAccount]); // Now it depends only on metaMaskAccount
 
   useEffect(() => {
     checkIfAccountOccupiedTile();
-  }, [metaMaskAccount, checkIfAccountOccupiedTile]);
+  }, [metaMaskAccount, checkIfAccountOccupiedTile, appKey]);
 
   
 
@@ -739,7 +835,7 @@ function App() {
       document.body.style.overflow = '';
       document.documentElement.style.overflow = '';
     };
-  }, []);
+  }, [appKey]);
 
 
 
@@ -753,6 +849,10 @@ function App() {
       setIsMusicPlaying(!isMusicPlaying);
     }
   };
+
+
+  
+  
 
 
   useEffect(() => {
@@ -803,8 +903,25 @@ function App() {
         contract.removeAllListeners("TileUpdated");
       });
     };
-  }, [loading]);
+  }, [loading, appKey]);
   
+  const handleGoBackToApp = () => {
+    setShowTheLand(false);
+    setAppKey(Date.now()); // Force a full re-render of App.js
+  };
+  
+  
+  
+  
+  
+  if (showTheLand) {
+    return (
+      <TheLand
+        tileCoords={selectedTile} // Pass the selected tile coordinates
+        goBackToApp={handleGoBackToApp} // Pass the go-back function
+      />
+    );
+  }
   
   
 
@@ -908,6 +1025,17 @@ function App() {
           <p>
             <strong>Logged in:</strong> {`${metaMaskAccount.slice(0, 4)}...${metaMaskAccount.slice(-3)}`} {/* Display logged in address */}
           </p>
+
+          </>
+        ) : (
+          <p>
+          <button type="button" onClick={loginMetaMask}>Connect</button>
+          </p>
+        )}
+
+        {metaMaskAccount && hasTileG && (
+          <>
+
 <button onClick={generateReferralLink} style={{ marginBottom: '10px' }}>
               Create Referral Link
             </button>
@@ -929,11 +1057,10 @@ function App() {
                 </span>
               </p>
             )}
-          </>
-        ) : (
-          <p>
-          <button type="button" onClick={loginMetaMask}>Connect</button>
-          </p>
+            </>
+
+
+
         )}
   {tileCoords.x !== null && tileCoords.y !== null && (
     <div>
@@ -964,6 +1091,10 @@ function App() {
   metaMaskAccount ? (
     getAddress(metaMaskAccount) === tileCoords.occupant && (
       <div>
+<p>
+<button onClick={handleEnterLand}>Enter the Land</button>
+      </p>
+
         {tileCoords.isOnSale ? (
           <>
           <p>Sale Price: {tileCoords.salePrice / 10 ** 6} LOP</p>
@@ -978,7 +1109,8 @@ function App() {
           placeholder="Enter sale price in LOP"
           value={salePrice}
           onChange={(e) => setSalePrice(e.target.value)}
-          style={{ marginBottom: '10px', width: '100%' }}
+         
+          className="fancy-inputX"
         />
         <button onClick={() => setTileForSale(tileCoords.x, tileCoords.y, true)}>
           Put on Sale
@@ -988,6 +1120,11 @@ function App() {
         <button onClick={fetchReferralNetwork} style={{ marginTop: '10px' }}>
     My Referral Network
   </button></p>
+
+
+     
+
+
       </div>
     )
   ) : (
@@ -1069,7 +1206,7 @@ function App() {
 
 
           <button type="button" onClick={() => occupyTile(tileCoords.x, tileCoords.y)}>
-            Yes
+            Occupy
           </button>
         </div>
       ) : (
@@ -1092,6 +1229,7 @@ function App() {
 
     </div>
   );
+
 }
 
 export default App;
