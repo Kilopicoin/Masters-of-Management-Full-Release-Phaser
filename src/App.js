@@ -47,7 +47,7 @@ function App() {
 
   const handleEnterLand = () => {
     if (tileCoords.x !== null && tileCoords.y !== null) {
-      setSelectedTile({ x: tileCoords.x, y: tileCoords.y }); // Pass selected tile coordinates
+      setSelectedTile({ x: tileCoords.x, y: tileCoords.y, bonusType: tileCoords.bonusType }); // Pass selected tile coordinates
       if (gameRef.current) {
         gameRef.current.destroy(true); // Destroy the current Phaser game instance
         gameRef.current = null; // Reset the reference
@@ -314,6 +314,8 @@ function App() {
     fetchAllOccupiedTiles();
   }, [appKey]);
 
+  
+
   const updateTileMap = () => {
     if (gameRef.current) {
       const scene = gameRef.current.scene.keys.default;
@@ -352,8 +354,29 @@ function App() {
 
       const tile = await contract.tiles(x, y);
 
+      const bonusX = await contract.bonuses(x, y);
+      const bonus = parseInt(bonusX);
+      
+      let bonusTypeX = '';
+      switch (bonus) {
+        case 1:
+          bonusTypeX = 'Food';
+          break;
+        case 2:
+          bonusTypeX = 'Wood';
+          break;
+        case 3:
+          bonusTypeX = 'Stone';
+          break;
+        case 4:
+          bonusTypeX = 'Iron';
+          break;
+        default:
+          bonusTypeX = 'None';
+      }
 
-                setTileCoords({ x: x + 1, y: y + 1, occupied: true, occupant, isOnSale: tile.isOnSale, salePrice: Number(tile.salePrice + tile.saleBurnAmount)}); // Update the state with occupant info
+
+                setTileCoords({ x: x + 1, y: y + 1, occupied: true, occupant, isOnSale: tile.isOnSale, salePrice: Number(tile.salePrice + tile.saleBurnAmount), bonusType: bonusTypeX}); // Update the state with occupant info
               }
             });
           }
@@ -654,28 +677,28 @@ function App() {
     const handleRightClick = async (x, y) => {
       const bonus = await getTileBonus(x, y);
       
-      let bonusType = '';
+      let bonusTypeX = '';
       switch (bonus) {
         case 1:
-          bonusType = 'Food';
+          bonusTypeX = 'Food';
           break;
         case 2:
-          bonusType = 'Wood';
+          bonusTypeX = 'Wood';
           break;
         case 3:
-          bonusType = 'Stone';
+          bonusTypeX = 'Stone';
           break;
         case 4:
-          bonusType = 'Iron';
+          bonusTypeX = 'Iron';
           break;
         default:
-          bonusType = 'None';
+          bonusTypeX = 'None';
       }
     
       if (x + 1 >= 1 && x + 1 <= 20 && y + 1 >= 1 && y + 1 <= 20) {
-        setTileCoords({ x: x + 1, y: y + 1, occupied: tilesRef.current[x][y], bonusType });
+        setTileCoords({ x: x + 1, y: y + 1, occupied: tilesRef.current[x][y], bonusType: bonusTypeX });
       } else {
-        setTileCoords({ x: null, y: null, occupied: null, bonusType });
+        setTileCoords({ x: null, y: null, occupied: null, bonusType: bonusTypeX });
       }
     };
     

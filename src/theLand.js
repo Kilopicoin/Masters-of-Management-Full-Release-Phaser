@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { toast, ToastContainer } from 'react-toastify';
 import Phaser from 'phaser';
 import grassXImage from './assets/grassX.png';
@@ -11,7 +11,15 @@ import houseImage from './assets/buildings/house.png';
 import marketImage from './assets/buildings/market.png';
 import towerImage from './assets/buildings/tower.png';
 import workshopImage from './assets/buildings/workshop.png';
+
+import foodImage from './assets/res/food.png';
+import woodImage from './assets/res/wood.png';
+import stoneImage from './assets/res/stone.png';
+import ironImage from './assets/res/iron.png';
+
+
 import { getTheLandSignerContract } from './TheLandContract';
+import { Circles } from 'react-loader-spinner';
 import './App.css';
 
 const TheLand = ({ tileCoords, goBackToApp }) => {
@@ -22,6 +30,8 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     const [selectedBuilding, setSelectedBuilding] = useState(null);
     const [interactionMenuType, setinteractionMenuType] = useState("home");
     const buildingPreviewRef = useRef(null);
+    const [loading, setLoading] = useState(true); // New state for loading
+    const [tileData, setTileData] = useState(null); // For storing tile data (food, wood, stone, iron, level)
     const mapSize = 9;
 
     const buildingTypes = [
@@ -34,6 +44,89 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
       { key: 'tower', label: 'Tower', image: 'tower' },
       { key: 'workshop', label: 'Workshop', image: 'workshop' },
   ];
+
+  const buildingImageMap = useMemo(() => ({
+    1: 'armory',
+    2: 'blacksmith',
+    3: 'clanhall',
+    4: 'fightingpit',
+    5: 'house',
+    6: 'market',
+    7: 'tower',
+    8: 'workshop',
+}), []);
+
+
+const fetchTileData = async (x, y) => {
+    try {
+        const contract = await getTheLandSignerContract();
+        const [food, wood, stone, iron, level] = await contract.getTileData(x - 1, y - 1);
+
+        // Convert BigNumber to string or number
+        setTileData({
+            food: food.toString(),
+            wood: wood.toString(),
+            stone: stone.toString(),
+            iron: iron.toString(),
+            level: level.toString(), // Assuming level fits in a JS number
+        });
+    } catch (error) {
+        console.error("Error fetching tile data:", error);
+        toast.error("Failed to fetch tile data.");
+    }
+};
+
+
+
+useEffect(() => {
+    if (tileCoords && tileCoords.x !== null && tileCoords.y !== null) {
+        fetchTileData(tileCoords.x, tileCoords.y);
+    }
+}, [tileCoords]);
+
+
+
+const placeBuildingOnTile = async (mainX, mainY, interiorX, interiorY, buildingType, onTransactionStart, onTransactionEnd) => {
+    setLoading(true);
+    try {
+        onTransactionStart(); // Temporarily place the transparent image
+        const contract = await getTheLandSignerContract();
+        const tx = await contract.placeBuilding(mainX, mainY, interiorX, interiorY, buildingType);
+        await tx.wait();
+        onTransactionEnd(true); // Confirm the image placement
+        toast.success('Building placed successfully!');
+        return true; // Indicate success
+    } catch (error) {
+        console.error('Error placing building:', error);
+        onTransactionEnd(false); // Remove the transparent image
+        toast.error('Failed to place building. Please try again.');
+        return false; // Indicate failure
+    } finally {
+        setLoading(false);
+      }
+};
+
+
+
+
+
+
+const fetchAllBuildings = async (mainX, mainY) => {
+    try {
+        const contract = await getTheLandSignerContract();
+        const buildings = await contract.getAllBuildings(mainX, mainY);
+        return buildings; // Returns a 9x9 array of building types
+    } catch (error) {
+        console.error('Error fetching all buildings:', error);
+        return Array(9).fill(Array(9).fill(0)); // Return an empty grid on error
+    } finally {
+        setLoading(false);
+      }
+};
+
+
+
+
 
     const loginMetaMask = async () => {
         if (window.ethereum) {
@@ -110,6 +203,11 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
             this.load.image('market', marketImage);
             this.load.image('tower', towerImage);
             this.load.image('workshop', workshopImage);
+
+            this.load.image('food', foodImage);
+            this.load.image('wood', woodImage);
+            this.load.image('stone', stoneImage);
+            this.load.image('iron', ironImage);
         }
 
         async function create() {
@@ -120,6 +218,9 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
 
             const totalMapHeight = ((mapSize - 1) * overlap + visibleTileHeight / 2) * 2;
             const offsetX = window.innerWidth / 2;
+
+            const { x: mainX, y: mainY } = tileCoords;
+            const buildings = await fetchAllBuildings(mainX - 1, mainY - 1);
 
             this.lights.enable();
             this.lights.setAmbientColor(0x9999);
@@ -135,6 +236,12 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
                 for (let x = 0; x < mapSize; x++) {
                     const { worldX, worldY } = tileToWorldPosition(x, y);
                     this.add.image(worldX, worldY, 'grassX').setDepth(worldY);
+
+                    const buildingType = buildings[x][y]; // Get building type from the fetched data
+                    if (buildingType > 0 && buildingImageMap[buildingType]) {
+                        const buildingImage = buildingImageMap[buildingType];
+                        this.add.image(worldX, worldY, buildingImage).setDepth(worldY + 1);
+                    }
 
                     if (x === 4 && y === 4) {
                       const elders = this.add.image(worldX, worldY, 'elders').setDepth(worldY + 1);
@@ -154,6 +261,7 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
             this.cameras.main.setZoom(zoomLevel);
             const mapCenterY = totalMapHeight / 2;
             this.cameras.main.scrollY = mapCenterY - window.innerHeight / 2;
+            
 
             let isDragging = false;
             let dragStartX = 0;
@@ -161,6 +269,15 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
             let cameraStartX = 0;
             let cameraStartY = 0;
 
+
+            this.input.on('pointerdown', (pointer, gameObjects) => {
+                if (pointer.button === 2) {
+                    // If the click is not on a building, show the "home" menu
+                    if (!gameObjects.length) {
+                        setinteractionMenuType("home");
+                    }
+                }
+            });
 
 
             const previewImage = this.add
@@ -193,29 +310,63 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
 
 
 
-            this.input.on('pointerdown', function (pointer) {
-              if (pointer.button === 0 && selectedBuildingRef.current) {
-                const worldX = pointer.worldX;
-                const worldY = pointer.worldY;
-
-                const x = Math.floor((worldY / overlap + (worldX - offsetX) / halfTileWidth) / 2);
-                const y = Math.floor((worldY / overlap - (worldX - offsetX) / halfTileWidth) / 2);
-
-                if (x >= 0 && x < mapSize && y >= 0 && y < mapSize) {
-                    const { worldX, worldY } = tileToWorldPosition(x, y);
-                    this.add.image(worldX, worldY, selectedBuildingRef.current).setDepth(worldY + 1);
-                    selectedBuildingRef.current = null;
+            this.input.on('pointerdown', async function (pointer) {
+                if (pointer.button === 0 && selectedBuildingRef.current) {
+                    const worldX = pointer.worldX;
+                    const worldY = pointer.worldY;
+            
+                    const x = Math.floor((worldY / overlap + (worldX - offsetX) / halfTileWidth) / 2);
+                    const y = Math.floor((worldY / overlap - (worldX - offsetX) / halfTileWidth) / 2);
+            
+                    if (x >= 0 && x < mapSize && y >= 0 && y < mapSize) {
+                        const { worldX, worldY } = tileToWorldPosition(x, y);
+                        const buildingType = Object.keys(buildingImageMap).find(
+                            (key) => buildingImageMap[key] === selectedBuildingRef.current
+                        );
+            
+                        if (buildingType) {
+                            // Add a temporary transparent image
+                            const tempImage = this.add.image(worldX, worldY, selectedBuildingRef.current)
+                                .setAlpha(0.5)
+                                .setDepth(worldY + 1);
+            
+                            const onTransactionStart = () => {
+                                tempImage.setVisible(true);
+                            };
+            
+                            const onTransactionEnd = (success) => {
+                                if (success) {
+                                    tempImage.setAlpha(1); // Make the image permanent
+                                } else {
+                                    tempImage.destroy(); // Remove the image on failure
+                                }
+                            };
+            
+                            await placeBuildingOnTile(
+                                tileCoords.x - 1, // Main X coordinate
+                                tileCoords.y - 1, // Main Y coordinate
+                                x,
+                                y,
+                                parseInt(buildingType),
+                                onTransactionStart,
+                                onTransactionEnd
+                            );
+            
+                            selectedBuildingRef.current = null; // Reset the selected building
+                        }
+                    }
                 }
-            }
-
-              if (pointer.button === 0) {
-                  isDragging = true;
-                  dragStartX = pointer.x;
-                  dragStartY = pointer.y;
-                  cameraStartX = this.cameras.main.scrollX;
-                  cameraStartY = this.cameras.main.scrollY;
-              }
-          }, this);
+            
+                if (pointer.button === 0) {
+                    isDragging = true;
+                    dragStartX = pointer.x;
+                    dragStartY = pointer.y;
+                    cameraStartX = this.cameras.main.scrollX;
+                    cameraStartY = this.cameras.main.scrollY;
+                }
+            }, this);
+            
+            
 
 
 
@@ -258,7 +409,7 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
         };
         
         
-    }, []);
+    }, [buildingImageMap , tileCoords]);
 
     useEffect(() => {
       // Update the ref whenever `selectedBuilding` changes
@@ -272,6 +423,8 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
         return;
     }
 
+    setLoading(true);
+
     try {
         const contract = await getTheLandSignerContract(); // Replace with your function to get a signer instance
         const tx = await contract.useTurns(turns, tileCoords.x - 1, tileCoords.y - 1);
@@ -281,7 +434,9 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     } catch (error) {
         console.error("Error using turns:", error);
         toast.error("Failed to use turns. Please try again.");
-    }
+    } finally {
+        setLoading(false);
+      }
 };
 
 
@@ -302,11 +457,49 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
                 style={{ width: '100%', height: '100%', position: 'relative', zIndex: 0 }}
             />
 
+
+{loading && (
+  <>
+    {/* Dark background overlay */}
+    <div
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        backgroundColor: 'rgba(0, 0, 0, 0.7)', // Dark overlay with some transparency
+        zIndex: 99, // Below the spinner, but above the rest of the content
+      }}
+    ></div>
+
+    {/* Loading spinner */}
+    <div
+      style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: 100, // Above everything
+      }}
+    >
+      <Circles
+        height="100"
+        width="100"
+        color="#ffffff"
+        ariaLabel="loading-indicator"
+      />
+    </div>
+  </>
+)}
+
+            
+
 <div
     id="interaction-menu"
     style={{
         position: 'absolute',
-        top: 50,
+        top: 20,
         left: '50%',
         transform: 'translateX(-50%)',
         display: 'block', // Initially hidden
@@ -322,6 +515,29 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
 
 {interactionMenuType === "home" && (
     <>
+        {tileData && (
+            <div style={{ marginBottom: '10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <img src={foodImage} alt="Food" style={{ width: '20px' }} />
+                    <span>Food: {tileData.food}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
+                    <span>Wood: {tileData.wood}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
+                    <span>Stone: {tileData.stone}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
+                    <span>Iron: {tileData.iron}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <span>Level: {tileData.level}</span>
+                </div>
+            </div>
+        )}
         <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <input
                 type="number"
@@ -332,30 +548,29 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
                 style={{ flex: '1' }}
             />
             <button
-    style={{
-        padding: '10px 20px',
-        backgroundColor: '#007bff',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        cursor: 'pointer',
-    }}
-    onClick={() => {
-        const turns = document.querySelector(".fancy-inputX").value; // Get input value
-        if (turns && turns > 0) {
-            executeUseTurns(parseInt(turns), tileCoords, toast); // Pass necessary arguments
-        } else {
-            toast.error("Please enter a valid number of turns");
-        }
-    }}
->
-    Use Turn(s)
-</button>
-
-
+                style={{
+                    padding: '10px 20px',
+                    backgroundColor: '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '5px',
+                    cursor: 'pointer',
+                }}
+                onClick={() => {
+                    const turns = document.querySelector(".fancy-inputX").value; // Get input value
+                    if (turns && turns > 0) {
+                        executeUseTurns(parseInt(turns), tileCoords, toast); // Pass necessary arguments
+                    } else {
+                        toast.error("Please enter a valid number of turns");
+                    }
+                }}
+            >
+                Use Turn(s)
+            </button>
         </div>
     </>
 )}
+
 
 
 
@@ -436,7 +651,7 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
             fontSize: '14px',
           }}
         >
-          Go Back
+          Back to Map
         </button>
                 {metaMaskAccount ? (
                     <p>
@@ -449,10 +664,17 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
                     </button>
                 )}
                 {tileCoords && (
-    <p>
-      <strong>Land:</strong> X: {tileCoords.x}, Y: {tileCoords.y}
-    </p>
-  )}
+        <>
+            <p>
+                <strong>Land:</strong> X: {tileCoords.x}, Y: {tileCoords.y}
+            </p>
+            {tileCoords.bonusType && (
+                <p>
+                    <strong>Bonus:</strong> {tileCoords.bonusType}
+                </p>
+            )}
+        </>
+    )}
             </div>
         </div>
     );
