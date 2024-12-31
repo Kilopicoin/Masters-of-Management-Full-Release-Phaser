@@ -60,7 +60,8 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
 const fetchTileData = async (x, y) => {
     try {
         const contract = await getTheLandSignerContract();
-        const [food, wood, stone, iron, level] = await contract.getTileData(x - 1, y - 1);
+        const [food, wood, stone, iron, level, accumulatedTurns] = await contract.getTileData(x - 1, y - 1);
+        const currentTurns = await contract.getTurn(x - 1, y - 1); // Fetch real-time turns
 
         // Convert BigNumber to string or number
         setTileData({
@@ -68,13 +69,16 @@ const fetchTileData = async (x, y) => {
             wood: wood.toString(),
             stone: stone.toString(),
             iron: iron.toString(),
-            level: level.toString(), // Assuming level fits in a JS number
+            level: level.toString(),
+            accumulatedTurns: accumulatedTurns.toString(),
+            turns: currentTurns.toString(), // Add turns
         });
     } catch (error) {
         console.error("Error fetching tile data:", error);
         toast.error("Failed to fetch tile data.");
     }
 };
+
 
 
 
@@ -430,14 +434,18 @@ const fetchAllBuildings = async (mainX, mainY) => {
         const tx = await contract.useTurns(turns, tileCoords.x - 1, tileCoords.y - 1);
         await tx.wait();
 
+        // Fetch updated tile data after the transaction
+        await fetchTileData(tileCoords.x, tileCoords.y);
+
         toast.success(`Successfully used ${turns} turn(s)!`);
     } catch (error) {
         console.error("Error using turns:", error);
         toast.error("Failed to use turns. Please try again.");
     } finally {
         setLoading(false);
-      }
+    }
 };
+
 
 
 
@@ -516,35 +524,98 @@ const fetchAllBuildings = async (mainX, mainY) => {
 {interactionMenuType === "home" && (
     <>
         {tileData && (
-            <div style={{ marginBottom: '10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <img src={foodImage} alt="Food" style={{ width: '20px' }} />
-                    <span>Food: {tileData.food}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
-                    <span>Wood: {tileData.wood}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
-                    <span>Stone: {tileData.stone}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
-                    <span>Iron: {tileData.iron}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <span>Level: {tileData.level}</span>
-                </div>
+    <>
+        <div
+            style={{
+                marginBottom: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '15px',
+                justifyContent: 'center',
+            }}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={foodImage} alt="Food" style={{ width: '20px' }} />
+                <span>{tileData.food}</span>
             </div>
-        )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
+                <span>{tileData.wood}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
+                <span>{tileData.stone}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
+                <span>{tileData.iron}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <strong>Level:</strong>
+                <span>{tileData.level}/500</span>
+            </div>
+        </div>
+
+        <div
+            style={{
+                marginBottom: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+            }}
+        >
+            <strong>Current Turns:</strong>
+            <span style={{ marginLeft: '5px' }}>{tileData.turns}</span>
+        </div>
+
+        {/* Loading Bar */}
+        <div
+            style={{
+                height: '20px',
+                width: '100%',
+                backgroundColor: '#ddd',
+                borderRadius: '5px',
+                overflow: 'hidden',
+                margin: '10px 0',
+                position: 'relative',
+            }}
+        >
+            <div
+                style={{
+                    height: '100%',
+                    width: `${(tileData.accumulatedTurns / 1000) * 100}%`,
+                    backgroundColor: '#007bff',
+                    transition: 'width 0.3s ease',
+                    position: 'absolute',
+                }}
+            />
+            <span
+                style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    color: '#fff',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    whiteSpace: 'nowrap',
+                }}
+            >
+                Next Level {tileData.accumulatedTurns}/{1000}
+            </span>
+        </div>
+    </>
+)}
+
+
+
         <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <input
                 type="number"
                 min="1"
-                max="300"
+                max="600"
                 className="fancy-inputX"
-                placeholder="Enter a number (1-300)"
+                placeholder="Enter a number (1-600)"
                 style={{ flex: '1' }}
             />
             <button
