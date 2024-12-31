@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { toast, ToastContainer } from 'react-toastify';
 import Phaser from 'phaser';
 import grassXImage from './assets/grassX.png';
@@ -16,7 +16,7 @@ import foodImage from './assets/res/food.png';
 import woodImage from './assets/res/wood.png';
 import stoneImage from './assets/res/stone.png';
 import ironImage from './assets/res/iron.png';
-
+import turnsImage from './assets/res/turns.png';
 
 import { getTheLandSignerContract } from './TheLandContract';
 import { Circles } from 'react-loader-spinner';
@@ -33,6 +33,7 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     const [loading, setLoading] = useState(true); // New state for loading
     const [tileData, setTileData] = useState(null); // For storing tile data (food, wood, stone, iron, level)
     const mapSize = 9;
+    const turnsPerLevel = 1000;
 
     const buildingTypes = [
       { key: 'armory', label: 'Armory', image: 'armory' },
@@ -56,6 +57,38 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     8: 'workshop',
 }), []);
 
+const [calculatedResources, setCalculatedResources] = useState({
+    food: 0,
+    wood: 0,
+    stone: 0,
+    iron: 0,
+});
+
+
+const calculateResources = useCallback((turns) => {
+    if (!tileData) return;
+    setCalculatedResources({
+        food: turns,
+        wood: turns,
+        stone: turns,
+        iron: turns,
+    });
+}, [tileData]);
+
+useEffect(() => {
+    if (tileData && tileData.inputTurns) {
+        calculateResources(parseInt(tileData.inputTurns));
+    }
+}, [tileData?.inputTurns, calculateResources, tileData]);
+
+
+const getMaxAllowedTurns = () => {
+    if (!tileData) return 0;
+    const maxTurns = turnsPerLevel - parseInt(tileData.accumulatedTurns);
+    return Math.min(maxTurns, parseInt(tileData.turns)); // Limit by available turns
+};
+
+
 
 const fetchTileData = async (x, y) => {
     try {
@@ -72,7 +105,9 @@ const fetchTileData = async (x, y) => {
             level: level.toString(),
             accumulatedTurns: accumulatedTurns.toString(),
             turns: currentTurns.toString(), // Add turns
+            inputTurns: "", // Initialize inputTurns
         });
+        
     } catch (error) {
         console.error("Error fetching tile data:", error);
         toast.error("Failed to fetch tile data.");
@@ -212,6 +247,7 @@ const fetchAllBuildings = async (mainX, mainY) => {
             this.load.image('wood', woodImage);
             this.load.image('stone', stoneImage);
             this.load.image('iron', ironImage);
+            this.load.image('turns', turnsImage);
         }
 
         async function create() {
@@ -556,17 +592,7 @@ const fetchAllBuildings = async (mainX, mainY) => {
             </div>
         </div>
 
-        <div
-            style={{
-                marginBottom: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-            }}
-        >
-            <strong>Current Turns:</strong>
-            <span style={{ marginLeft: '5px' }}>{tileData.turns}</span>
-        </div>
+        
 
         {/* Loading Bar */}
         <div
@@ -610,35 +636,142 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
 
         <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <input
-                type="number"
-                min="1"
-                max="600"
-                className="fancy-inputX"
-                placeholder="Enter a number (1-600)"
-                style={{ flex: '1' }}
-            />
-            <button
-                style={{
-                    padding: '10px 20px',
-                    backgroundColor: '#007bff',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                }}
-                onClick={() => {
-                    const turns = document.querySelector(".fancy-inputX").value; // Get input value
-                    if (turns && turns > 0) {
-                        executeUseTurns(parseInt(turns), tileCoords, toast); // Pass necessary arguments
-                    } else {
-                        toast.error("Please enter a valid number of turns");
-                    }
-                }}
-            >
-                Use Turn(s)
-            </button>
+       
+        {tileData && (
+    <>
+
+        <div
+            style={{
+                marginBottom: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+            }}
+        >
+             <img src={turnsImage} alt="Turns" style={{ width: '20px' }} />
+            <span style={{ marginLeft: '5px' }}>{tileData.turns}/600</span>
         </div>
+        </>
+)}
+
+<input
+    type="number"
+    min="1"
+    className="fancy-inputX"
+    placeholder="Enter a number"
+    style={{ flex: '1' }}
+    value={(tileData && tileData.inputTurns) || ""}
+    onChange={(e) => {
+        const enteredValue = parseInt(e.target.value || "0", 10);
+        const maxAllowed = getMaxAllowedTurns();
+        const validatedValue = Math.min(enteredValue, maxAllowed); // Ensure the input does not exceed maxAllowed
+        setTileData((prev) => ({ ...prev, inputTurns: validatedValue })); // Update input value in state
+    }}
+/>
+
+
+<button
+    style={{
+        padding: '10px 20px',
+        backgroundColor: '#007bff',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        cursor: 'pointer',
+    }}
+    onClick={() => {
+        const turns = tileData?.inputTurns;
+        if (turns && turns > 0) {
+            executeUseTurns(turns, tileCoords, toast); // Use the validated value
+        } else {
+            toast.error("Please enter a valid number of turns");
+        }
+    }}
+>
+    Use Turn(s)
+</button>
+
+
+
+
+
+
+
+
+        </div>
+
+
+
+        {tileData && tileData.inputTurns > 0 && (
+            <>
+                <div
+                    style={{
+                        marginTop: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-around',
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <img src={foodImage} alt="Food" style={{ width: '20px' }} />
+                        <span>+{calculatedResources.food}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
+                        <span>+{calculatedResources.wood}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
+                        <span>+{calculatedResources.stone}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
+                        <span>+{calculatedResources.iron}</span>
+                    </div>
+                </div>
+
+
+
+
+<div
+            style={{
+                marginTop: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-around',
+            }}
+        >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={foodImage} alt="Food" style={{ width: '20px' }} />
+                <span>
+                    {parseInt(tileData.food) + calculatedResources.food}
+                </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
+                <span>
+                    {parseInt(tileData.wood) + calculatedResources.wood}
+                </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
+                <span>
+                    {parseInt(tileData.stone) + calculatedResources.stone}
+                </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
+                <span>
+                    {parseInt(tileData.iron) + calculatedResources.iron}
+                </span>
+            </div>
+        </div>
+
+        </>
+            )}
+
+
+
     </>
 )}
 
