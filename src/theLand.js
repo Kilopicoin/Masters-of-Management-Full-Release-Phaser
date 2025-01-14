@@ -66,14 +66,34 @@ const [calculatedResources, setCalculatedResources] = useState({
 
 
 const calculateResources = useCallback((turns) => {
-    if (!tileData) return;
-    setCalculatedResources({
-        food: turns,
-        wood: turns,
-        stone: turns,
-        iron: turns,
-    });
-}, [tileData]);
+    if (!tileData || !tileCoords.bonusType) return;
+
+    let food = turns + parseInt(tileData.level),
+        wood = turns + parseInt(tileData.level),
+        stone = turns + parseInt(tileData.level),
+        iron = turns + parseInt(tileData.level);
+
+    // Apply bonus based on the bonus type
+    switch (tileCoords.bonusType) {
+        case "Food":
+            food += turns;
+            break;
+        case "Wood":
+            wood += turns;
+            break;
+        case "Stone":
+            stone += turns;
+            break;
+        case "Iron":
+            iron += turns;
+            break;
+        default:
+            break;
+    }
+
+    setCalculatedResources({ food, wood, stone, iron });
+}, [tileData, tileCoords.bonusType]);
+
 
 useEffect(() => {
     if (tileData && tileData.inputTurns) {
