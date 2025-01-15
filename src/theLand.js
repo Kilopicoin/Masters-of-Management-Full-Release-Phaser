@@ -36,15 +36,17 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     const turnsPerLevel = 1000;
 
     const buildingTypes = [
-      { key: 'armory', label: 'Armory', image: 'armory' },
-      { key: 'blacksmith', label: 'Blacksmith', image: 'blacksmith' },
-      { key: 'clanhall', label: 'Clan Hall', image: 'clanhall' },
-      { key: 'fightingpit', label: 'Fighting Pit', image: 'fightingpit' },
-      { key: 'house', label: 'House', image: 'house' },
-      { key: 'market', label: 'Market', image: 'market' },
-      { key: 'tower', label: 'Tower', image: 'tower' },
-      { key: 'workshop', label: 'Workshop', image: 'workshop' },
-  ];
+        { key: 'armory', label: 'Armory', image: 'armory', cost: { food: 100, wood: 50, stone: 30, iron: 20 } },
+        { key: 'blacksmith', label: 'Blacksmith', image: 'blacksmith', cost: { food: 200, wood: 100, stone: 50, iron: 40 } },
+        { key: 'clanhall', label: 'Clan Hall', image: 'clanhall', cost: { food: 300, wood: 100, stone: 50, iron: 40 } },
+        { key: 'fightingpit', label: 'Fighting Pit', image: 'fightingpit', cost: { food: 400, wood: 100, stone: 50, iron: 40 } },
+        { key: 'house', label: 'House', image: 'house', cost: { food: 500, wood: 100, stone: 50, iron: 40 } },
+        { key: 'market', label: 'Market', image: 'market', cost: { food: 600, wood: 100, stone: 50, iron: 40 } },
+        { key: 'tower', label: 'Tower', image: 'tower', cost: { food: 700, wood: 100, stone: 50, iron: 40 } },
+        { key: 'workshop', label: 'Workshop', image: 'workshop', cost: { food: 800, wood: 100, stone: 50, iron: 40 } },
+    ];
+    
+
 
   const buildingImageMap = useMemo(() => ({
     1: 'armory',
@@ -110,7 +112,7 @@ const getMaxAllowedTurns = () => {
 
 
 
-const fetchTileData = async (x, y) => {
+const fetchTileData = useCallback(async (x, y) => {
     try {
         const contract = await getTheLandSignerContract();
         const [food, wood, stone, iron, level, accumulatedTurns] = await contract.getTileData(x - 1, y - 1);
@@ -127,12 +129,12 @@ const fetchTileData = async (x, y) => {
             turns: currentTurns.toString(), // Add turns
             inputTurns: "", // Initialize inputTurns
         });
-        
     } catch (error) {
         console.error("Error fetching tile data:", error);
         toast.error("Failed to fetch tile data.");
     }
-};
+}, []); // Add dependencies if required (e.g., external variables used inside the function)
+
 
 
 
@@ -141,29 +143,41 @@ useEffect(() => {
     if (tileCoords && tileCoords.x !== null && tileCoords.y !== null) {
         fetchTileData(tileCoords.x, tileCoords.y);
     }
-}, [tileCoords]);
+}, [tileCoords, fetchTileData]); // Include fetchTileData as a dependency
 
 
 
-const placeBuildingOnTile = async (mainX, mainY, interiorX, interiorY, buildingType, onTransactionStart, onTransactionEnd) => {
-    setLoading(true);
-    try {
-        onTransactionStart(); // Temporarily place the transparent image
-        const contract = await getTheLandSignerContract();
-        const tx = await contract.placeBuilding(mainX, mainY, interiorX, interiorY, buildingType);
-        await tx.wait();
-        onTransactionEnd(true); // Confirm the image placement
-        toast.success('Building placed successfully!');
-        return true; // Indicate success
-    } catch (error) {
-        console.error('Error placing building:', error);
-        onTransactionEnd(false); // Remove the transparent image
-        toast.error('Failed to place building. Please try again.');
-        return false; // Indicate failure
-    } finally {
-        setLoading(false);
-      }
-};
+
+const placeBuildingOnTile = useCallback(
+    async (mainX, mainY, interiorX, interiorY, buildingType, onTransactionStart, onTransactionEnd) => {
+        setLoading(true);
+        try {
+            onTransactionStart(); // Temporarily place the transparent image
+            const contract = await getTheLandSignerContract();
+            const tx = await contract.placeBuilding(mainX, mainY, interiorX, interiorY, buildingType);
+            await tx.wait();
+
+            onTransactionEnd(true); // Confirm the image placement
+            toast.success('Building placed successfully!');
+
+            // Fetch updated tile data after the building is placed
+            await fetchTileData(tileCoords.x, tileCoords.y);
+
+            return true; // Indicate success
+        } catch (error) {
+            console.error('Error placing building:', error);
+            onTransactionEnd(false); // Remove the transparent image
+            toast.error('Failed to place building. Please try again.');
+            return false; // Indicate failure
+        } finally {
+            setLoading(false);
+        }
+    },
+    [tileCoords, fetchTileData] // Include necessary dependencies
+);
+
+
+
 
 
 
@@ -347,6 +361,20 @@ const fetchAllBuildings = async (mainX, mainY) => {
                 .setDepth(10000); // Make sure it's above everything else
             buildingPreviewRef.current = previewImage;
 
+
+            this.input.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    // Deselect building
+                    setSelectedBuilding(null);
+                    selectedBuildingRef.current = null;
+        
+                    // Hide the preview image
+                    if (buildingPreviewRef.current) {
+                        buildingPreviewRef.current.setVisible(false);
+                    }
+                }
+            });
+
             this.input.on('pointermove', (pointer) => {
                 if (selectedBuildingRef.current) {
                     const worldX = pointer.worldX;
@@ -372,6 +400,7 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
             this.input.on('pointerdown', async function (pointer) {
                 if (pointer.button === 0 && selectedBuildingRef.current) {
+
                     const worldX = pointer.worldX;
                     const worldY = pointer.worldY;
             
@@ -400,7 +429,10 @@ const fetchAllBuildings = async (mainX, mainY) => {
                                 } else {
                                     tempImage.destroy(); // Remove the image on failure
                                 }
+                                
                             };
+
+                            
             
                             await placeBuildingOnTile(
                                 tileCoords.x - 1, // Main X coordinate
@@ -411,13 +443,14 @@ const fetchAllBuildings = async (mainX, mainY) => {
                                 onTransactionStart,
                                 onTransactionEnd
                             );
+
+                            
+
             
                             selectedBuildingRef.current = null; // Reset the selected building
                         }
                     }
-                }
-            
-                if (pointer.button === 0) {
+                } else if (pointer.button === 0 && !selectedBuildingRef.current) {
                     isDragging = true;
                     dragStartX = pointer.x;
                     dragStartY = pointer.y;
@@ -469,7 +502,7 @@ const fetchAllBuildings = async (mainX, mainY) => {
         };
         
         
-    }, [buildingImageMap , tileCoords]);
+    }, [buildingImageMap, tileCoords, placeBuildingOnTile]);
 
     useEffect(() => {
       // Update the ref whenever `selectedBuilding` changes
@@ -815,32 +848,102 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
 
 
-    {interactionMenuType === "buildings" && (
-        <>
-    <strong>Select Building Type:</strong>
-    <div style={{ marginTop: '10px' }}>
-        {buildingTypes.map((building) => (
-            <button
-                key={building.key}
+{interactionMenuType === "buildings" && (
+    <>
+        <strong>Select Building Type:</strong>
+
+        {/* Current Tile Resources */}
+        {tileData && (
+            <div
                 style={{
-                    margin: '5px',
-                    padding: '10px',
-                    backgroundColor: selectedBuilding === building.image ? '#007bff' : '#f0f0f0',
-                    color: selectedBuilding === building.image ? 'white' : '#333',
-                    border: 'none',
-                    borderRadius: '5px',
-                    cursor: 'pointer',
-                }}
-                onClick={() => {
-                    setSelectedBuilding(building.image);
+                    marginBottom: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '15px',
+                    justifyContent: 'center',
                 }}
             >
-                {building.label}
-            </button>
-        ))}
-    </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <img src={foodImage} alt="Food" style={{ width: '20px' }} />
+                    <span>{tileData.food}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
+                    <span>{tileData.wood}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
+                    <span>{tileData.stone}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
+                    <span>{tileData.iron}</span>
+                </div>
+                
+            </div>
+        )}
+
+        {/* Building Type List */}
+        <div
+            style={{
+                marginTop: '10px',
+                display: 'flex', // Use flex for horizontal alignment
+                gap: '6px', // Add space between building cards
+                overflowX: 'auto', // Enable horizontal scrolling if needed
+                padding: '3px 0',
+            }}
+        >
+            {buildingTypes.map((building) => (
+                <div
+                    key={building.key}
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'column', // Stack image and text vertically
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '3px',
+                        border: `2px solid ${
+                            selectedBuilding === building.image ? '#007bff' : '#f0f0f0'
+                        }`,
+                        borderRadius: '10px',
+                        cursor: 'pointer',
+                        backgroundColor: selectedBuilding === building.image ? '#e8f0ff' : 'white',
+                        minWidth: '120px', // Set a minimum width for each card
+                    }}
+                    onClick={() => setSelectedBuilding(building.image)}
+                >
+                    <img
+                        src={require(`./assets/buildings/${building.image}.png`)}
+                        alt={building.label}
+                        style={{ width: '60px', height: '60px' }}
+                    />
+                    <strong>{building.label}</strong>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                            <img src={foodImage} alt="Food" style={{ width: '20px' }} />
+                            <span>{building.cost.food}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                            <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
+                            <span>{building.cost.wood}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                            <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
+                            <span>{building.cost.stone}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                            <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
+                            <span>{building.cost.iron}</span>
+                        </div>
+                    </div>
+                </div>
+            ))}
+        </div>
     </>
 )}
+
+
+
 </div>
 
 
