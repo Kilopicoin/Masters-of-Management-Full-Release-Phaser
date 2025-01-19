@@ -18,6 +18,9 @@ import stoneImage from './assets/res/stone.png';
 import ironImage from './assets/res/iron.png';
 import turnsImage from './assets/res/turns.png';
 
+import defensiveArmorImage from './assets/armors/defensive.png';
+import offensiveArmorImage from './assets/armors/offensive.png';
+
 import { getTheLandSignerContract } from './TheLandContract';
 import { Circles } from 'react-loader-spinner';
 import './App.css';
@@ -34,6 +37,18 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     const [tileData, setTileData] = useState(null); // For storing tile data (food, wood, stone, iron, level)
     const mapSize = 9;
     const turnsPerLevel = 1000;
+    const [armorQuantities, setArmorQuantities] = useState({ offensive: 0, defensive: 0 }); // To track input quantities
+    const [showArmorCosts, setShowArmorCosts] = useState(false);
+
+
+    const [armorCosts, setArmorCosts] = useState({
+        food: 0,
+        wood: 0,
+        stone: 0,
+        iron: 0,
+    });
+    
+    
 
     const buildingTypes = [
         { key: 'armory', label: 'Armory', image: 'armory', cost: { food: 100, wood: 50, stone: 30, iron: 20 } },
@@ -65,6 +80,77 @@ const [calculatedResources, setCalculatedResources] = useState({
     stone: 0,
     iron: 0,
 });
+
+const produceArmor = async (armorType, quantity) => {
+    if (quantity <= 0) {
+        toast.error("Quantity must be greater than 0.");
+        return;
+    }
+
+    try {
+        setLoading(true);
+        const contract = await getTheLandSignerContract();
+        const tx = await contract.produceArmor(
+            tileCoords.x - 1,
+            tileCoords.y - 1,
+            armorType,
+            quantity
+        );
+        await tx.wait();
+        toast.success(`${armorType === 1 ? "Offensive" : "Defensive"} armor produced successfully!`);
+        await fetchTileData(tileCoords.x, tileCoords.y); // Refresh tile data
+    } catch (error) {
+        console.error("Error producing armor:", error);
+        toast.error("Failed to produce armor. Please try again.");
+    } finally {
+        setLoading(false);
+    }
+};
+
+const calculateArmorCost = useCallback((armorType, quantity) => {
+    if (!tileData) return;
+
+    const baseCost = armorType === 1
+        ? { food: 50, wood: 30, stone: 20, iron: 10 } // Base costs for offensive armor
+        : { food: 40, wood: 20, stone: 30, iron: 15 }; // Base costs for defensive armor
+
+    // Adjust the cost if armories exist
+    const armoryCount = 1; // You may want to dynamically calculate this based on your interior map data
+    const multiplier = quantity / armoryCount;
+
+    return {
+        food: Math.ceil(baseCost.food * multiplier),
+        wood: Math.ceil(baseCost.wood * multiplier),
+        stone: Math.ceil(baseCost.stone * multiplier),
+        iron: Math.ceil(baseCost.iron * multiplier),
+    };
+}, [tileData]);
+
+const handleArmorInputChange = (armorType, value) => {
+    const quantity = parseInt(value || "0", 10);
+
+    const offensiveCost = calculateArmorCost(1, armorType === 1 ? quantity : armorQuantities.offensive);
+    const defensiveCost = calculateArmorCost(2, armorType === 2 ? quantity : armorQuantities.defensive);
+
+    setArmorCosts({
+        food: offensiveCost.food + defensiveCost.food,
+        wood: offensiveCost.wood + defensiveCost.wood,
+        stone: offensiveCost.stone + defensiveCost.stone,
+        iron: offensiveCost.iron + defensiveCost.iron,
+    });
+
+    setArmorQuantities((prev) => ({
+        ...prev,
+        [armorType === 1 ? 'offensive' : 'defensive']: value,
+    }));
+
+    // Show or hide the cost line based on input values
+    setShowArmorCosts(quantity > 0 || (armorType === 1 ? armorQuantities.defensive : armorQuantities.offensive) > 0);
+};
+
+
+
+
 
 
 const calculateResources = useCallback((turns) => {
@@ -115,7 +201,7 @@ const getMaxAllowedTurns = () => {
 const fetchTileData = useCallback(async (x, y) => {
     try {
         const contract = await getTheLandSignerContract();
-        const [food, wood, stone, iron, level, accumulatedTurns] = await contract.getTileData(x - 1, y - 1);
+        const [food, wood, stone, iron, level, accumulatedTurns, offensiveArmor, defensiveArmor] = await contract.getTileData(x - 1, y - 1);
         const currentTurns = await contract.getTurn(x - 1, y - 1); // Fetch real-time turns
 
         // Convert BigNumber to string or number
@@ -128,6 +214,8 @@ const fetchTileData = useCallback(async (x, y) => {
             accumulatedTurns: accumulatedTurns.toString(),
             turns: currentTurns.toString(), // Add turns
             inputTurns: "", // Initialize inputTurns
+            offensiveArmor: offensiveArmor.toString(),
+            defensiveArmor: defensiveArmor.toString()
         });
     } catch (error) {
         console.error("Error fetching tile data:", error);
@@ -282,6 +370,9 @@ const fetchAllBuildings = async (mainX, mainY) => {
             this.load.image('stone', stoneImage);
             this.load.image('iron', ironImage);
             this.load.image('turns', turnsImage);
+
+            this.load.image('defensivearmor', defensiveArmorImage);
+            this.load.image('offensivearmor', offensiveArmorImage);
         }
 
         async function create() {
@@ -314,14 +405,27 @@ const fetchAllBuildings = async (mainX, mainY) => {
                     const buildingType = buildings[x][y]; // Get building type from the fetched data
                     if (buildingType > 0 && buildingImageMap[buildingType]) {
                         const buildingImage = buildingImageMap[buildingType];
-                        this.add.image(worldX, worldY, buildingImage).setDepth(worldY + 1);
+                        const building = this.add.image(worldX, worldY, buildingImage).setDepth(worldY + 1);
+            
+                        // Add interactivity specifically for the armory
+                        if (buildingImage === 'armory') {
+                            building.setInteractive({ pixelPerfect: true });
+                            building.on('pointerdown', (pointer) => {
+                                if (pointer.button === 2) { // Right-click
+                                    setinteractionMenuType('armory'); // Set the menu type to armory
+                                }
+                            });
+                        }
                     }
+                    
 
                     if (x === 4 && y === 4) {
                       const elders = this.add.image(worldX, worldY, 'elders').setDepth(worldY + 1);
       
                       // Add right-click listener to the elders image
-                      elders.setInteractive();
+                      elders.setInteractive({
+                        pixelPerfect: true
+                      });
                       elders.on('pointerdown', (pointer) => {
                           if (pointer.button === 2) {
                               // Show the "Select Building Type" menu
@@ -400,6 +504,7 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
             this.input.on('pointerdown', async function (pointer) {
                 if (pointer.button === 0 && selectedBuildingRef.current) {
+
                     const worldX = pointer.worldX;
                     const worldY = pointer.worldY;
             
@@ -428,7 +533,10 @@ const fetchAllBuildings = async (mainX, mainY) => {
                                 } else {
                                     tempImage.destroy(); // Remove the image on failure
                                 }
+                                
                             };
+
+                            
             
                             await placeBuildingOnTile(
                                 tileCoords.x - 1, // Main X coordinate
@@ -439,13 +547,14 @@ const fetchAllBuildings = async (mainX, mainY) => {
                                 onTransactionStart,
                                 onTransactionEnd
                             );
+
+                            
+
             
                             selectedBuildingRef.current = null; // Reset the selected building
                         }
                     }
-                }
-            
-                if (pointer.button === 0) {
+                } else if (pointer.button === 0 && !selectedBuildingRef.current) {
                     isDragging = true;
                     dragStartX = pointer.x;
                     dragStartY = pointer.y;
@@ -641,6 +750,25 @@ const fetchAllBuildings = async (mainX, mainY) => {
         </div>
 
         
+        <div
+                    style={{
+                        marginBottom: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '15px',
+                        justifyContent: 'center',
+                    }}
+                >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <img src={offensiveArmorImage} alt="Offensive Armor" style={{ width: '20px' }} />
+                        <span>{tileData.offensiveArmor}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <img src={defensiveArmorImage} alt="Defensive Armor" style={{ width: '20px' }} />
+                        <span>{tileData.defensiveArmor}</span>
+                    </div>
+                </div>
+
 
         {/* Loading Bar */}
         <div
@@ -936,6 +1064,155 @@ const fetchAllBuildings = async (mainX, mainY) => {
         </div>
     </>
 )}
+
+
+
+{interactionMenuType === "armory" && (
+  <div>
+    <div className="card-title">Produce Armor</div>
+    {tileData && (
+        <>
+      <div className="card-resource-bar">
+        <div className="resource-item">
+          <img src={foodImage} alt="Food" style={{ width: "20px" }} />
+          <span>{tileData.food}</span>
+        </div>
+        <div className="resource-item">
+          <img src={woodImage} alt="Wood" style={{ width: "20px" }} />
+          <span>{tileData.wood}</span>
+        </div>
+        <div className="resource-item">
+          <img src={stoneImage} alt="Stone" style={{ width: "20px" }} />
+          <span>{tileData.stone}</span>
+        </div>
+        <div className="resource-item">
+          <img src={ironImage} alt="Iron" style={{ width: "20px" }} />
+          <span>{tileData.iron}</span>
+        </div>
+
+        
+      </div>
+
+<div
+style={{
+    marginBottom: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px',
+    justifyContent: 'center',
+}}
+>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={offensiveArmorImage} alt="Offensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.offensiveArmor}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={defensiveArmorImage} alt="Defensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.defensiveArmor}</span>
+</div>
+</div>
+
+</>
+    )}
+    <div className="card-content">
+    <div className="input-container">
+        <img src={offensiveArmorImage} alt="Offensive" style={{ width: "50px" }} />
+        <input
+            type="number"
+            min="0"
+            value={armorQuantities.offensive}
+            onChange={(e) => handleArmorInputChange(1, e.target.value)}
+        />
+        <button
+            className="card-button"
+            onClick={() => produceArmor(1, armorQuantities.offensive)}
+        >
+            Produce Offensive Armor
+        </button>
+    </div>
+    <div className="input-container">
+        <img src={defensiveArmorImage} alt="Defensive" style={{ width: "50px" }} />
+        <input
+            type="number"
+            min="0"
+            value={armorQuantities.defensive}
+            onChange={(e) => handleArmorInputChange(2, e.target.value)}
+        />
+        <button
+            className="card-button"
+            onClick={() => produceArmor(2, armorQuantities.defensive)}
+        >
+            Produce Defensive Armor
+        </button>
+    </div>
+
+    {showArmorCosts && (
+        <>
+    <div
+        style={{
+            marginTop: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '15px',
+        }}
+    >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <img src={foodImage} alt="Food" style={{ width: '20px' }} />
+            <span>-{armorCosts.food}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
+            <span>-{armorCosts.wood}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
+            <span>-{armorCosts.stone}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
+            <span>-{armorCosts.iron}</span>
+        </div>
+    </div>
+
+<div
+style={{
+    marginTop: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '15px',
+}}
+>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={foodImage} alt="Food" style={{ width: '20px' }} />
+    
+    <span>{parseInt(tileData.food) - armorCosts.food}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
+    <span>{parseInt(tileData.wood) - armorCosts.wood}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
+    <span>{parseInt(tileData.stone) - armorCosts.stone}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
+    <span>{parseInt(tileData.iron) - armorCosts.iron}</span>
+</div>
+</div>
+
+</>
+)}
+
+</div>
+
+
+  </div>
+)}
+
+
 
 
 
