@@ -21,6 +21,9 @@ import turnsImage from './assets/res/turns.png';
 import defensiveArmorImage from './assets/armors/defensive.png';
 import offensiveArmorImage from './assets/armors/offensive.png';
 
+import defensiveWeaponImage from './assets/weapons/defensive.png';
+import offensiveWeaponImage from './assets/weapons/offensive.png';
+
 import { getTheLandSignerContract } from './TheLandContract';
 import { Circles } from 'react-loader-spinner';
 import './App.css';
@@ -38,11 +41,20 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     const mapSize = 9;
     const turnsPerLevel = 1000;
     const [armorQuantities, setArmorQuantities] = useState({ offensive: 0, defensive: 0 }); // To track input quantities
+    const [weaponQuantities, setWeaponQuantities] = useState({ offensive: 0, defensive: 0 }); // To track input quantities
     const [showArmorCosts, setShowArmorCosts] = useState(false);
+    const [showWeaponCosts, setShowWeaponCosts] = useState(false);
     const [buildingCounts, setBuildingCounts] = useState({});
 
 
     const [armorCosts, setArmorCosts] = useState({
+        food: 0,
+        wood: 0,
+        stone: 0,
+        iron: 0,
+    });
+
+    const [weaponCosts, setWeaponCosts] = useState({
         food: 0,
         wood: 0,
         stone: 0,
@@ -118,6 +130,38 @@ const produceArmor = async (armorType, quantity) => {
     }
 };
 
+
+
+
+const produceWeapon = async (weaponType, quantity) => {
+    if (quantity <= 0) {
+        toast.error("Quantity must be greater than 0.");
+        return;
+    }
+
+    try {
+        setLoading(true);
+        const contract = await getTheLandSignerContract();
+        const tx = await contract.produceWeapon(
+            tileCoords.x - 1,
+            tileCoords.y - 1,
+            weaponType,
+            quantity
+        );
+        await tx.wait();
+        toast.success(`${weaponType === 1 ? "Offensive" : "Defensive"} weapon produced successfully!`);
+        await fetchTileData(tileCoords.x, tileCoords.y); // Refresh tile data
+    } catch (error) {
+        console.error("Error producing weapon:", error);
+        toast.error("Failed to produce weapon. Please try again.");
+    } finally {
+        setLoading(false);
+    }
+};
+
+
+
+
 const calculateArmorCost = useCallback((armorType, quantity) => {
     if (!tileData) return;
 
@@ -136,6 +180,32 @@ const calculateArmorCost = useCallback((armorType, quantity) => {
         iron: Math.ceil(baseCost.iron * multiplier),
     };
 }, [tileData]);
+
+
+
+
+const calculateWeaponCost = useCallback((weaponType, quantity) => {
+    if (!tileData) return;
+
+    const baseCost = weaponType === 1
+        ? { food: 50, wood: 30, stone: 20, iron: 10 } // Base costs for offensive armor
+        : { food: 40, wood: 20, stone: 30, iron: 15 }; // Base costs for defensive armor
+
+    // Adjust the cost if armories exist
+    const blacksmithCount = 1; // You may want to dynamically calculate this based on your interior map data
+    const multiplier = quantity / blacksmithCount;
+
+    return {
+        food: Math.ceil(baseCost.food * multiplier),
+        wood: Math.ceil(baseCost.wood * multiplier),
+        stone: Math.ceil(baseCost.stone * multiplier),
+        iron: Math.ceil(baseCost.iron * multiplier),
+    };
+}, [tileData]);
+
+
+
+
 
 const handleArmorInputChange = (armorType, value) => {
     const quantity = parseInt(value || "0", 10);
@@ -157,6 +227,31 @@ const handleArmorInputChange = (armorType, value) => {
 
     // Show or hide the cost line based on input values
     setShowArmorCosts(quantity > 0 || (armorType === 1 ? armorQuantities.defensive : armorQuantities.offensive) > 0);
+};
+
+
+
+
+const handleWeaponInputChange = (weaponType, value) => {
+    const quantity = parseInt(value || "0", 10);
+
+    const offensiveCost = calculateWeaponCost(1, weaponType === 1 ? quantity : weaponQuantities.offensive);
+    const defensiveCost = calculateWeaponCost(2, weaponType === 2 ? quantity : weaponQuantities.defensive);
+
+    setWeaponCosts({
+        food: offensiveCost.food + defensiveCost.food,
+        wood: offensiveCost.wood + defensiveCost.wood,
+        stone: offensiveCost.stone + defensiveCost.stone,
+        iron: offensiveCost.iron + defensiveCost.iron,
+    });
+
+    setWeaponQuantities((prev) => ({
+        ...prev,
+        [weaponType === 1 ? 'offensive' : 'defensive']: value,
+    }));
+
+    // Show or hide the cost line based on input values
+    setShowWeaponCosts(quantity > 0 || (weaponType === 1 ? weaponQuantities.defensive : weaponQuantities.offensive) > 0);
 };
 
 
@@ -212,7 +307,7 @@ const getMaxAllowedTurns = () => {
 const fetchTileData = useCallback(async (x, y) => {
     try {
         const contract = await getTheLandSignerContract();
-        const [food, wood, stone, iron, level, accumulatedTurns, offensiveArmor, defensiveArmor] = await contract.getTileData(x - 1, y - 1);
+        const [food, wood, stone, iron, level, accumulatedTurns, offensiveArmor, defensiveArmor, offensiveWeapon, defensiveWeapon] = await contract.getTileData(x - 1, y - 1);
         const currentTurns = await contract.getTurn(x - 1, y - 1); // Fetch real-time turns
 
         // Convert BigNumber to string or number
@@ -226,7 +321,9 @@ const fetchTileData = useCallback(async (x, y) => {
             turns: currentTurns.toString(), // Add turns
             inputTurns: "", // Initialize inputTurns
             offensiveArmor: offensiveArmor.toString(),
-            defensiveArmor: defensiveArmor.toString()
+            defensiveArmor: defensiveArmor.toString(),
+            offensiveWeapon: offensiveWeapon.toString(),
+            defensiveWeapon: defensiveWeapon.toString()
         });
     } catch (error) {
         console.error("Error fetching tile data:", error);
@@ -383,6 +480,9 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
             this.load.image('defensivearmor', defensiveArmorImage);
             this.load.image('offensivearmor', offensiveArmorImage);
+
+            this.load.image('defensiveweapon', defensiveWeaponImage);
+            this.load.image('offensiveweapon', offensiveWeaponImage);
         }
 
         async function create() {
@@ -444,7 +544,15 @@ const fetchAllBuildings = async (mainX, mainY) => {
                                     setinteractionMenuType('armory'); // Set the menu type to armory
                                 }
                             });
+                        } else if (buildingImage === 'blacksmith') {
+                            building.setInteractive({ pixelPerfect: true });
+                            building.on('pointerdown', (pointer) => {
+                                if (pointer.button === 2) { // Right-click
+                                    setinteractionMenuType('blacksmith'); // Set the menu type to blacksmith
+                                }
+                            });
                         }
+                        
                     }
                     
 
@@ -796,6 +904,18 @@ const fetchAllBuildings = async (mainX, mainY) => {
                         <img src={defensiveArmorImage} alt="Defensive Armor" style={{ width: '20px' }} />
                         <span>{tileData.defensiveArmor}</span>
                     </div>
+
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <img src={offensiveWeaponImage} alt="Offensive Weapon" style={{ width: '20px' }} />
+                        <span>{tileData.offensiveWeapon}</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <img src={defensiveWeaponImage} alt="Defensive Weapon" style={{ width: '20px' }} />
+                        <span>{tileData.defensiveWeapon}</span>
+                    </div>
+
+
                 </div>
 
 
@@ -1139,6 +1259,19 @@ style={{
     <img src={defensiveArmorImage} alt="Defensive Armor" style={{ width: '20px' }} />
     <span>{tileData.defensiveArmor}</span>
 </div>
+
+
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={offensiveWeaponImage} alt="Offensive Weapon" style={{ width: '20px' }} />
+    <span>{tileData.offensiveWeapon}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={defensiveWeaponImage} alt="Defensive Weapon" style={{ width: '20px' }} />
+    <span>{tileData.defensiveWeapon}</span>
+</div>
+
+
+
 </div>
 
 </>
@@ -1242,6 +1375,165 @@ style={{
 )}
 
 
+
+
+
+
+{interactionMenuType === "blacksmith" && (
+  <div>
+    <div className="card-title">Produce Weapon</div>
+    {tileData && (
+        <>
+      <div className="card-resource-bar">
+        <div className="resource-item">
+          <img src={foodImage} alt="Food" style={{ width: "20px" }} />
+          <span>{tileData.food}</span>
+        </div>
+        <div className="resource-item">
+          <img src={woodImage} alt="Wood" style={{ width: "20px" }} />
+          <span>{tileData.wood}</span>
+        </div>
+        <div className="resource-item">
+          <img src={stoneImage} alt="Stone" style={{ width: "20px" }} />
+          <span>{tileData.stone}</span>
+        </div>
+        <div className="resource-item">
+          <img src={ironImage} alt="Iron" style={{ width: "20px" }} />
+          <span>{tileData.iron}</span>
+        </div>
+
+        
+      </div>
+
+<div
+style={{
+    marginBottom: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px',
+    justifyContent: 'center',
+}}
+>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={offensiveArmorImage} alt="Offensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.offensiveArmor}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={defensiveArmorImage} alt="Defensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.defensiveArmor}</span>
+</div>
+
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={offensiveWeaponImage} alt="Offensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.offensiveWeapon}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={defensiveWeaponImage} alt="Defensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.defensiveWeapon}</span>
+</div>
+
+
+</div>
+
+</>
+    )}
+    <div className="card-content">
+    <div className="input-container">
+        <img src={offensiveWeaponImage} alt="Offensive" style={{ width: "50px" }} />
+        <input
+            type="number"
+            min="0"
+            value={weaponQuantities.offensive}
+            onChange={(e) => handleWeaponInputChange(1, e.target.value)}
+        />
+        <button
+            className="card-button"
+            onClick={() => produceWeapon(1, weaponQuantities.offensive)}
+        >
+            Produce Offensive Weapon
+        </button>
+    </div>
+    <div className="input-container">
+        <img src={defensiveWeaponImage} alt="Defensive" style={{ width: "50px" }} />
+        <input
+            type="number"
+            min="0"
+            value={weaponQuantities.defensive}
+            onChange={(e) => handleWeaponInputChange(2, e.target.value)}
+        />
+        <button
+            className="card-button"
+            onClick={() => produceWeapon(2, weaponQuantities.defensive)}
+        >
+            Produce Defensive Weapon
+        </button>
+    </div>
+
+    {showWeaponCosts && (
+        <>
+    <div
+        style={{
+            marginTop: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '15px',
+        }}
+    >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <img src={foodImage} alt="Food" style={{ width: '20px' }} />
+            <span>-{weaponCosts.food}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
+            <span>-{weaponCosts.wood}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
+            <span>-{weaponCosts.stone}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
+            <span>-{weaponCosts.iron}</span>
+        </div>
+    </div>
+
+<div
+style={{
+    marginTop: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '15px',
+}}
+>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={foodImage} alt="Food" style={{ width: '20px' }} />
+    
+    <span>{parseInt(tileData.food) - weaponCosts.food}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
+    <span>{parseInt(tileData.wood) - weaponCosts.wood}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
+    <span>{parseInt(tileData.stone) - weaponCosts.stone}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
+    <span>{parseInt(tileData.iron) - weaponCosts.iron}</span>
+</div>
+</div>
+
+</>
+)}
+
+</div>
+
+
+  </div>
+)}
 
 
 
