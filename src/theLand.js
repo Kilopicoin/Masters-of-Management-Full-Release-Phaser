@@ -24,6 +24,9 @@ import offensiveArmorImage from './assets/armors/offensive.png';
 import defensiveWeaponImage from './assets/weapons/defensive.png';
 import offensiveWeaponImage from './assets/weapons/offensive.png';
 
+import defensiveSoldierImage from './assets/soldiers/defensive.png';
+import offensiveSoldierImage from './assets/soldiers/offensive.png';
+
 import { getTheLandSignerContract } from './TheLandContract';
 import { Circles } from 'react-loader-spinner';
 import './App.css';
@@ -42,8 +45,11 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     const turnsPerLevel = 1000;
     const [armorQuantities, setArmorQuantities] = useState({ offensive: 0, defensive: 0 }); // To track input quantities
     const [weaponQuantities, setWeaponQuantities] = useState({ offensive: 0, defensive: 0 }); // To track input quantities
+    const [soldierQuantities, setSoldierQuantities] = useState({ offensive: 0, defensive: 0 });
+
     const [showArmorCosts, setShowArmorCosts] = useState(false);
     const [showWeaponCosts, setShowWeaponCosts] = useState(false);
+    const [showSoldierCosts, setShowSoldierCosts] = useState(false);
     const [buildingCounts, setBuildingCounts] = useState({});
 
 
@@ -55,6 +61,13 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     });
 
     const [weaponCosts, setWeaponCosts] = useState({
+        food: 0,
+        wood: 0,
+        stone: 0,
+        iron: 0,
+    });
+
+    const [soldierCosts, setSoldierCosts] = useState({
         food: 0,
         wood: 0,
         stone: 0,
@@ -161,6 +174,37 @@ const produceWeapon = async (weaponType, quantity) => {
 
 
 
+const trainSoldier = async (soldierType, quantity) => {
+    if (quantity <= 0) {
+        toast.error("Quantity must be greater than 0.");
+        return;
+    }
+
+    try {
+        setLoading(true);
+        const contract = await getTheLandSignerContract();
+        const tx = await contract.createSoldier(
+            tileCoords.x - 1,
+            tileCoords.y - 1,
+            soldierType,
+            quantity
+        );
+        await tx.wait();
+        toast.success(`${soldierType === 1 ? "Offensive" : "Defensive"} soldier trained successfully!`);
+        
+        await fetchTileData(tileCoords.x, tileCoords.y); // Refresh tile data after training soldiers
+    } catch (error) {
+        console.error("Error training soldier:", error);
+        toast.error("Failed to train soldier. Please try again.");
+    } finally {
+        setLoading(false);
+    }
+};
+
+
+
+
+
 
 const calculateArmorCost = useCallback((armorType, quantity) => {
     if (!tileData) return;
@@ -204,6 +248,24 @@ const calculateWeaponCost = useCallback((weaponType, quantity) => {
 }, [tileData]);
 
 
+const calculateSoldierCost = useCallback((soldierType, quantity) => {
+    if (!tileData) return;
+
+    const baseCost = soldierType === 1
+        ? { food: 60, wood: 60, stone: 60, iron: 60 } // Base costs for offensive soldier
+        : { food: 60, wood: 60, stone: 60, iron: 60 }; // Base costs for defensive soldier
+
+    // Adjust cost if a Fighting Pit exists
+    const fightingPitCount = 1; // Replace this with dynamic logic if needed
+    const multiplier = quantity / fightingPitCount;
+
+    return {
+        food: Math.ceil(baseCost.food * multiplier),
+        wood: Math.ceil(baseCost.wood * multiplier),
+        stone: Math.ceil(baseCost.stone * multiplier),
+        iron: Math.ceil(baseCost.iron * multiplier),
+    };
+}, [tileData]);
 
 
 
@@ -254,6 +316,27 @@ const handleWeaponInputChange = (weaponType, value) => {
     setShowWeaponCosts(quantity > 0 || (weaponType === 1 ? weaponQuantities.defensive : weaponQuantities.offensive) > 0);
 };
 
+
+const handleSoldierInputChange = (soldierType, value) => {
+    const quantity = parseInt(value || "0", 10);
+
+    const offensiveCost = calculateSoldierCost(1, soldierType === 1 ? quantity : soldierQuantities.offensive);
+    const defensiveCost = calculateSoldierCost(2, soldierType === 2 ? quantity : soldierQuantities.defensive);
+
+    setSoldierCosts({
+        food: offensiveCost.food + defensiveCost.food,
+        wood: offensiveCost.wood + defensiveCost.wood,
+        stone: offensiveCost.stone + defensiveCost.stone,
+        iron: offensiveCost.iron + defensiveCost.iron,
+    });
+
+    setSoldierQuantities((prev) => ({
+        ...prev,
+        [soldierType === 1 ? 'offensive' : 'defensive']: value,
+    }));
+
+    setShowSoldierCosts(quantity > 0 || (soldierType === 1 ? soldierQuantities.defensive : soldierQuantities.offensive) > 0);
+};
 
 
 
@@ -307,23 +390,25 @@ const getMaxAllowedTurns = () => {
 const fetchTileData = useCallback(async (x, y) => {
     try {
         const contract = await getTheLandSignerContract();
-        const [food, wood, stone, iron, level, accumulatedTurns, offensiveArmor, defensiveArmor, offensiveWeapon, defensiveWeapon] = await contract.getTileData(x - 1, y - 1);
+        const tileDataResponse = await contract.getTileData(x - 1, y - 1);
         const currentTurns = await contract.getTurn(x - 1, y - 1); // Fetch real-time turns
 
         // Convert BigNumber to string or number
         setTileData({
-            food: food.toString(),
-            wood: wood.toString(),
-            stone: stone.toString(),
-            iron: iron.toString(),
-            level: level.toString(),
-            accumulatedTurns: accumulatedTurns.toString(),
+            food: tileDataResponse.food.toString(),
+            wood: tileDataResponse.wood.toString(),
+            stone: tileDataResponse.stone.toString(),
+            iron: tileDataResponse.iron.toString(),
+            level: tileDataResponse.level.toString(),
+            accumulatedTurns: tileDataResponse.accumulatedTurns.toString(),
             turns: currentTurns.toString(), // Add turns
             inputTurns: "", // Initialize inputTurns
-            offensiveArmor: offensiveArmor.toString(),
-            defensiveArmor: defensiveArmor.toString(),
-            offensiveWeapon: offensiveWeapon.toString(),
-            defensiveWeapon: defensiveWeapon.toString()
+            offensiveArmor: tileDataResponse.offensiveArmor.toString(),
+            defensiveArmor: tileDataResponse.defensiveArmor.toString(),
+            offensiveWeapon: tileDataResponse.offensiveWeapon.toString(),
+            defensiveWeapon: tileDataResponse.defensiveWeapon.toString(),
+            offensiveSoldier: tileDataResponse.offensiveSoldier.toString(),
+            defensiveSoldier: tileDataResponse.defensiveSoldier.toString(),
         });
     } catch (error) {
         console.error("Error fetching tile data:", error);
@@ -483,6 +568,10 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
             this.load.image('defensiveweapon', defensiveWeaponImage);
             this.load.image('offensiveweapon', offensiveWeaponImage);
+
+            this.load.image('defensivesoldier', defensiveSoldierImage);
+            this.load.image('offensivesoldier', offensiveSoldierImage);
+
         }
 
         async function create() {
@@ -549,6 +638,13 @@ const fetchAllBuildings = async (mainX, mainY) => {
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
                                     setinteractionMenuType('blacksmith'); // Set the menu type to blacksmith
+                                }
+                            });
+                        } else if (buildingImage === 'fightingpit') {
+                            building.setInteractive({ pixelPerfect: true });
+                            building.on('pointerdown', (pointer) => {
+                                if (pointer.button === 2) { // Right-click
+                                    setinteractionMenuType('train-soldier'); // Set the menu type to train soldiers
                                 }
                             });
                         }
@@ -916,6 +1012,16 @@ const fetchAllBuildings = async (mainX, mainY) => {
                     </div>
 
 
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={offensiveSoldierImage} alt="Offensive Soldier" style={{ width: '20px' }} />
+                <span>{tileData.offensiveSoldier}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={defensiveSoldierImage} alt="Defensive Soldier" style={{ width: '20px' }} />
+                <span>{tileData.defensiveSoldier}</span>
+            </div>
+
+
                 </div>
 
 
@@ -1271,6 +1377,15 @@ style={{
 </div>
 
 
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={offensiveSoldierImage} alt="Offensive Soldier" style={{ width: '20px' }} />
+                <span>{tileData.offensiveSoldier}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={defensiveSoldierImage} alt="Defensive Soldier" style={{ width: '20px' }} />
+                <span>{tileData.defensiveSoldier}</span>
+            </div>
+
 
 </div>
 
@@ -1432,6 +1547,14 @@ style={{
     <span>{tileData.defensiveWeapon}</span>
 </div>
 
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={offensiveSoldierImage} alt="Offensive Soldier" style={{ width: '20px' }} />
+                <span>{tileData.offensiveSoldier}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={defensiveSoldierImage} alt="Defensive Soldier" style={{ width: '20px' }} />
+                <span>{tileData.defensiveSoldier}</span>
+            </div>
 
 </div>
 
@@ -1534,6 +1657,179 @@ style={{
 
   </div>
 )}
+
+
+
+{interactionMenuType === "train-soldier" && (
+  <div>
+    <div className="card-title">Train Soldiers</div>
+    {tileData && (
+        <>
+          <div className="card-resource-bar">
+            <div className="resource-item">
+              <img src={foodImage} alt="Food" style={{ width: "20px" }} />
+              <span>{tileData.food}</span>
+            </div>
+            <div className="resource-item">
+              <img src={woodImage} alt="Wood" style={{ width: "20px" }} />
+              <span>{tileData.wood}</span>
+            </div>
+            <div className="resource-item">
+              <img src={stoneImage} alt="Stone" style={{ width: "20px" }} />
+              <span>{tileData.stone}</span>
+            </div>
+            <div className="resource-item">
+              <img src={ironImage} alt="Iron" style={{ width: "20px" }} />
+              <span>{tileData.iron}</span>
+            </div>
+          </div>
+
+          <div
+            style={{
+                marginBottom: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '15px',
+                justifyContent: 'center',
+            }}
+          >
+
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={offensiveArmorImage} alt="Offensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.offensiveArmor}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={defensiveArmorImage} alt="Defensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.defensiveArmor}</span>
+</div>
+
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={offensiveWeaponImage} alt="Offensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.offensiveWeapon}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={defensiveWeaponImage} alt="Defensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.defensiveWeapon}</span>
+</div>
+
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={offensiveSoldierImage} alt="Offensive Soldier" style={{ width: '20px' }} />
+                <span>{tileData.offensiveSoldier}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <img src={defensiveSoldierImage} alt="Defensive Soldier" style={{ width: '20px' }} />
+                <span>{tileData.defensiveSoldier}</span>
+            </div>
+          </div>
+        </>
+    )}
+
+    <div className="card-content">
+      <div className="input-container">
+          <img src={offensiveSoldierImage} alt="Offensive Soldier" style={{ width: "50px" }} />
+          <input
+              type="number"
+              min="0"
+              value={soldierQuantities.offensive}
+              onChange={(e) => handleSoldierInputChange(1, e.target.value)}
+          />
+          <button
+    className="card-button"
+    onClick={() => trainSoldier(1, soldierQuantities.offensive)}
+>
+    Train Offensive Soldier
+</button>
+      </div>
+
+      <div className="input-container">
+          <img src={defensiveSoldierImage} alt="Defensive Soldier" style={{ width: "50px" }} />
+          <input
+              type="number"
+              min="0"
+              value={soldierQuantities.defensive}
+              onChange={(e) => handleSoldierInputChange(2, e.target.value)}
+          />
+          <button
+    className="card-button"
+    onClick={() => trainSoldier(2, soldierQuantities.defensive)}
+>
+    Train Defensive Soldier
+</button>
+      </div>
+
+
+
+
+      {showSoldierCosts && (
+        <>
+    <div
+        style={{
+            marginTop: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '15px',
+        }}
+    >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <img src={foodImage} alt="Food" style={{ width: '20px' }} />
+            <span>-{soldierCosts.food}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
+            <span>-{soldierCosts.wood}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
+            <span>-{soldierCosts.stone}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
+            <span>-{soldierCosts.iron}</span>
+        </div>
+    </div>
+
+<div
+style={{
+    marginTop: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '15px',
+}}
+>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={foodImage} alt="Food" style={{ width: '20px' }} />
+    
+    <span>{parseInt(tileData.food) - soldierCosts.food}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
+    <span>{parseInt(tileData.wood) - soldierCosts.wood}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
+    <span>{parseInt(tileData.stone) - soldierCosts.stone}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
+    <span>{parseInt(tileData.iron) - soldierCosts.iron}</span>
+</div>
+</div>
+
+</>
+)}
+
+
+
+
+    </div>
+  </div>
+)}
+
+
+
 
 
 
