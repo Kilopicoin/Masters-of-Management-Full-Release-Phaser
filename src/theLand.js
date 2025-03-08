@@ -202,6 +202,25 @@ const trainSoldier = async (soldierType, quantity) => {
 };
 
 
+const upgradeTech = async (techType) => {
+    try {
+        setLoading(true);
+        const contract = await getTheLandSignerContract();
+        const tx = await contract.upgradeTech(tileCoords.x - 1, tileCoords.y - 1, techType);
+        await tx.wait();
+        toast.success("Technology upgraded successfully!");
+
+        await fetchTileData(tileCoords.x, tileCoords.y); // Refresh data after upgrade
+    } catch (error) {
+        console.error("Error upgrading tech:", error);
+        toast.error("Failed to upgrade technology. Please try again.");
+    } finally {
+        setLoading(false);
+    }
+};
+
+
+
 
 
 
@@ -343,33 +362,36 @@ const handleSoldierInputChange = (soldierType, value) => {
 
 
 const calculateResources = useCallback((turns) => {
-    if (!tileData || !tileCoords.bonusType) return;
+    if (!tileData || !tileCoords.bonusType || !buildingCounts) return;
 
-    let food = turns + parseInt(tileData.level),
-        wood = turns + parseInt(tileData.level),
-        stone = turns + parseInt(tileData.level),
-        iron = turns + parseInt(tileData.level);
+    const houseCount = (buildingCounts[5] || 0) + 1; // Ensure at least a multiplier of 1
+
+    let food = turns * houseCount;
+    let wood = turns * houseCount;
+    let stone = turns * houseCount;
+    let iron = turns * houseCount;
 
     // Apply bonus based on the bonus type
     switch (tileCoords.bonusType) {
         case "Food":
-            food += turns;
+            food += turns * houseCount;
             break;
         case "Wood":
-            wood += turns;
+            wood += turns * houseCount;
             break;
         case "Stone":
-            stone += turns;
+            stone += turns * houseCount;
             break;
         case "Iron":
-            iron += turns;
+            iron += turns * houseCount;
             break;
         default:
             break;
     }
 
     setCalculatedResources({ food, wood, stone, iron });
-}, [tileData, tileCoords.bonusType]);
+}, [tileData, tileCoords.bonusType, buildingCounts]);
+
 
 
 useEffect(() => {
@@ -409,6 +431,10 @@ const fetchTileData = useCallback(async (x, y) => {
             defensiveWeapon: tileDataResponse.defensiveWeapon.toString(),
             offensiveSoldier: tileDataResponse.offensiveSoldier.toString(),
             defensiveSoldier: tileDataResponse.defensiveSoldier.toString(),
+            techLevels: {
+                offensiveTech: tileDataResponse.offensiveTech.toString(),
+                defensiveTech: tileDataResponse.defensiveTech.toString(),
+            },
         });
     } catch (error) {
         console.error("Error fetching tile data:", error);
@@ -416,6 +442,22 @@ const fetchTileData = useCallback(async (x, y) => {
     }
 }, []); // Add dependencies if required (e.g., external variables used inside the function)
 
+const fetchTileTurns = async (x, y) => {
+    try {
+        const contract = await getTheLandSignerContract();
+        const updatedTurns = await contract.getTurn(x - 1, y - 1); // Fetch real-time turns
+
+        setTileData((prev) => ({
+            ...prev,
+            turns: updatedTurns.toString(), // Update turns in the state
+        }));
+
+        toast.success("Turns updated!");
+    } catch (error) {
+        console.error("Error fetching turns:", error);
+        toast.error("Failed to fetch turns.");
+    }
+};
 
 
 
@@ -645,6 +687,27 @@ const fetchAllBuildings = async (mainX, mainY) => {
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
                                     setinteractionMenuType('train-soldier'); // Set the menu type to train soldiers
+                                }
+                            });
+                        } else if (buildingImage === 'house') {
+                            building.setInteractive({ pixelPerfect: true });
+                            building.on('pointerdown', (pointer) => {
+                                if (pointer.button === 2) { // Right-click
+                                    setinteractionMenuType('house-info'); // Set the menu type to train soldiers
+                                }
+                            });
+                        } else if (buildingImage === 'tower') {
+                            building.setInteractive({ pixelPerfect: true });
+                            building.on('pointerdown', (pointer) => {
+                                if (pointer.button === 2) { // Right-click
+                                    setinteractionMenuType('tower-info'); // Set the menu type to train soldiers
+                                }
+                            });
+                        } else if (buildingImage === 'workshop') {
+                            building.setInteractive({ pixelPerfect: true });
+                            building.on('pointerdown', (pointer) => {
+                                if (pointer.button === 2) { // Right-click
+                                    setinteractionMenuType('workshop'); // Set the menu type to train soldiers
                                 }
                             });
                         }
@@ -1011,6 +1074,18 @@ const fetchAllBuildings = async (mainX, mainY) => {
                         <span>{tileData.defensiveWeapon}</span>
                     </div>
 
+                    </div>
+
+
+                    <div
+                    style={{
+                        marginBottom: '10px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '15px',
+                        justifyContent: 'center',
+                    }}
+                >
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                 <img src={offensiveSoldierImage} alt="Offensive Soldier" style={{ width: '20px' }} />
@@ -1020,6 +1095,20 @@ const fetchAllBuildings = async (mainX, mainY) => {
                 <img src={defensiveSoldierImage} alt="Defensive Soldier" style={{ width: '20px' }} />
                 <span>{tileData.defensiveSoldier}</span>
             </div>
+
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    Attack: 
+    <span>{tileData ? (parseInt(tileData.offensiveSoldier) + parseInt(tileData.level) + parseInt(tileData.techLevels.offensiveTech)) : 0}</span>
+</div>
+
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    Defense: 
+    <span>{tileData ? (parseInt(tileData.defensiveSoldier) + parseInt(tileData.level) + (parseInt(buildingCounts[7] || 0) * 100)  + parseInt(tileData.techLevels.defensiveTech)) : 0}</span>
+</div>
+
+            
+
 
 
                 </div>
@@ -1071,17 +1160,22 @@ const fetchAllBuildings = async (mainX, mainY) => {
         {tileData && (
     <>
 
-        <div
-            style={{
-                marginBottom: '10px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-            }}
-        >
-             <img src={turnsImage} alt="Turns" style={{ width: '20px' }} />
-            <span style={{ marginLeft: '5px' }}>{tileData.turns}/600</span>
-        </div>
+<div
+    style={{
+        marginBottom: '10px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '15px',
+        justifyContent: 'center',
+    }}
+>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }} 
+        onClick={() => fetchTileTurns(tileCoords.x, tileCoords.y)}>
+        <img src={turnsImage} alt="Turns" style={{ width: '20px' }} />
+        <span>{tileData.turns}/600</span>
+    </div>
+</div>
+
         </>
 )}
 
@@ -1826,6 +1920,110 @@ style={{
 
     </div>
   </div>
+)}
+
+
+
+
+{interactionMenuType === "house-info" && (
+    <div>
+    <div className="card-title">House</div>
+    {tileData && (
+        <>
+          <div className="card-resource-bar">
+          House is providing +1 to all resources each turn
+          </div>
+
+          
+        </>
+    )}
+
+  
+  </div>
+)}
+
+
+
+
+{interactionMenuType === "tower-info" && (
+    <div>
+    <div className="card-title">Tower</div>
+    {tileData && (
+        <>
+          <div className="card-resource-bar">
+          Tower is providing +100 to Realm's Defense Power
+          </div>
+
+          
+        </>
+    )}
+
+  
+  </div>
+)}
+
+
+
+
+{interactionMenuType === "workshop" && (
+    <div>
+        <div className="card-title">Workshop</div>
+
+        {tileData && (
+            <>
+                <div className="card-resource-bar">
+                    <div className="resource-item">
+                        <img src={foodImage} alt="Food" style={{ width: "20px" }} />
+                        <span>{tileData.food}</span>
+                    </div>
+                    <div className="resource-item">
+                        <img src={woodImage} alt="Wood" style={{ width: "20px" }} />
+                        <span>{tileData.wood}</span>
+                    </div>
+                    <div className="resource-item">
+                        <img src={stoneImage} alt="Stone" style={{ width: "20px" }} />
+                        <span>{tileData.stone}</span>
+                    </div>
+                    <div className="resource-item">
+                        <img src={ironImage} alt="Iron" style={{ width: "20px" }} />
+                        <span>{tileData.iron}</span>
+                    </div>
+                </div>
+
+                <div className="card-content">
+                    {[
+                        { id: 1, name: "Offensive Tech", level: tileData.techLevels.offensiveTech },
+                        { id: 2, name: "Defensive Tech", level: tileData.techLevels.defensiveTech }
+                    ].map((tech) => {
+                        // Calculate upgrade costs dynamically
+                        const workshopCount = buildingCounts[8] || 1; // Ensure at least 1 workshop exists
+                        const costMultiplier = parseInt(tech.level) + 1;
+                        const foodCost = Math.ceil((100 * costMultiplier) / workshopCount);
+                        const woodCost = Math.ceil((80 * costMultiplier) / workshopCount);
+                        const stoneCost = Math.ceil((60 * costMultiplier) / workshopCount);
+                        const ironCost = Math.ceil((50 * costMultiplier) / workshopCount);
+
+                        return (
+                            <div className="tech-item" key={tech.id}>
+                                <strong>{tech.name}:</strong> {tech.level}
+                                <button onClick={() => upgradeTech(tech.id)}>Upgrade</button>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <img src={foodImage} alt="Food" style={{ width: '20px' }} />
+                                    <span>{foodCost}</span>
+                                    <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
+                                    <span>{woodCost}</span>
+                                    <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
+                                    <span>{stoneCost}</span>
+                                    <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
+                                    <span>{ironCost}</span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </>
+        )}
+    </div>
 )}
 
 
