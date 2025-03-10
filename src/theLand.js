@@ -28,6 +28,9 @@ import defensiveSoldierImage from './assets/soldiers/defensive.png';
 import offensiveSoldierImage from './assets/soldiers/offensive.png';
 
 import { getTheLandSignerContract } from './TheLandContract';
+import { getMarketplaceSignerContract, contractAddress } from './MarketplaceContract';
+import { getTokenSignerContract } from './Tokencontract';
+
 import { Circles } from 'react-loader-spinner';
 import './App.css';
 
@@ -51,6 +54,15 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     const [showWeaponCosts, setShowWeaponCosts] = useState(false);
     const [showSoldierCosts, setShowSoldierCosts] = useState(false);
     const [buildingCounts, setBuildingCounts] = useState({});
+
+    const [selectedResourceType, setSelectedResourceType] = useState("1"); // Default to Food
+    const [marketplaceItems, setMarketplaceItems] = useState([]);
+
+    const [selectedResource, setSelectedResource] = useState("1");
+const [sellAmount, setSellAmount] = useState("");
+const [sellPrice, setSellPrice] = useState("");
+
+
 
 
     const [armorCosts, setArmorCosts] = useState({
@@ -461,6 +473,110 @@ const fetchTileTurns = async (x, y) => {
 
 
 
+const fetchMarketplaceItemsByType = async () => {
+    try {
+        setLoading(true);
+        const contract = await getMarketplaceSignerContract();
+        const items = await contract.getListingsByResourceType(selectedResourceType); // Fetch only selected category
+
+        const formattedItems = items.map((item, index) => ({
+            id: index, // Since we don't store an ID in the contract, use index
+            seller: item.seller,
+            resourceType: item.resourceType.toString(),
+            amount: item.amount.toString(),
+            price: item.price.toString(),
+        }));
+
+        setMarketplaceItems(formattedItems);
+    } catch (error) {
+        console.error("Error fetching marketplace items:", error);
+        toast.error("Failed to load marketplace items.");
+    } finally {
+        setLoading(false);
+    }
+};
+
+
+
+
+const listItemForSale = async () => {
+    try {
+        setLoading(true);
+        const contract = await getMarketplaceSignerContract();
+        const x = tileCoords.x - 1;
+        const y = tileCoords.y - 1;
+
+        const resourceType = parseInt(selectedResource);
+        const amount = parseInt(sellAmount);
+        const price = parseInt(sellPrice);
+
+        if (amount <= 0 || price <= 0) {
+            toast.error("Amount and price must be greater than 0");
+            setLoading(false);
+            return;
+        }
+
+        const tx = await contract.listItemForSale(x, y, resourceType, amount, price);
+        await tx.wait();
+
+        toast.success("Item listed successfully!");
+        await fetchTileData(tileCoords.x, tileCoords.y); // Refresh tile data
+
+        // Reset the input fields after successful listing
+        setSellAmount("");
+        setSellPrice("");
+    } catch (error) {
+        console.error("Error listing item:", error);
+        toast.error("Failed to list item.");
+    } finally {
+        setLoading(false);
+    }
+};
+
+
+
+
+
+const buyItem = async (item, index) => {
+    try {
+        setLoading(true);
+
+
+
+
+        const TokencontractSigner = await getTokenSignerContract();
+        
+                const Allowancetx = await TokencontractSigner.increaseAllowance(
+                  contractAddress,
+                  item.price
+                );
+                await Allowancetx.wait();
+
+
+
+        const contract = await getMarketplaceSignerContract();
+        const tx = await contract.buyItem(
+            tileCoords.x - 1,
+            tileCoords.y - 1,
+            item.resourceType,
+            index
+        );
+        await tx.wait();
+
+        toast.success("Item purchased successfully!");
+        await fetchTileData(tileCoords.x, tileCoords.y); // Refresh tile data
+        await fetchMarketplaceItemsByType(); // Refresh marketplace items
+    } catch (error) {
+        console.error("Error buying item:", error);
+        toast.error("Failed to buy item.");
+    } finally {
+        setLoading(false);
+    }
+};
+
+
+
+
 
 useEffect(() => {
     if (tileCoords && tileCoords.x !== null && tileCoords.y !== null) {
@@ -708,6 +824,13 @@ const fetchAllBuildings = async (mainX, mainY) => {
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
                                     setinteractionMenuType('workshop'); // Set the menu type to train soldiers
+                                }
+                            });
+                        } else if (buildingImage === 'market') {
+                            building.setInteractive({ pixelPerfect: true });
+                            building.on('pointerdown', (pointer) => {
+                                if (pointer.button === 2) { // Right-click
+                                    setinteractionMenuType('marketplace'); // Set the menu type to train soldiers
                                 }
                             });
                         }
@@ -2020,6 +2143,150 @@ style={{
                             </div>
                         );
                     })}
+                </div>
+            </>
+        )}
+    </div>
+)}
+
+
+
+
+{interactionMenuType === "marketplace" && (
+    <div>
+        <div className="card-title">Marketplace</div>
+
+        {/* Resource Selection */}
+        <div className="card-content">
+            <h4>Select a Resource Type</h4>
+            <select 
+                value={selectedResourceType} 
+                onChange={(e) => setSelectedResourceType(e.target.value)}
+            >
+                <option value="1">Food</option>
+                <option value="2">Wood</option>
+                <option value="3">Stone</option>
+                <option value="4">Iron</option>
+                <option value="5">Offensive Armor</option>
+                <option value="6">Defensive Armor</option>
+                <option value="7">Offensive Weapon</option>
+                <option value="8">Defensive Weapon</option>
+            </select>
+            <button 
+                onClick={fetchMarketplaceItemsByType} 
+                style={{ marginTop: '10px', padding: '8px' }}
+            >
+                Show Listings
+            </button>
+        </div>
+
+        {/* List of Items (Only shows after fetching) */}
+        {marketplaceItems.length > 0 ? (
+            <div className="marketplace-list">
+                <h4>Listed Items</h4>
+                {marketplaceItems.map((item, index) => (
+                    <div key={index} className="market-item" 
+                        style={{
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            justifyContent: 'space-between',
+                            padding: '5px 10px', 
+                            borderBottom: '1px solid #ddd'
+                        }}>
+                        <span><strong>{item.seller.slice(0, 6)}...</strong></span>
+                        <span>Amount: {item.amount}</span>
+                        <span>Price: {item.price} LOP</span>
+                        <button 
+                            style={{
+                                padding: '5px 10px', 
+                                backgroundColor: '#28a745', 
+                                color: 'white', 
+                                border: 'none', 
+                                borderRadius: '5px', 
+                                cursor: 'pointer'
+                            }}
+                            onClick={() => buyItem(item, index)}
+                        >
+                            Buy
+                        </button>
+                    </div>
+                ))}
+            </div>
+        ) : (
+            <p style={{ marginTop: '10px' }}>No items found in this category.</p>
+        )}
+
+        {/* Button to List a New Item */}
+        <button 
+            onClick={() => setinteractionMenuType("marketplaceCreate")}
+            style={{ marginTop: '10px', padding: '8px' }}
+        >
+            List an Item for Sale
+        </button>
+    </div>
+)}
+
+
+
+
+
+
+
+
+{interactionMenuType === "marketplaceCreate" && (
+    <div>
+        <div className="card-title">Marketplace</div>
+
+        {tileData && (
+            <>
+                <div className="card-resource-bar">
+                    <div className="resource-item">
+                        <img src={foodImage} alt="Food" style={{ width: "20px" }} />
+                        <span>{tileData.food}</span>
+                    </div>
+                    <div className="resource-item">
+                        <img src={woodImage} alt="Wood" style={{ width: "20px" }} />
+                        <span>{tileData.wood}</span>
+                    </div>
+                    <div className="resource-item">
+                        <img src={stoneImage} alt="Stone" style={{ width: "20px" }} />
+                        <span>{tileData.stone}</span>
+                    </div>
+                    <div className="resource-item">
+                        <img src={ironImage} alt="Iron" style={{ width: "20px" }} />
+                        <span>{tileData.iron}</span>
+                    </div>
+                </div>
+
+                <div className="card-content">
+                    <h4>List an Item for Sale</h4>
+                    <select value={selectedResource} onChange={(e) => setSelectedResource(e.target.value)}>
+    <option value="1">Food</option>
+    <option value="2">Wood</option>
+    <option value="3">Stone</option>
+    <option value="4">Iron</option>
+    <option value="5">Offensive Armor</option>
+    <option value="6">Defensive Armor</option>
+    <option value="7">Offensive Weapon</option>
+    <option value="8">Defensive Weapon</option>
+</select>
+<input 
+    type="number" 
+    placeholder="Amount" 
+    value={sellAmount} 
+    onChange={(e) => setSellAmount(e.target.value)} 
+/>
+
+<input 
+    type="number" 
+    placeholder="Price in LOP" 
+    value={sellPrice} 
+    onChange={(e) => setSellPrice(e.target.value)} 
+/>
+
+                    <button onClick={() => listItemForSale()}>
+                        List Item for Sale
+                    </button>
                 </div>
             </>
         )}
