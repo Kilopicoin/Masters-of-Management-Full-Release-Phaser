@@ -28,7 +28,8 @@ import defensiveSoldierImage from './assets/soldiers/defensive.png';
 import offensiveSoldierImage from './assets/soldiers/offensive.png';
 
 import { getTheLandSignerContract } from './TheLandContract';
-import { getMarketplaceSignerContract, contractAddress } from './MarketplaceContract';
+import { getMarketplaceSignerContract, MarketplacecontractAddress } from './MarketplaceContract';
+import { getclanSignerContract } from './clancontract';
 import { getTokenSignerContract } from './Tokencontract';
 
 import { Circles } from 'react-loader-spinner';
@@ -62,8 +63,8 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
 const [sellAmount, setSellAmount] = useState("");
 const [sellPrice, setSellPrice] = useState("");
 
-
-
+const [userClan, setUserClan] = useState(null);
+const [clanDetails, setClanDetails] = useState(null);
 
     const [armorCosts, setArmorCosts] = useState({
         food: 0,
@@ -124,7 +125,50 @@ const [calculatedResources, setCalculatedResources] = useState({
 
   
 
+const checkUserClan = useCallback(async () => {
+    try {
+        const contract = await getclanSignerContract();
+        const userAddress = await window.ethereum.request({ method: 'eth_accounts' });
 
+        if (!userAddress.length) {
+            setUserClan(null);
+            return;
+        }
+
+        const clanId = await contract.members(userAddress[0]);
+        if (clanId.isMember) {
+            setUserClan(clanId.clanId);
+            const details = await contract.getClanInfo(clanId.clanId);
+            setClanDetails(details);
+        } else {
+            setUserClan(null);
+            setClanDetails(null);
+        }
+    } catch (error) {
+        console.error("Error fetching clan info:", error);
+        toast.error("Failed to fetch clan information.");
+    }
+}, []);
+
+const createClan = async () => {
+    try {
+        setLoading(true);
+        const contract = await getclanSignerContract();
+        const tx = await contract.createClan("My Clan");
+        await tx.wait();
+        toast.success("Clan created successfully!");
+        await checkUserClan();
+    } catch (error) {
+        console.error("Error creating clan:", error);
+        toast.error("Failed to create clan.");
+    } finally {
+        setLoading(false);
+    }
+};
+
+useEffect(() => {
+    checkUserClan();
+}, [checkUserClan]);
 
 
 
@@ -547,7 +591,7 @@ const buyItem = async (item, index) => {
         const TokencontractSigner = await getTokenSignerContract();
         
                 const Allowancetx = await TokencontractSigner.increaseAllowance(
-                  contractAddress,
+                  MarketplacecontractAddress,
                   item.price
                 );
                 await Allowancetx.wait();
@@ -831,6 +875,13 @@ const fetchAllBuildings = async (mainX, mainY) => {
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
                                     setinteractionMenuType('marketplace'); // Set the menu type to train soldiers
+                                }
+                            });
+                        } else if (buildingImage === 'clanhall') {
+                            building.setInteractive({ pixelPerfect: true });
+                            building.on('pointerdown', (pointer) => {
+                                if (pointer.button === 2) { // Right-click
+                                    setinteractionMenuType('clanhall'); // Set the menu type to train soldiers
                                 }
                             });
                         }
@@ -2292,6 +2343,26 @@ style={{
         )}
     </div>
 )}
+
+
+
+
+{interactionMenuType === "clanhall" && (
+                <div className="interaction-menu">
+                    <h3>Clan Hall</h3>
+                    {userClan ? (
+                        <div>
+                            <p><strong>Clan:</strong> {clanDetails?.name}</p>
+                            <p><strong>Leader:</strong> {clanDetails?.leader}</p>
+                            <p><strong>Members:</strong> {clanDetails?.memberCount}/30</p>
+                        </div>
+                    ) : (
+                        <button onClick={createClan} disabled={loading}>
+                            {loading ? "Creating Clan..." : "Create Clan"}
+                        </button>
+                    )}
+                </div>
+            )}
 
 
 
