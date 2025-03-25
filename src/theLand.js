@@ -29,7 +29,7 @@ import offensiveSoldierImage from './assets/soldiers/offensive.png';
 
 import { getTheLandSignerContract } from './TheLandContract';
 import { getMarketplaceSignerContract, MarketplacecontractAddress } from './MarketplaceContract';
-import { getclanSignerContract } from './clancontract';
+import { getclanSignerContract, clancontractAddress } from './clancontract';
 import { getTokenSignerContract } from './Tokencontract';
 
 import { Circles } from 'react-loader-spinner';
@@ -47,6 +47,7 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     const [tileData, setTileData] = useState(null); // For storing tile data (food, wood, stone, iron, level)
     const mapSize = 9;
     const turnsPerLevel = 1000;
+    const clancreationcost = 100000 * 10 ** 6;
     const [armorQuantities, setArmorQuantities] = useState({ offensive: 0, defensive: 0 }); // To track input quantities
     const [weaponQuantities, setWeaponQuantities] = useState({ offensive: 0, defensive: 0 }); // To track input quantities
     const [soldierQuantities, setSoldierQuantities] = useState({ offensive: 0, defensive: 0 });
@@ -55,6 +56,7 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     const [showWeaponCosts, setShowWeaponCosts] = useState(false);
     const [showSoldierCosts, setShowSoldierCosts] = useState(false);
     const [buildingCounts, setBuildingCounts] = useState({});
+    const [newClanName, setNewClanName] = useState('');
 
     const [selectedResourceType, setSelectedResourceType] = useState("1"); // Default to Food
     const [marketplaceItems, setMarketplaceItems] = useState([]);
@@ -65,6 +67,12 @@ const [sellPrice, setSellPrice] = useState("");
 
 const [userClan, setUserClan] = useState(null);
 const [clanDetails, setClanDetails] = useState(null);
+
+
+const [allClans, setAllClans] = useState([]);
+const [showAllClansModal, setShowAllClansModal] = useState(false);
+
+
 
     const [armorCosts, setArmorCosts] = useState({
         food: 0,
@@ -122,6 +130,17 @@ const [calculatedResources, setCalculatedResources] = useState({
 
 
 
+const fetchAllClans = async () => {
+    try {
+        const contract = await getclanSignerContract();
+        const clans = await contract.getAllClans();
+        setAllClans(clans);
+        setShowAllClansModal(true);
+    } catch (error) {
+        console.error("Error fetching all clans:", error);
+        toast.error("Failed to load all clans.");
+    }
+};
 
   
 
@@ -151,13 +170,27 @@ const checkUserClan = useCallback(async () => {
 }, []);
 
 const createClan = async () => {
+    if (!newClanName || newClanName.trim() === "") {
+        toast.error("Please enter a clan name.");
+        return;
+    }
+
     try {
         setLoading(true);
+
+        const TokencontractSigner = await getTokenSignerContract();
+        const Allowancetx = await TokencontractSigner.increaseAllowance(
+            clancontractAddress,
+            clancreationcost
+        );
+        await Allowancetx.wait();
+
         const contract = await getclanSignerContract();
-        const tx = await contract.createClan("My Clan");
+        const tx = await contract.createClan(newClanName);
         await tx.wait();
         toast.success("Clan created successfully!");
         await checkUserClan();
+        setNewClanName(""); // Reset input
     } catch (error) {
         console.error("Error creating clan:", error);
         toast.error("Failed to create clan.");
@@ -165,6 +198,31 @@ const createClan = async () => {
         setLoading(false);
     }
 };
+
+
+
+
+const handleDisbandClan = async () => {
+    if (!userClan) return;
+    
+    try {
+        setLoading(true);
+        const contract = await getclanSignerContract();
+        const tx = await contract.disbandClan(userClan);
+        await tx.wait();
+        toast.success("Clan disbanded successfully!");
+        await checkUserClan(); // refresh clan data
+    } catch (error) {
+        console.error("Error disbanding clan:", error);
+        toast.error("Failed to disband clan.");
+    } finally {
+        setLoading(false);
+    }
+};
+
+
+
+
 
 useEffect(() => {
     checkUserClan();
@@ -2348,21 +2406,163 @@ style={{
 
 
 {interactionMenuType === "clanhall" && (
-                <div className="interaction-menu">
-                    <h3>Clan Hall</h3>
-                    {userClan ? (
-                        <div>
-                            <p><strong>Clan:</strong> {clanDetails?.name}</p>
-                            <p><strong>Leader:</strong> {clanDetails?.leader}</p>
-                            <p><strong>Members:</strong> {clanDetails?.memberCount}/30</p>
-                        </div>
-                    ) : (
-                        <button onClick={createClan} disabled={loading}>
-                            {loading ? "Creating Clan..." : "Create Clan"}
-                        </button>
-                    )}
+    <div className="interaction-menu">
+        <h3>Clan Hall</h3>
+        {userClan ? (
+            <div>
+                <p><strong>Clan:</strong> {clanDetails?.name}</p>
+                <p><strong>Leader:</strong> {clanDetails?.leader}</p>
+                <p><strong>Members:</strong> {parseInt(clanDetails?.memberCount)}/30</p>
+
+                {clanDetails?.leader?.toLowerCase() === metaMaskAccount?.toLowerCase() && (
+                    <button 
+                        onClick={handleDisbandClan}
+                        style={{
+                            marginTop: '10px',
+                            padding: '10px',
+                            backgroundColor: '#dc3545',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '5px',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Disband Clan
+                    </button>
+                )}
+            </div>
+        ) : (
+            <div>
+                <input
+                    type="text"
+                    placeholder="Enter clan name"
+                    value={newClanName}
+                    onChange={(e) => setNewClanName(e.target.value)}
+                    style={{
+                        marginBottom: '10px',
+                        padding: '8px',
+                        width: '100%',
+                        borderRadius: '5px',
+                        border: '1px solid #ccc'
+                    }}
+                />
+                <button
+                    onClick={createClan}
+                    disabled={loading}
+                    style={{
+                        padding: '10px',
+                        backgroundColor: '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        cursor: 'pointer',
+                        width: '100%'
+                    }}
+                >
+                    {loading ? "Creating Clan..." : "Create Clan"}
+                </button>
+            </div>
+        )}
+
+        {/* Show this button for both cases */}
+        <button
+    style={{
+        marginTop: '15px',
+        padding: '10px',
+        backgroundColor: '#28a745',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        cursor: 'pointer',
+        width: '100%',
+    }}
+    onClick={fetchAllClans}
+>
+    List All Clans
+</button>
+
+    </div>
+)}
+
+
+
+{showAllClansModal && (
+    <div
+        style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            backgroundColor: 'white',
+            padding: '20px',
+            borderRadius: '10px',
+            zIndex: 999,
+            width: '420px',
+            maxHeight: '400px',
+            overflowY: 'auto',
+            boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+        }}
+    >
+        <h4 style={{ marginBottom: '10px', textAlign: 'center' }}>All Clans</h4>
+
+        {allClans.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                {/* Header Row */}
+                <div
+                    style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        fontWeight: 'bold',
+                        borderBottom: '1px solid #ccc',
+                        paddingBottom: '6px',
+                    }}
+                >
+                    <span>Name</span>
+                    <span>Leader</span>
+                    <span>Members</span>
                 </div>
-            )}
+
+                {/* Clan Rows */}
+                {allClans.map((clan, index) => (
+                    <div
+                        key={index}
+                        style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            borderBottom: '1px solid #eee',
+                            padding: '4px 0',
+                            fontSize: '14px',
+                        }}
+                    >
+                        <span>{clan.name}</span>
+                        <span>{clan.leader.slice(0, 6)}...</span>
+                        <span>{parseInt(clan.memberCount)}/30</span>
+                    </div>
+                ))}
+            </div>
+        ) : (
+            <p>No clans found.</p>
+        )}
+
+        <button
+            onClick={() => setShowAllClansModal(false)}
+            style={{
+                marginTop: '12px',
+                padding: '10px 16px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                width: '100%',
+                fontWeight: 'bold',
+            }}
+        >
+            Close
+        </button>
+    </div>
+)}
+
 
 
 
