@@ -16,7 +16,7 @@ import playIcon from './assets/play-icon.png';
 import stopIcon from './assets/stop-icon.png';
 import { getAddress } from 'ethers';
 import TheLand from './theLand';
-
+import { getclanSignerContract } from './clancontract';
 
 
 function App() {
@@ -352,6 +352,20 @@ function App() {
                 const occupant = await contract.getTileOccupant(x, y); // Fetch the occupant address
 
 
+                const clanContract = await getclanSignerContract();
+const clanId = await clanContract.getTileClan(x, y);
+
+let clanInfo = null;
+if (clanId > 0) {
+  const info = await clanContract.getClanInfo(clanId);
+  clanInfo = {
+    name: info.name,
+    leader: info.leader,
+    memberCount: Number(info.memberCount)
+  };
+}
+
+
       const tile = await contract.tiles(x, y);
 
       const bonusX = await contract.bonuses(x, y);
@@ -376,7 +390,21 @@ function App() {
       }
 
 
-                setTileCoords({ x: x + 1, y: y + 1, occupied: true, occupant, isOnSale: tile.isOnSale, salePrice: Number(tile.salePrice + tile.saleBurnAmount), bonusType: bonusTypeX}); // Update the state with occupant info
+
+                setTileCoords({
+                  x: x + 1,
+                  y: y + 1,
+                  occupied: true,
+                  occupant,
+                  isOnSale: tile.isOnSale,
+                  salePrice: Number(tile.salePrice + tile.saleBurnAmount),
+                  bonusType: bonusTypeX,
+                  clan: clanInfo // Add clan info here
+                });
+
+
+
+
               }
             });
           }
@@ -1102,10 +1130,24 @@ function App() {
         </p>
       )}
       {tileCoords.occupant && (
+        <>
   <p>
     <strong>Occupant</strong>: 
     {`${tileCoords.occupant.slice(0, 4)}...${tileCoords.occupant.slice(-3)}`} {/* Show first 4 and last 3 characters */}
   </p>
+
+  {tileCoords.clan ? (
+    <>
+    <strong>Clan</strong>: {tileCoords.clan.name} <br />
+    </>
+  ) : (
+    
+<p><strong>Clan</strong>: None</p>
+
+)}
+
+
+</>
       )}
 
 
