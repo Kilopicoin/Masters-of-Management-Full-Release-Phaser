@@ -40,7 +40,31 @@ function App() {
   const [showTheLand, setShowTheLand] = useState(false);
   const [selectedTile, setSelectedTile] = useState(null);
   const [appKey, setAppKey] = useState(Date.now());
+  const [userClan, setUserClan] = useState(null);
 
+  useEffect(() => {
+    const fetchUserClan = async () => {
+      if (!metaMaskAccount) return;
+      try {
+        const clanContract = await getclanSignerContract();
+        const memberInfo = await clanContract.members(metaMaskAccount);
+        if (memberInfo.isMember) {
+          const info = await clanContract.getClanInfo(memberInfo.clanId);
+          setUserClan({
+            id: memberInfo.clanId,
+            isLeader: info.leader.toLowerCase() === metaMaskAccount.toLowerCase(),
+          });
+        } else {
+          setUserClan(null);
+        }
+      } catch (err) {
+        console.error('Failed to fetch user clan', err);
+      }
+    };
+  
+    fetchUserClan();
+  }, [metaMaskAccount]);
+  
 
 
 
@@ -1145,6 +1169,31 @@ if (clanId > 0) {
 <p><strong>Clan</strong>: None</p>
 
 )}
+
+
+
+{tileCoords.occupant &&
+  !tileCoords.clan && // Tile has no clan
+  userClan?.isLeader && ( // User is a clan leader
+    <p>
+      <button
+        onClick={async () => {
+          try {
+            const clanContract = await getclanSignerContract();
+            const tx = await clanContract.inviteToClan(userClan.id, tileCoords.occupant);
+            await tx.wait();
+            toast.success("Invitation sent!");
+          } catch (err) {
+            console.error(err);
+            toast.error("Failed to send invite");
+          }
+        }}
+      >
+        Invite to Clan
+      </button>
+    </p>
+)}
+
 
 
 </>
