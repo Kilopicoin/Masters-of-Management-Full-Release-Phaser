@@ -32,6 +32,7 @@ import { getMarketplaceSignerContract, MarketplacecontractAddress } from './Mark
 import { getclanSignerContract, clancontractAddress } from './clancontract';
 import { getTokenSignerContract } from './Tokencontract';
 
+
 import { Circles } from 'react-loader-spinner';
 import './App.css';
 
@@ -71,6 +72,9 @@ const [clanDetails, setClanDetails] = useState(null);
 
 const [allClans, setAllClans] = useState([]);
 const [showAllClansModal, setShowAllClansModal] = useState(false);
+
+const [pendingInviteClanId, setPendingInviteClanId] = useState(null);
+const [pendingInviteClanName, setPendingInviteClanName] = useState("");
 
 
 
@@ -142,7 +146,32 @@ const fetchAllClans = async () => {
     }
 };
 
-  
+const fetchPendingInvite = async () => {
+    try {
+        const contract = await getclanSignerContract();
+        const userAddress = await window.ethereum.request({ method: 'eth_accounts' });
+        if (!userAddress.length) return;
+
+        const clanId = await contract.pendingInvites(userAddress[0]);
+        if (clanId > 0) {
+            const info = await contract.getClanInfo(clanId);
+            setPendingInviteClanId(clanId);
+            setPendingInviteClanName(info.name);
+        } else {
+            setPendingInviteClanId(null);
+            setPendingInviteClanName("");
+        }
+    } catch (error) {
+        console.error("Error fetching pending invite:", error);
+    }
+};
+
+
+useEffect(() => {
+    if (metaMaskAccount) {
+        fetchPendingInvite();
+    }
+}, [metaMaskAccount]);
 
 const checkUserClan = useCallback(async () => {
     try {
@@ -1450,12 +1479,53 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
 
 
-
-
-
-
-
         </div>
+
+
+
+        {pendingInviteClanId && (
+    <div style={{ marginTop: '15px', textAlign: 'center' }}>
+        <p>You have a pending invite from clan <strong>{pendingInviteClanName}</strong></p>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+            <button
+                onClick={async () => {
+                    try {
+                        const contract = await getclanSignerContract();
+                        const tx = await contract.acceptInvite();
+                        await tx.wait();
+                        toast.success("Joined the clan!");
+                        await checkUserClan();
+                        await fetchPendingInvite();
+                    } catch (err) {
+                        console.error("Accept failed:", err);
+                        toast.error("Failed to accept invite.");
+                    }
+                }}
+                style={{ padding: '6px 10px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px' }}
+            >
+                Accept
+            </button>
+            <button
+                onClick={async () => {
+                    try {
+                        const contract = await getclanSignerContract();
+                        const tx = await contract.refuseInvite();
+                        await tx.wait();
+                        toast.info("Invite refused.");
+                        setPendingInviteClanId(null);
+                        setPendingInviteClanName("");
+                    } catch (err) {
+                        console.error("Refuse failed:", err);
+                        toast.error("Failed to refuse invite.");
+                    }
+                }}
+                style={{ padding: '6px 10px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '5px' }}
+            >
+                Refuse
+            </button>
+        </div>
+    </div>
+)}
 
 
 
