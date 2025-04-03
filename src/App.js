@@ -389,6 +389,13 @@ if (clanId > 0) {
   };
 }
 
+const occupantPendingClanId = await clanContract.pendingInvites(occupant);
+let hasPendingInvite = false;
+if (occupantPendingClanId > 0) {
+  hasPendingInvite = true;
+}
+
+
 
       const tile = await contract.tiles(x, y);
 
@@ -423,7 +430,8 @@ if (clanId > 0) {
                   isOnSale: tile.isOnSale,
                   salePrice: Number(tile.salePrice + tile.saleBurnAmount),
                   bonusType: bonusTypeX,
-                  clan: clanInfo // Add clan info here
+                  clan: clanInfo, // Add clan info here
+                  hasPendingInviteToClan: hasPendingInvite,
                 });
 
 
@@ -1174,25 +1182,35 @@ if (clanId > 0) {
 
 {tileCoords.occupant &&
   !tileCoords.clan && // Tile has no clan
-  userClan?.isLeader && ( // User is a clan leader
+  userClan?.isLeader && (
     <p>
-      <button
-        onClick={async () => {
-          try {
-            const clanContract = await getclanSignerContract();
-            const tx = await clanContract.inviteToClan(userClan.id, tileCoords.occupant);
-            await tx.wait();
-            toast.success("Invitation sent!");
-          } catch (err) {
-            console.error(err);
-            toast.error("Failed to send invite");
-          }
-        }}
-      >
-        Invite to Clan
-      </button>
+      {tileCoords.hasPendingInviteToClan ? (
+        <span>Has a pending clan invitation</span>
+      ) : (
+        <button
+          onClick={async () => {
+            try {
+              const clanContract = await getclanSignerContract();
+              const tx = await clanContract.inviteToClan(userClan.id, tileCoords.occupant);
+              await tx.wait();
+              toast.success("Invitation sent!");
+              // Refresh tileCoords after invite
+              setTileCoords(prev => ({
+                ...prev,
+                hasPendingInviteToClan: true,
+              }));
+            } catch (err) {
+              console.error(err);
+              toast.error("Failed to send invite");
+            }
+          }}
+        >
+          Invite to Clan
+        </button>
+      )}
     </p>
 )}
+
 
 
 
