@@ -1171,6 +1171,69 @@ if (occupantPendingClanId > 0) {
   {tileCoords.clan ? (
     <>
     <strong>Clan</strong>: {tileCoords.clan.name} <br />
+
+
+
+    {tileCoords.occupant.toLowerCase() === metaMaskAccount?.toLowerCase() &&
+  userClan &&
+  !userClan.isLeader && (
+    <button
+      onClick={async () => {
+        try {
+          const clanContract = await getclanSignerContract();
+          const tx = await clanContract.leaveClan();
+          await tx.wait();
+          toast.success("You have left the clan.");
+          // Reset clan info in UI
+          setUserClan(null);
+          setTileCoords((prev) => ({
+            ...prev,
+            clan: null,
+            hasPendingInviteToClan: false,
+          }));
+        } catch (err) {
+          console.error("Error leaving clan:", err);
+          toast.error("Failed to leave the clan.");
+        }
+      }}
+    >
+      Leave Clan
+    </button>
+)}
+
+
+
+
+
+
+
+
+    {tileCoords.clan.leader.toLowerCase() === metaMaskAccount.toLowerCase() &&
+  tileCoords.occupant.toLowerCase() !== metaMaskAccount.toLowerCase() && (
+    <button
+      onClick={async () => {
+        try {
+          const clanContract = await getclanSignerContract();
+          const tx = await clanContract.removeMember(userClan.id, tileCoords.occupant);
+          await tx.wait();
+          toast.success("Member removed from clan");
+          setTileCoords(prev => ({
+            ...prev,
+            clan: null,
+            hasPendingInviteToClan: false
+          }));
+        } catch (err) {
+          console.error("Failed to remove member from clan:", err);
+          toast.error("Failed to remove member");
+        }
+      }}
+    >
+      Remove from Clan
+    </button>
+)}
+
+
+    
     </>
   ) : (
     
