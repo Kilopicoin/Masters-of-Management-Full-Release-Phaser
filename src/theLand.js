@@ -77,6 +77,10 @@ const [pendingInviteClanId, setPendingInviteClanId] = useState(null);
 const [pendingInviteClanName, setPendingInviteClanName] = useState("");
 
 
+const [showNameInput, setShowNameInput] = useState(false);
+const [tileNameInput, setTileNameInput] = useState('');
+
+const [tileName, setTileName] = useState('');
 
     const [armorCosts, setArmorCosts] = useState({
         food: 0,
@@ -131,6 +135,57 @@ const [calculatedResources, setCalculatedResources] = useState({
     stone: 0,
     iron: 0,
 });
+
+
+
+
+useEffect(() => {
+    const fetchTileName = async () => {
+        try {
+            const contract = await getclanSignerContract();
+            const name = await contract.getTileName(tileCoords.x - 1, tileCoords.y - 1);
+            setTileName(name);
+        } catch (error) {
+            console.error("Error fetching tile name:", error);
+        }
+    };
+
+    if (tileCoords?.x !== null && tileCoords?.y !== null) {
+        fetchTileName();
+    }
+}, [tileCoords]);
+
+
+
+
+const handleNameTile = async () => {
+    if (!tileNameInput.trim()) {
+        toast.error("Tile name cannot be empty.");
+        return;
+    }
+
+    try {
+        setLoading(true);
+
+        const TokenContract = await getTokenSignerContract();
+        const approvalTx = await TokenContract.increaseAllowance(clancontractAddress, 10000 * 10 ** 6);
+        await approvalTx.wait();
+
+        const contract = await getclanSignerContract();
+        const tx = await contract.nameTile(tileCoords.x - 1, tileCoords.y - 1, tileNameInput);
+        await tx.wait();
+
+        toast.success("Tile named successfully!");
+        setShowNameInput(false);
+        setTileNameInput('');
+    } catch (error) {
+        console.error("Error naming tile:", error);
+        toast.error("Failed to name tile.");
+    } finally {
+        setLoading(false);
+    }
+};
+
 
 
 
@@ -2690,6 +2745,81 @@ style={{
             <p>
                 <strong>Land:</strong> X: {tileCoords.x}, Y: {tileCoords.y}
             </p>
+
+
+            {tileName ? (
+    <>
+        <strong>Realm Name:</strong> {tileName}
+    </>
+) : (
+
+<>
+        Realm has no Name
+    </>
+
+
+)}
+
+
+
+
+            {metaMaskAccount && (
+    <>
+        <button
+            style={{
+                marginTop: '10px',
+                padding: '8px',
+                backgroundColor: '#ffc107',
+                color: '#333',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                width: '100%',
+                fontWeight: 'bold',
+            }}
+            onClick={() => setShowNameInput(prev => !prev)}
+
+        >
+            Name your Realm
+        </button>
+
+        {showNameInput && (
+            <div style={{ marginTop: '10px' }}>
+                <input
+                    type="text"
+                    placeholder="Enter Realm Name (10.000 LOP Tokens)"
+                    value={tileNameInput}
+                    onChange={(e) => setTileNameInput(e.target.value)}
+                    style={{
+                        padding: '6px',
+                        width: '100%',
+                        borderRadius: '5px',
+                        border: '1px solid #ccc',
+                        marginBottom: '8px'
+                    }}
+                />
+                <button
+                    onClick={handleNameTile}
+                    style={{
+                        padding: '8px',
+                        backgroundColor: '#28a745',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        cursor: 'pointer',
+                        width: '100%'
+                    }}
+                >
+                    Submit
+                </button>
+            </div>
+        )}
+    </>
+)}
+
+
+
+
             {tileCoords.bonusType && (
                 <p>
                     <strong>Bonus:</strong> {tileCoords.bonusType}

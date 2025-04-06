@@ -17,7 +17,7 @@ import stopIcon from './assets/stop-icon.png';
 import { getAddress } from 'ethers';
 import TheLand from './theLand';
 import { getclanSignerContract } from './clancontract';
-
+import { getTheLandSignerContract } from './TheLandContract';
 
 function App() {
   const gameRef = useRef(null);
@@ -377,7 +377,14 @@ function App() {
 
 
                 const clanContract = await getclanSignerContract();
+                const tileName = await clanContract.getTileName(x, y);
 const clanId = await clanContract.getTileClan(x, y);
+
+const landContract = await getTheLandSignerContract();
+const tileData = await landContract.getTileData(x, y);
+
+const totalPoints = Number(tileData.points);
+
 
 let clanInfo = null;
 if (clanId > 0) {
@@ -432,6 +439,8 @@ if (occupantPendingClanId > 0) {
                   bonusType: bonusTypeX,
                   clan: clanInfo, // Add clan info here
                   hasPendingInviteToClan: hasPendingInvite,
+                  tileName: tileName && tileName.trim().length > 0 ? tileName : null,
+                  points: totalPoints,
                 });
 
 
@@ -1167,6 +1176,18 @@ if (occupantPendingClanId > 0) {
     <strong>Occupant</strong>: 
     {`${tileCoords.occupant.slice(0, 4)}...${tileCoords.occupant.slice(-3)}`} {/* Show first 4 and last 3 characters */}
   </p>
+
+  {tileCoords.tileName ? (
+  <p><strong>Realm Name</strong>: {tileCoords.tileName}</p>
+) : (
+  <p>Realm has no Name</p>
+)}
+
+{tileCoords.points !== undefined && (
+  <p><strong>Points</strong>: {tileCoords.points}</p>
+)}
+
+
 
   {tileCoords.clan ? (
     <>
