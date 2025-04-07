@@ -32,7 +32,6 @@ import { getMarketplaceSignerContract, MarketplacecontractAddress } from './Mark
 import { getclanSignerContract, clancontractAddress } from './clancontract';
 import { getTokenSignerContract } from './Tokencontract';
 
-
 import { Circles } from 'react-loader-spinner';
 import './App.css';
 
@@ -81,6 +80,9 @@ const [showNameInput, setShowNameInput] = useState(false);
 const [tileNameInput, setTileNameInput] = useState('');
 
 const [tileName, setTileName] = useState('');
+
+
+
 
     const [armorCosts, setArmorCosts] = useState({
         food: 0,
@@ -135,6 +137,13 @@ const [calculatedResources, setCalculatedResources] = useState({
     stone: 0,
     iron: 0,
 });
+
+
+
+
+
+
+
 
 
 
@@ -631,8 +640,9 @@ const fetchTileData = useCallback(async (x, y) => {
             defensiveSoldier: tileDataResponse.defensiveSoldier.toString(),
             techLevels: {
                 offensiveTech: tileDataResponse.offensiveTech.toString(),
-                defensiveTech: tileDataResponse.defensiveTech.toString(),
+                defensiveTech: tileDataResponse.defensiveTech.toString()
             },
+            points: tileDataResponse.points.toString()
         });
     } catch (error) {
         console.error("Error fetching tile data:", error);
@@ -2611,6 +2621,10 @@ style={{
 
 
 
+
+
+
+
 {showAllClansModal && (
     <div
         style={{
@@ -2747,6 +2761,14 @@ style={{
             </p>
 
 
+                <p>
+                    <strong>Bonus:</strong> {tileCoords.bonusType}
+                </p>
+
+
+
+
+
             {tileName ? (
     <>
         <strong>Realm Name:</strong> {tileName}
@@ -2759,6 +2781,9 @@ style={{
 
 
 )}
+
+
+
 
 
 
@@ -2820,11 +2845,11 @@ style={{
 
 
 
-            {tileCoords.bonusType && (
-                <p>
-                    <strong>Bonus:</strong> {tileCoords.bonusType}
-                </p>
-            )}
+
+
+
+
+            
         </>
     )}
             </div>

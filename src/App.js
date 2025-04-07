@@ -41,6 +41,57 @@ function App() {
   const [selectedTile, setSelectedTile] = useState(null);
   const [appKey, setAppKey] = useState(Date.now());
   const [userClan, setUserClan] = useState(null);
+  const [leaderboardData, setLeaderboardData] = useState([]);
+  const [interactionMenuTypeA, setinteractionMenuTypeA] = useState("");
+
+
+
+
+
+
+  const fetchLeaderboardData = async () => {
+      try {
+          setLoading(true);
+          const TileMap = await getSignerContract(); // This holds ownership info
+          const Land = await getTheLandSignerContract();
+          const Clan = await getclanSignerContract();
+  
+          const tiles = [];
+  
+          for (let x = 0; x < 20; x++) {
+              for (let y = 0; y < 20; y++) {
+                  const tileStats = await Land.getTileData(x, y);
+                  const points = parseInt(tileStats.points.toString());
+                  if (points > 0) {
+                      const occupant = await TileMap.getTileOccupant(x, y);
+                      const name = await Clan.getTileName(x, y);
+                      const clan = await Clan.getTileClan(x, y);
+                      
+                      tiles.push({
+                          x: x + 1,
+                          y: y + 1,
+                          occupant,
+                          name,
+                          clan,
+                          level: tileStats.level.toString(),
+                          points,
+                      });
+                  }
+              }
+          }
+  
+          tiles.sort((a, b) => b.points - a.points); // sort descending
+          setLeaderboardData(tiles);
+      } catch (error) {
+          console.error("Error fetching leaderboard:", error);
+          toast.error("Failed to load leaderboard.");
+      } finally {
+          setLoading(false);
+      }
+  };
+
+
+
 
   useEffect(() => {
     const fetchUserClan = async () => {
@@ -1149,6 +1200,33 @@ if (occupantPendingClanId > 0) {
                 </span>
               </p>
             )}
+
+
+
+
+
+
+        <button
+            style={{
+                marginTop: '5px',
+                padding: '8px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                width: '100%',
+                fontWeight: 'bold',
+            }}
+            onClick={() => setinteractionMenuTypeA("leaderboardX")}
+        >
+            Leaderboard
+        </button>
+
+
+
+
+
             </>
 
 
@@ -1434,6 +1512,122 @@ if (occupantPendingClanId > 0) {
     </div>
   )}
 </div>
+
+
+
+
+
+
+
+
+{interactionMenuTypeA === "leaderboardX" && (
+    <div className="interaction-menuA">
+        <p style={{ marginBottom: '15px', fontWeight: 'bold' }}>
+            Loading Leaderboard requires around 1 minute, do you want to load the Leaderboard?
+        </p>
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("leaderboard");
+                fetchLeaderboardData();
+            }}
+        >
+            Yes, load the Leaderboard
+        </button>
+
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("");
+            }}
+        >
+            Cancel
+        </button>
+
+    </div>
+)}
+
+
+
+
+{interactionMenuTypeA === "leaderboard" && (
+    <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
+        <h3 style={{ marginBottom: '10px' }}>🏆 Leaderboard 🏆</h3>
+
+        <button
+            style={{
+                padding: '8px 12px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                marginBottom: '10px',
+                cursor: 'pointer'
+            }}
+            onClick={() => {
+              setinteractionMenuTypeA("");
+          }}
+        >
+            Close Leaderboard
+        </button>
+
+        {leaderboardData.length > 0 ? (
+            <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
+                <thead>
+                    <tr style={{ backgroundColor: '#f2f2f2' }}>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>#</th>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Realm</th>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Clan</th>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Coords</th>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Level</th>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Points</th>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Occupant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {leaderboardData.map((item, index) => (
+                        <tr key={index}>
+                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{index + 1}</td>
+                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.name || "Unnamed"}</td>
+                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.clan || "None"}</td>
+                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.x},{item.y}</td>
+                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.level}</td>
+                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.points}</td>
+                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>
+                                {item.occupant.slice(0, 6)}...{item.occupant.slice(-4)}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        ) : (
+            <p style={{ marginTop: '10px' }}>Leaderboard is empty or not loaded.</p>
+        )}
+    </div>
+)}
+
+
+
+
+
+
+
 <div className="journal-card">
   <strong>Journal</strong>
   <ul>
