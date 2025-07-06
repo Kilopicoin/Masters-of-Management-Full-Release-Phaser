@@ -18,6 +18,7 @@ import { getAddress } from 'ethers';
 import TheLand from './theLand';
 import { getclanSignerContract } from './clancontract';
 import { getTheLandSignerContract } from './TheLandContract';
+import { getNFTSignerContract } from './nftContract';
 
 function App() {
   const gameRef = useRef(null);
@@ -43,7 +44,7 @@ function App() {
   const [userClan, setUserClan] = useState(null);
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [interactionMenuTypeA, setinteractionMenuTypeA] = useState("");
-
+const [clanFlags, setClanFlags] = useState({});
 
 
 
@@ -79,6 +80,21 @@ function App() {
                   }
               }
           }
+
+          const clanFlagsMap = {};
+const nftMarket = await getNFTSignerContract(); // assuming this is your NFT market contract
+
+for (let tile of tiles) {
+  if (tile.clan > 0 && !clanFlagsMap[tile.clan]) {
+    const clanContract = await getclanSignerContract();
+    const flagTokenId = await clanContract.clanFlags(tile.clan);
+    if (flagTokenId > 0) {
+      const nftData = await nftMarket.getNFTData(flagTokenId);
+      clanFlagsMap[tile.clan] = nftData[2]; // index 2 is `url` (image)
+    }
+  }
+}
+setClanFlags(clanFlagsMap); // Save it in state
   
           tiles.sort((a, b) => b.points - a.points); // sort descending
           setLeaderboardData(tiles);

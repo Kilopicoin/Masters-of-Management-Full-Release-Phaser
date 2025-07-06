@@ -16,8 +16,9 @@ import playIcon from './assets/play-icon.png';
 import stopIcon from './assets/stop-icon.png';
 import { getAddress } from 'ethers';
 import TheLand from './theLand';
-
-
+import { getclanSignerContract } from './clancontract';
+import { getTheLandSignerContract } from './TheLandContract';
+import { getNFTSignerContract } from './nftContract';
 
 function App() {
   const gameRef = useRef(null);
@@ -40,14 +41,104 @@ function App() {
   const [showTheLand, setShowTheLand] = useState(false);
   const [selectedTile, setSelectedTile] = useState(null);
   const [appKey, setAppKey] = useState(Date.now());
+  const [userClan, setUserClan] = useState(null);
+  const [leaderboardData, setLeaderboardData] = useState([]);
+  const [interactionMenuTypeA, setinteractionMenuTypeA] = useState("");
+const [clanFlags, setClanFlags] = useState({});
 
+
+
+
+
+  const fetchLeaderboardData = async () => {
+      try {
+          setLoading(true);
+          const TileMap = await getSignerContract(); // This holds ownership info
+          const Land = await getTheLandSignerContract();
+          const Clan = await getclanSignerContract();
+  
+          const tiles = [];
+  
+          for (let x = 0; x < 20; x++) {
+              for (let y = 0; y < 20; y++) {
+                  const tileStats = await Land.getTileData(x, y);
+                  const points = parseInt(tileStats.points.toString());
+                  if (points > 0) {
+                      const occupant = await TileMap.getTileOccupant(x, y);
+                      const name = await Clan.getTileName(x, y);
+                      const clan = await Clan.getTileClan(x, y);
+                      
+                      tiles.push({
+                          x: x + 1,
+                          y: y + 1,
+                          occupant,
+                          name,
+                          clan,
+                          level: tileStats.level.toString(),
+                          points,
+                      });
+                  }
+              }
+          }
+
+          const clanFlagsMap = {};
+const nftMarket = await getNFTSignerContract(); // assuming this is your NFT market contract
+
+for (let tile of tiles) {
+  if (tile.clan > 0 && !clanFlagsMap[tile.clan]) {
+    const clanContract = await getclanSignerContract();
+    const flagTokenId = await clanContract.clanFlags(tile.clan);
+    if (flagTokenId > 0) {
+      const nftData = await nftMarket.getNFTData(flagTokenId);
+      clanFlagsMap[tile.clan] = nftData[2]; // index 2 is `url` (image)
+    }
+  }
+}
+setClanFlags(clanFlagsMap); // Save it in state
+  
+          tiles.sort((a, b) => b.points - a.points); // sort descending
+          setLeaderboardData(tiles);
+      } catch (error) {
+          console.error("Error fetching leaderboard:", error);
+          toast.error("Failed to load leaderboard.");
+      } finally {
+          setLoading(false);
+      }
+  };
+
+
+
+
+  useEffect(() => {
+    const fetchUserClan = async () => {
+      if (!metaMaskAccount) return;
+      try {
+        const clanContract = await getclanSignerContract();
+        const memberInfo = await clanContract.members(metaMaskAccount);
+        if (memberInfo.isMember) {
+          const info = await clanContract.getClanInfo(memberInfo.clanId);
+          setUserClan({
+            id: memberInfo.clanId,
+            isLeader: info.leader.toLowerCase() === metaMaskAccount.toLowerCase(),
+          });
+        } else {
+          setUserClan(null);
+        }
+      } catch (err) {
+        console.error('Failed to fetch user clan', err);
+      }
+    };
+  
+    fetchUserClan();
+  }, [metaMaskAccount]);
+  
 
 
 
 
   const handleEnterLand = () => {
     if (tileCoords.x !== null && tileCoords.y !== null) {
-      setSelectedTile({ x: tileCoords.x, y: tileCoords.y }); // Pass selected tile coordinates
+      setSelectedTile({ x: tileCoords.x, y: tileCoords.y, bonusType: tileCoords.bonusType }); // Pass selected tile coordinates
       if (gameRef.current) {
         gameRef.current.destroy(true); // Destroy the current Phaser game instance
         gameRef.current = null; // Reset the reference
@@ -314,6 +405,8 @@ function App() {
     fetchAllOccupiedTiles();
   }, [appKey]);
 
+  
+
   const updateTileMap = () => {
     if (gameRef.current) {
       const scene = gameRef.current.scene.keys.default;
@@ -350,10 +443,76 @@ function App() {
                 const occupant = await contract.getTileOccupant(x, y); // Fetch the occupant address
 
 
+                const clanContract = await getclanSignerContract();
+                const tileName = await clanContract.getTileName(x, y);
+const clanId = await clanContract.getTileClan(x, y);
+
+const landContract = await getTheLandSignerContract();
+const tileData = await landContract.getTileData(x, y);
+
+const totalPoints = Number(tileData.points);
+
+
+let clanInfo = null;
+if (clanId > 0) {
+  const info = await clanContract.getClanInfo(clanId);
+  clanInfo = {
+    name: info.name,
+    leader: info.leader,
+    memberCount: Number(info.memberCount)
+  };
+}
+
+const occupantPendingClanId = await clanContract.pendingInvites(occupant);
+let hasPendingInvite = false;
+if (occupantPendingClanId > 0) {
+  hasPendingInvite = true;
+}
+
+
+
       const tile = await contract.tiles(x, y);
 
+      const bonusX = await contract.bonuses(x, y);
+      const bonus = parseInt(bonusX);
+      
+      let bonusTypeX = '';
+      switch (bonus) {
+        case 1:
+          bonusTypeX = 'Food';
+          break;
+        case 2:
+          bonusTypeX = 'Wood';
+          break;
+        case 3:
+          bonusTypeX = 'Stone';
+          break;
+        case 4:
+          bonusTypeX = 'Iron';
+          break;
+        default:
+          bonusTypeX = 'None';
+      }
 
-                setTileCoords({ x: x + 1, y: y + 1, occupied: true, occupant, isOnSale: tile.isOnSale, salePrice: Number(tile.salePrice + tile.saleBurnAmount)}); // Update the state with occupant info
+
+
+                setTileCoords({
+                  x: x + 1,
+                  y: y + 1,
+                  occupied: true,
+                  occupant,
+                  isOnSale: tile.isOnSale,
+                  salePrice: Number(tile.salePrice + tile.saleBurnAmount),
+                  bonusType: bonusTypeX,
+                  clan: clanInfo, // Add clan info here
+                  hasPendingInviteToClan: hasPendingInvite,
+                  tileName: tileName && tileName.trim().length > 0 ? tileName : null,
+                  points: totalPoints,
+                });
+
+
+
+
               }
             });
           }
@@ -654,28 +813,28 @@ function App() {
     const handleRightClick = async (x, y) => {
       const bonus = await getTileBonus(x, y);
       
-      let bonusType = '';
+      let bonusTypeX = '';
       switch (bonus) {
         case 1:
-          bonusType = 'Food';
+          bonusTypeX = 'Food';
           break;
         case 2:
-          bonusType = 'Wood';
+          bonusTypeX = 'Wood';
           break;
         case 3:
-          bonusType = 'Stone';
+          bonusTypeX = 'Stone';
           break;
         case 4:
-          bonusType = 'Iron';
+          bonusTypeX = 'Iron';
           break;
         default:
-          bonusType = 'None';
+          bonusTypeX = 'None';
       }
     
       if (x + 1 >= 1 && x + 1 <= 20 && y + 1 >= 1 && y + 1 <= 20) {
-        setTileCoords({ x: x + 1, y: y + 1, occupied: tilesRef.current[x][y], bonusType });
+        setTileCoords({ x: x + 1, y: y + 1, occupied: tilesRef.current[x][y], bonusType: bonusTypeX });
       } else {
-        setTileCoords({ x: null, y: null, occupied: null, bonusType });
+        setTileCoords({ x: null, y: null, occupied: null, bonusType: bonusTypeX });
       }
     };
     
@@ -1057,6 +1216,33 @@ function App() {
                 </span>
               </p>
             )}
+
+
+
+
+
+
+        <button
+            style={{
+                marginTop: '5px',
+                padding: '8px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                width: '100%',
+                fontWeight: 'bold',
+            }}
+            onClick={() => setinteractionMenuTypeA("leaderboardX")}
+        >
+            Leaderboard
+        </button>
+
+
+
+
+
             </>
 
 
@@ -1079,10 +1265,134 @@ function App() {
         </p>
       )}
       {tileCoords.occupant && (
+        <>
   <p>
     <strong>Occupant</strong>: 
     {`${tileCoords.occupant.slice(0, 4)}...${tileCoords.occupant.slice(-3)}`} {/* Show first 4 and last 3 characters */}
   </p>
+
+  {tileCoords.tileName ? (
+  <p><strong>Realm Name</strong>: {tileCoords.tileName}</p>
+) : (
+  <p>Realm has no Name</p>
+)}
+
+{tileCoords.points !== undefined && (
+  <p><strong>Points</strong>: {tileCoords.points}</p>
+)}
+
+
+
+  {tileCoords.clan ? (
+    <>
+    <strong>Clan</strong>: {tileCoords.clan.name} <br />
+
+
+
+    {tileCoords.occupant.toLowerCase() === metaMaskAccount?.toLowerCase() &&
+  userClan &&
+  !userClan.isLeader && (
+    <button
+      onClick={async () => {
+        try {
+          const clanContract = await getclanSignerContract();
+          const tx = await clanContract.leaveClan();
+          await tx.wait();
+          toast.success("You have left the clan.");
+          // Reset clan info in UI
+          setUserClan(null);
+          setTileCoords((prev) => ({
+            ...prev,
+            clan: null,
+            hasPendingInviteToClan: false,
+          }));
+        } catch (err) {
+          console.error("Error leaving clan:", err);
+          toast.error("Failed to leave the clan.");
+        }
+      }}
+    >
+      Leave Clan
+    </button>
+)}
+
+
+
+
+
+
+
+
+    {tileCoords.clan.leader.toLowerCase() === metaMaskAccount.toLowerCase() &&
+  tileCoords.occupant.toLowerCase() !== metaMaskAccount.toLowerCase() && (
+    <button
+      onClick={async () => {
+        try {
+          const clanContract = await getclanSignerContract();
+          const tx = await clanContract.removeMember(userClan.id, tileCoords.occupant);
+          await tx.wait();
+          toast.success("Member removed from clan");
+          setTileCoords(prev => ({
+            ...prev,
+            clan: null,
+            hasPendingInviteToClan: false
+          }));
+        } catch (err) {
+          console.error("Failed to remove member from clan:", err);
+          toast.error("Failed to remove member");
+        }
+      }}
+    >
+      Remove from Clan
+    </button>
+)}
+
+
+    
+    </>
+  ) : (
+    
+<p><strong>Clan</strong>: None</p>
+
+)}
+
+
+
+{tileCoords.occupant &&
+  !tileCoords.clan && // Tile has no clan
+  userClan?.isLeader && (
+    <p>
+      {tileCoords.hasPendingInviteToClan ? (
+        <span>Has a pending clan invitation</span>
+      ) : (
+        <button
+          onClick={async () => {
+            try {
+              const clanContract = await getclanSignerContract();
+              const tx = await clanContract.inviteToClan(userClan.id, tileCoords.occupant);
+              await tx.wait();
+              toast.success("Invitation sent!");
+              // Refresh tileCoords after invite
+              setTileCoords(prev => ({
+                ...prev,
+                hasPendingInviteToClan: true,
+              }));
+            } catch (err) {
+              console.error(err);
+              toast.error("Failed to send invite");
+            }
+          }}
+        >
+          Invite to Clan
+        </button>
+      )}
+    </p>
+)}
+
+
+
+
+</>
       )}
 
 
@@ -1218,6 +1528,122 @@ function App() {
     </div>
   )}
 </div>
+
+
+
+
+
+
+
+
+{interactionMenuTypeA === "leaderboardX" && (
+    <div className="interaction-menuA">
+        <p style={{ marginBottom: '15px', fontWeight: 'bold' }}>
+            Loading Leaderboard requires around 1 minute, do you want to load the Leaderboard?
+        </p>
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("leaderboard");
+                fetchLeaderboardData();
+            }}
+        >
+            Yes, load the Leaderboard
+        </button>
+
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("");
+            }}
+        >
+            Cancel
+        </button>
+
+    </div>
+)}
+
+
+
+
+{interactionMenuTypeA === "leaderboard" && (
+    <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
+        <h3 style={{ marginBottom: '10px' }}>🏆 Leaderboard 🏆</h3>
+
+        <button
+            style={{
+                padding: '8px 12px',
+                backgroundColor: '#007bff',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                marginBottom: '10px',
+                cursor: 'pointer'
+            }}
+            onClick={() => {
+              setinteractionMenuTypeA("");
+          }}
+        >
+            Close Leaderboard
+        </button>
+
+        {leaderboardData.length > 0 ? (
+            <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
+                <thead>
+                    <tr style={{ backgroundColor: '#f2f2f2' }}>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>#</th>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Realm</th>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Clan</th>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Coords</th>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Level</th>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Points</th>
+                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Occupant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {leaderboardData.map((item, index) => (
+                        <tr key={index}>
+                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{index + 1}</td>
+                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.name || "Unnamed"}</td>
+                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.clan || "None"}</td>
+                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.x},{item.y}</td>
+                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.level}</td>
+                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.points}</td>
+                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>
+                                {item.occupant.slice(0, 6)}...{item.occupant.slice(-4)}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        ) : (
+            <p style={{ marginTop: '10px' }}>Leaderboard is empty or not loaded.</p>
+        )}
+    </div>
+)}
+
+
+
+
+
+
+
 <div className="journal-card">
   <strong>Journal</strong>
   <ul>

@@ -1,24 +1,24 @@
 // contract.js
 import { BrowserProvider, Contract, JsonRpcProvider } from 'ethers';
-import contractABI from './clancontractABI.json'; // Import the ABI JSON file
+import nftcontractABI from './nftcontractABI.json'; // Import the ABI JSON file
 
-export const clancontractAddress = '0xc311e5115AF3dd4C6f82097f7B5f7F294A5479db';
+const nftContractAddress = '0x25a46179b54fBfca292270C7f13f96305CF81cf4';
 const RPC = 'https://api.s0.b.hmny.io';
 
-const getclanContract = async () => {
+const getNFTContract = async () => {
   const provider = new JsonRpcProvider(RPC);
-  return new Contract(clancontractAddress, contractABI.abi, provider);
+  return new Contract(nftContractAddress, nftcontractABI.abi, provider);
 };
 
-export const getclanSignerContract = async () => {
+export const getNFTSignerContract = async () => {
   if (typeof window !== 'undefined' && typeof window.ethereum !== 'undefined') {
     await window.ethereum.request({ method: 'eth_requestAccounts' });
     const provider = new BrowserProvider(window.ethereum);
     const signer = await provider.getSigner();
-    return new Contract(clancontractAddress, contractABI.abi, signer);
+    return new Contract(nftContractAddress, nftcontractABI.abi, signer);
   } else {
     throw new Error('Ethereum wallet is not installed');
   }
 };
 
-export default getclanContract;
+export default getNFTContract;

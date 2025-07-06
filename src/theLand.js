@@ -31,6 +31,7 @@ import { getTheLandSignerContract } from './TheLandContract';
 import { getMarketplaceSignerContract, MarketplacecontractAddress } from './MarketplaceContract';
 import { getclanSignerContract, clancontractAddress } from './clancontract';
 import { getTokenSignerContract } from './Tokencontract';
+import { getNFTSignerContract } from './nftContract';
 
 import { Circles } from 'react-loader-spinner';
 import './App.css';
@@ -80,6 +81,9 @@ const [showNameInput, setShowNameInput] = useState(false);
 const [tileNameInput, setTileNameInput] = useState('');
 
 const [tileName, setTileName] = useState('');
+
+const [showFlagSelector, setShowFlagSelector] = useState(false);
+const [ownedFlagNFTs, setOwnedFlagNFTs] = useState([]);
 
 
 
@@ -138,8 +142,42 @@ const [calculatedResources, setCalculatedResources] = useState({
     iron: 0,
 });
 
+const handleSetClanFlag = async (tokenId) => {
+  try {
+    const clanContract = await getclanSignerContract();
+    const tx = await clanContract.setClanFlag(userClan, tokenId);
+
+    await tx.wait();
+    toast.success("Clan flag set!");
+    setShowFlagSelector(false);
+  } catch (err) {
+    console.error("Failed to set clan flag", err);
+    toast.error("Failed to set flag");
+  }
+};
 
 
+const fetchFlagNFTs = async () => {
+  try {
+    const nftContract = await getNFTSignerContract(); // MyNFTMarket
+    const tokenIds = await nftContract.getOwnedTokenIds(metaMaskAccount);
+    
+    const validFlagNFTs = [];
+    for (let i = 0; i < tokenIds.length; i++) {
+      const tid = tokenIds[i];
+      const [, , url, , , , , , , cId, ] = await nftContract.getNFTData(tid);
+      if (Number(cId) === 1) {
+        validFlagNFTs.push({ tokenId: tid, imageUrl: url });
+      }
+    }
+
+    setOwnedFlagNFTs(validFlagNFTs);
+    setShowFlagSelector(true);
+  } catch (err) {
+    console.error("Failed to fetch flag NFTs", err);
+    toast.error("Failed to load your NFTs from collection 1");
+  }
+};
 
 
 
@@ -2549,7 +2587,32 @@ style={{
                 <p><strong>Leader:</strong> {clanDetails?.leader}</p>
                 <p><strong>Members:</strong> {parseInt(clanDetails?.memberCount)}/30</p>
 
+            {showFlagSelector && (
+  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto' }}>
+    <h3>Select an NFT as your Clan Flag</h3>
+    <button onClick={() => setShowFlagSelector(false)}>Cancel</button>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+      {ownedFlagNFTs.map(nft => (
+        <div key={nft.tokenId} style={{ border: '1px solid #ccc', padding: '5px' }}>
+          <img src={nft.imageUrl} alt="nft" width={100} height={100} />
+          <button onClick={() => handleSetClanFlag(nft.tokenId)}>
+            Set as Flag
+          </button>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+
+
+
                 {clanDetails?.leader?.toLowerCase() === metaMaskAccount?.toLowerCase() && (
+<>
+                    <button onClick={() => fetchFlagNFTs()}>
+    Set Clan Flag
+  </button>
+
                     <button 
                         onClick={handleDisbandClan}
                         style={{
@@ -2564,6 +2627,7 @@ style={{
                     >
                         Disband Clan
                     </button>
+                    </>
                 )}
             </div>
         ) : (
