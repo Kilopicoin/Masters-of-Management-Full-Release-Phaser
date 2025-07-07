@@ -44,11 +44,44 @@ function App() {
   const [userClan, setUserClan] = useState(null);
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [interactionMenuTypeA, setinteractionMenuTypeA] = useState("");
-const [clanFlags, setClanFlags] = useState({});
+  const [clanFlags, setClanFlags] = useState({});
 
+const fetchClanFlags = async () => {
+  try {
+    const clanContract = await getclanSignerContract();
+    const nftContract = await getNFTSignerContract();
 
+    const clanList = await clanContract.getAllClans();
+    const flagUrls = {};
 
+    for (let i = 0; i < clanList.length; i++) {
+      const clanId = i + 1;
+      const clan = clanList[i];
 
+      if (!clan.exists) continue;
+
+      const tokenId = await clanContract.clanFlags(clanId);
+      if (tokenId.toString() === '0') continue;
+
+      const [, , url] = await nftContract.getNFTData(tokenId); // getNFTData returns [name, desc, url, metaUrl, ...]
+      flagUrls[clanId] = url;
+    }
+
+    return flagUrls; // { 1: "ipfs://...", 2: "https://...", ... }
+  } catch (err) {
+    console.error("Error fetching clan flag URLs:", err);
+    return {};
+  }
+};
+
+useEffect(() => {
+  const loadClanFlags = async () => {
+    const flags = await fetchClanFlags();
+    setClanFlags(flags);
+  };
+
+  loadClanFlags();
+}, []);
 
   const fetchLeaderboardData = async () => {
       try {
@@ -81,20 +114,6 @@ const [clanFlags, setClanFlags] = useState({});
               }
           }
 
-          const clanFlagsMap = {};
-const nftMarket = await getNFTSignerContract(); // assuming this is your NFT market contract
-
-for (let tile of tiles) {
-  if (tile.clan > 0 && !clanFlagsMap[tile.clan]) {
-    const clanContract = await getclanSignerContract();
-    const flagTokenId = await clanContract.clanFlags(tile.clan);
-    if (flagTokenId > 0) {
-      const nftData = await nftMarket.getNFTData(flagTokenId);
-      clanFlagsMap[tile.clan] = nftData[2]; // index 2 is `url` (image)
-    }
-  }
-}
-setClanFlags(clanFlagsMap); // Save it in state
   
           tiles.sort((a, b) => b.points - a.points); // sort descending
           setLeaderboardData(tiles);
