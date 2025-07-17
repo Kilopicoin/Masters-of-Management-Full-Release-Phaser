@@ -809,6 +809,12 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
         const coords = await contract.getOccupiedTileByAddress(metaMaskAccount);
         const [x, y] = coords.map(coord => Number(coord)); // Convert BigInt to regular numbers
         updateTileImage(x, y); // Update the tile image to skyflag
+      } else {
+        const scene = gameRef.current.scene.keys.default;
+        const existingFlag = scene.children.getByName(`flagSky`);
+          if (existingFlag) {
+            existingFlag.destroy();
+          }
       }
 
       
@@ -1550,7 +1556,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 {tileCoords.occupied && (
   metaMaskAccount ? (
     getAddress(metaMaskAccount) === tileCoords.occupant && (
-      <div>
+      <div >
 <p>
 <button onClick={handleEnterLand}>Enter the Land</button>
       </p>
@@ -1569,7 +1575,6 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
           placeholder="Enter sale price in LOP"
           value={salePrice}
           onChange={(e) => setSalePrice(e.target.value)}
-         
           className="fancy-inputX"
         />
         <button onClick={() => setTileForSale(tileCoords.x, tileCoords.y, true)}>
