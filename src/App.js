@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+
 import Phaser from 'phaser';
 import grassImage from './assets/grass.png';
 import oceanImage from './assets/ocean.png';
@@ -44,58 +45,43 @@ function App() {
   const [userClan, setUserClan] = useState(null);
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [interactionMenuTypeA, setinteractionMenuTypeA] = useState("");
-  const [clanFlags, setClanFlags] = useState({});
 
-  const urlToKeyMap = {
-  "https://kilopi.net/files/necessary/nftdeneme/1.png": "nftflag_1",
-  "https://kilopi.net/files/necessary/nftdeneme/2.png": "nftflag_2",
-  "https://kilopi.net/files/necessary/nftdeneme/3.png": "nftflag_3",
-  "https://kilopi.net/files/necessary/nftdeneme/4.png": "nftflag_4",
-  "https://kilopi.net/files/necessary/nftdeneme/5.png": "nftflag_5",
-  "https://kilopi.net/files/necessary/nftdeneme/6.png": "nftflag_6",
-  "https://kilopi.net/files/necessary/nftdeneme/7.png": "nftflag_7",
-  "https://kilopi.net/files/necessary/nftdeneme/8.png": "nftflag_8",
-  "https://kilopi.net/files/necessary/nftdeneme/9.png": "nftflag_9",
-  "https://kilopi.net/files/necessary/nftdeneme/10.png": "nftflag_10"
-};
+const urlToKeyMap = useMemo(() => ({
+  "https://kilopi.net/mom/nfts/1.png": "nftflag_1",
+  "https://kilopi.net/mom/nfts/2.png": "nftflag_2",
+  "https://kilopi.net/mom/nfts/3.png": "nftflag_3",
+  "https://kilopi.net/mom/nfts/4.png": "nftflag_4",
+  "https://kilopi.net/mom/nfts/5.png": "nftflag_5",
+  "https://kilopi.net/mom/nfts/6.png": "nftflag_6",
+  "https://kilopi.net/mom/nfts/7.png": "nftflag_7",
+  "https://kilopi.net/mom/nfts/8.png": "nftflag_8",
+  "https://kilopi.net/mom/nfts/9.png": "nftflag_9",
+  "https://kilopi.net/mom/nfts/10.png": "nftflag_10",
+  "https://kilopi.net/mom/nfts/11.png": "nftflag_11",
+  "https://kilopi.net/mom/nfts/12.png": "nftflag_12",
+  "https://kilopi.net/mom/nfts/13.png": "nftflag_13",
+  "https://kilopi.net/mom/nfts/14.png": "nftflag_14",
+  "https://kilopi.net/mom/nfts/15.png": "nftflag_15",
+  "https://kilopi.net/mom/nfts/16.png": "nftflag_16",
+  "https://kilopi.net/mom/nfts/17.png": "nftflag_17",
+  "https://kilopi.net/mom/nfts/18.png": "nftflag_18",
+  "https://kilopi.net/mom/nfts/19.png": "nftflag_19",
+  "https://kilopi.net/mom/nfts/20.png": "nftflag_20",
+  "https://kilopi.net/mom/nfts/21.png": "nftflag_21",
+  "https://kilopi.net/mom/nfts/22.png": "nftflag_22",
+  "https://kilopi.net/mom/nfts/23.png": "nftflag_23",
+  "https://kilopi.net/mom/nfts/24.png": "nftflag_24",
+  "https://kilopi.net/mom/nfts/25.png": "nftflag_25",
+  "https://kilopi.net/mom/nfts/26.png": "nftflag_26",
+  "https://kilopi.net/mom/nfts/27.png": "nftflag_27",
+  "https://kilopi.net/mom/nfts/28.png": "nftflag_28",
+  "https://kilopi.net/mom/nfts/29.png": "nftflag_29",
+  "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
+}), []);
 
-const fetchClanFlags = async () => {
-  try {
-    const clanContract = await getclanSignerContract();
-    const nftContract = await getNFTSignerContract();
 
-    const clanList = await clanContract.getAllClans();
-    const flagUrls = {};
 
-    for (let i = 0; i < clanList.length; i++) {
-      const clanId = i + 1;
-      const clan = clanList[i];
 
-      if (!clan.exists) continue;
-
-      const tokenId = await clanContract.clanFlags(clanId);
-      if (tokenId.toString() === '0') continue;
-
-      const [, , url] = await nftContract.getNFTData(tokenId); // getNFTData returns [name, desc, url, metaUrl, ...]
-      flagUrls[clanId] = url;
-    }
-    
-
-    return flagUrls; // { 1: "ipfs://...", 2: "https://...", ... }
-  } catch (err) {
-    console.error("Error fetching clan flag URLs:", err);
-    return {};
-  }
-};
-
-useEffect(() => {
-  const loadClanFlags = async () => {
-    const flags = await fetchClanFlags();
-    setClanFlags(flags);
-  };
-
-  loadClanFlags();
-}, []);
 
   const fetchLeaderboardData = async () => {
       try {
@@ -423,85 +409,8 @@ useEffect(() => {
     checkMetaMaskConnection();
   }, [appKey]);
 
-  useEffect(() => {
-    const fetchAllOccupiedTiles = async () => {
-  try {
-    const contract = await getContract();
-    const clanContract = await getclanSignerContract();
-    const nftContract = await getNFTSignerContract();
 
-    // Fetch all occupied tiles
-    const occupiedTilesRaw = await contract.getAllOccupiedTiles();
-    const occupiedTiles = occupiedTilesRaw.map(row => [...row]);
-
-    // Fetch clan tile mappings
-    const tilesWithClans = await clanContract.getAllTilesWithClans();
-
-    // Build quick lookup of clan data per tile
-    const clanTileMap = {};
-    for (let i = 0; i < tilesWithClans.length; i++) {
-      const { x, y, clanId, flagTokenId } = tilesWithClans[i];
-      clanTileMap[`${x}-${y}`] = { clanId, flagTokenId };
-    }
-
-    // Fetch and map all clanId -> flagURL
-    const clanList = await clanContract.getAllClans();
-    const clanFlagMap = {};
-
-    for (let i = 0; i < clanList.length; i++) {
-      const clanId = i + 1;
-      const clan = clanList[i];
-
-      if (!clan.exists) continue;
-
-      const tokenId = await clanContract.clanFlags(clanId);
-      if (tokenId.toString() === '0') continue;
-
-      const [, , url] = await nftContract.getNFTData(tokenId);
-      clanFlagMap[clanId.toString()] = url;
-    }
-
-    // Inject data into each tile
-    for (let x = 0; x < occupiedTiles.length; x++) {
-      for (let y = 0; y < occupiedTiles[x].length; y++) {
-        const value = occupiedTiles[x][y];
-
-        if (value === true) {
-          const key = `${x}-${y}`;
-          const clanData = clanTileMap[key] || { clanId: 0, flagTokenId: 0 };
-          const clanIdStr = clanData.clanId.toString();
-
-          occupiedTiles[x][y] = {
-            occupied: true,
-            clanId: clanIdStr,
-            flagTokenId: clanData.flagTokenId,
-            flagUrl: clanFlagMap[clanIdStr] || null,
-          };
-        } else {
-          occupiedTiles[x][y] = null;
-        }
-      }
-    }
-
-    tilesRef.current = occupiedTiles;
-
-    // Set flag map for rendering (e.g., for textureKey lookups)
-    setClanFlags(clanFlagMap);
-
-    updateTileMap();
-    setLoading(false);
-  } catch (error) {
-    console.error('Error fetching all occupied tiles with clans and flags:', error);
-  }
-};
-
-
-    fetchAllOccupiedTiles();
-  }, [appKey]);
-
-  
-
-  const updateTileMap = () => {
+  const updateTileMap = useCallback(() => {
     if (gameRef.current) {
       const scene = gameRef.current.scene.keys.default;
       const tileWidth = 386;
@@ -522,10 +431,10 @@ useEffect(() => {
 
           if (tilesRef.current.length > 0 && tilesRef.current[x][y]) {
            
-            console.log(tilesRef.current[x][y].clanId)
+
             const flagUrl = tilesRef.current[x][y].flagUrl;
 
-            console.log(flagUrl)
+
 const textureKey = urlToKeyMap[flagUrl] || 'whiteflag'; // fallback
 
 const flag = scene.add.image(worldX, worldY, textureKey).setDepth(worldY + 1);
@@ -621,25 +530,94 @@ if (occupantPendingClanId > 0) {
         }
       }
     }
-  }
+  }, [gameRef, mapSize, urlToKeyMap]);
 
 
   useEffect(() => {
-  
-  updateTileMap();
-  }, [metaMaskAccount, appKey]);
+    const fetchAllOccupiedTiles = async () => {
+  try {
+    const contract = await getContract();
+    const clanContract = await getclanSignerContract();
+    const nftContract = await getNFTSignerContract();
 
-  const fetchAllOccupiedTiles = async () => {
-    try {
-      const contract = await getContract();
-      const occupiedTiles = await contract.getAllOccupiedTiles();
-      tilesRef.current = occupiedTiles;
-      updateTileMap();
-      setLoading(false);  // End loading when done
-    } catch (error) {
-      console.error('Error fetching all occupied tiles:', error);
+    // Fetch all occupied tiles
+    const occupiedTilesRaw = await contract.getAllOccupiedTiles();
+    const occupiedTiles = occupiedTilesRaw.map(row => [...row]);
+
+    // Fetch clan tile mappings
+    const tilesWithClans = await clanContract.getAllTilesWithClans();
+
+    // Build quick lookup of clan data per tile
+    const clanTileMap = {};
+    for (let i = 0; i < tilesWithClans.length; i++) {
+      const { x, y, clanId, flagTokenId } = tilesWithClans[i];
+      clanTileMap[`${x}-${y}`] = { clanId, flagTokenId };
     }
-  };
+
+    // Fetch and map all clanId -> flagURL
+    const clanList = await clanContract.getAllClans();
+    const clanFlagMap = {};
+
+    for (let i = 0; i < clanList.length; i++) {
+      const clanId = i + 1;
+      const clan = clanList[i];
+
+      if (!clan.exists) continue;
+
+      const tokenId = await clanContract.clanFlags(clanId);
+      if (tokenId.toString() === '0') continue;
+
+      const [, , url] = await nftContract.getNFTData(tokenId);
+      clanFlagMap[clanId.toString()] = url;
+    }
+
+    // Inject data into each tile
+    for (let x = 0; x < occupiedTiles.length; x++) {
+      for (let y = 0; y < occupiedTiles[x].length; y++) {
+        const value = occupiedTiles[x][y];
+
+        if (value === true) {
+          const key = `${x}-${y}`;
+          const clanData = clanTileMap[key] || { clanId: 0, flagTokenId: 0 };
+          const clanIdStr = clanData.clanId.toString();
+
+          occupiedTiles[x][y] = {
+            occupied: true,
+            clanId: clanIdStr,
+            flagTokenId: clanData.flagTokenId,
+            flagUrl: clanFlagMap[clanIdStr] || null,
+          };
+        } else {
+          occupiedTiles[x][y] = null;
+        }
+      }
+    }
+
+    tilesRef.current = occupiedTiles;
+
+
+    updateTileMap();
+    setLoading(false);
+  } catch (error) {
+    console.error('Error fetching all occupied tiles with clans and flags:', error);
+  }
+};
+
+
+    fetchAllOccupiedTiles();
+}, [appKey, updateTileMap]);
+
+  
+
+
+
+
+ useEffect(() => {
+  updateTileMap();
+}, [metaMaskAccount, appKey, updateTileMap]);
+
+
+
 
 
 
@@ -707,6 +685,39 @@ if (occupantPendingClanId > 0) {
   };
   
 
+  const updateSingleTileWithFlag = async (x, y) => {
+  const contract = await getContract();
+  const clanContract = await getclanSignerContract();
+  const nftContract = await getNFTSignerContract();
+
+  const tile = await contract.tiles(x, y);
+  const occupied = tile.occupied;
+  
+  let flagUrl = null;
+
+  if (occupied) {
+    const clanId = await clanContract.getTileClan(x, y);
+    if (clanId.toString() !== "0") {
+      const flagTokenId = await clanContract.clanFlags(clanId);
+      if (flagTokenId.toString() !== "0") {
+        const [, , url] = await nftContract.getNFTData(flagTokenId);
+        flagUrl = url;
+      }
+    }
+  }
+
+  // Update the specific tile in the tilesRef
+  tilesRef.current[x][y] = {
+    occupied,
+    flagUrl,
+  };
+
+  updateTileMap();
+};
+
+
+
+
   const occupyTile = async (x, y) => {
     setLoading(true);
     try {
@@ -771,7 +782,7 @@ if (occupantPendingClanId > 0) {
         const tx = await contractSigner.occupyTile(x - 1, y - 1, referrerAddress);
         await tx.wait();
 
-        await fetchAllOccupiedTiles();
+        await updateSingleTileWithFlag(x - 1, y - 1);
         await checkIfAccountOccupiedTile();
         setTileCoords((prev) => ({ ...prev, occupied: true }));
       }
@@ -794,6 +805,8 @@ if (occupantPendingClanId > 0) {
         const [x, y] = coords.map(coord => Number(coord)); // Convert BigInt to regular numbers
         updateTileImage(x, y); // Update the tile image to skyflag
       }
+
+      
       sethasTileG(hasTile);
     }
   }, [metaMaskAccount]); // Now it depends only on metaMaskAccount
@@ -821,14 +834,13 @@ if (occupantPendingClanId > 0) {
   
       const { worldX, worldY } = tileToWorldPosition(x, y);
   
-      // Remove the current whiteflag image (if any) and add the skyflag image
-      const currentFlag = scene.children.getByName(`flag-${x}-${y}`);
-      if (currentFlag) {
-        currentFlag.destroy(); // Remove the whiteflag image
-      }
+      const existingFlag = scene.children.getByName(`flagSky`);
+    if (existingFlag) {
+      existingFlag.destroy();
+    }
   
-      const skyFlag = scene.add.image(worldX, worldY, 'skyflag').setDepth(worldY + 1);
-      skyFlag.setName(`flag-${x}-${y}`); // Name it so it can be referenced later
+      const skyFlag = scene.add.image(worldX, worldY, 'skyflag').setDepth(worldY + 2);
+      skyFlag.setName(`flagSky`); // Name it so it can be referenced later
     }
   };
 
@@ -897,16 +909,37 @@ if (occupantPendingClanId > 0) {
       this.load.image('skyflag', skyflagImage);
       this.load.image('largemap', largemapImage);
       this.load.audio('backgroundMusic', backgroundMusicFile);
-      this.load.image('nftflag_1', "https://kilopi.net/files/necessary/nftdeneme/1.png");
-      this.load.image('nftflag_2', 'https://kilopi.net/files/necessary/nftdeneme/2.png');
-      this.load.image('nftflag_3', 'https://kilopi.net/files/necessary/nftdeneme/3.png');
-      this.load.image('nftflag_4', 'https://kilopi.net/files/necessary/nftdeneme/4.png');
-      this.load.image('nftflag_5', 'https://kilopi.net/files/necessary/nftdeneme/5.png');
-      this.load.image('nftflag_6', 'https://kilopi.net/files/necessary/nftdeneme/6.png');
-      this.load.image('nftflag_7', 'https://kilopi.net/files/necessary/nftdeneme/7.png');
-      this.load.image('nftflag_8', 'https://kilopi.net/files/necessary/nftdeneme/8.png');
-      this.load.image('nftflag_9', 'https://kilopi.net/files/necessary/nftdeneme/9.png');
-      this.load.image('nftflag_10', 'https://kilopi.net/files/necessary/nftdeneme/10.png');
+      this.load.image('nftflag_1', "https://kilopi.net/mom/nfts/1.png");
+      this.load.image('nftflag_2', "https://kilopi.net/mom/nfts/2.png");
+      this.load.image('nftflag_3', "https://kilopi.net/mom/nfts/3.png");
+      this.load.image('nftflag_4', "https://kilopi.net/mom/nfts/4.png");
+      this.load.image('nftflag_5', "https://kilopi.net/mom/nfts/5.png");
+      this.load.image('nftflag_6', "https://kilopi.net/mom/nfts/6.png");
+      this.load.image('nftflag_7', "https://kilopi.net/mom/nfts/7.png");
+      this.load.image('nftflag_8', "https://kilopi.net/mom/nfts/8.png");
+      this.load.image('nftflag_9', "https://kilopi.net/mom/nfts/9.png");
+      this.load.image('nftflag_10', "https://kilopi.net/mom/nfts/10.png");
+      this.load.image('nftflag_11', "https://kilopi.net/mom/nfts/11.png");
+      this.load.image('nftflag_12', "https://kilopi.net/mom/nfts/12.png");
+      this.load.image('nftflag_13', "https://kilopi.net/mom/nfts/13.png");
+      this.load.image('nftflag_14', "https://kilopi.net/mom/nfts/14.png");
+      this.load.image('nftflag_15', "https://kilopi.net/mom/nfts/15.png");
+      this.load.image('nftflag_16', "https://kilopi.net/mom/nfts/16.png");
+      this.load.image('nftflag_17', "https://kilopi.net/mom/nfts/17.png");
+      this.load.image('nftflag_18', "https://kilopi.net/mom/nfts/18.png");
+      this.load.image('nftflag_19', "https://kilopi.net/mom/nfts/19.png");
+      this.load.image('nftflag_20', "https://kilopi.net/mom/nfts/20.png");
+      this.load.image('nftflag_21', "https://kilopi.net/mom/nfts/21.png");
+      this.load.image('nftflag_22', "https://kilopi.net/mom/nfts/22.png");
+      this.load.image('nftflag_23', "https://kilopi.net/mom/nfts/23.png");
+      this.load.image('nftflag_24', "https://kilopi.net/mom/nfts/24.png");
+      this.load.image('nftflag_25', "https://kilopi.net/mom/nfts/25.png");
+      this.load.image('nftflag_26', "https://kilopi.net/mom/nfts/26.png");
+      this.load.image('nftflag_27', "https://kilopi.net/mom/nfts/27.png");
+      this.load.image('nftflag_28', "https://kilopi.net/mom/nfts/28.png");
+      this.load.image('nftflag_29', "https://kilopi.net/mom/nfts/29.png");
+      this.load.image('nftflag_30', "https://kilopi.net/mom/nfts/30.png");
+
     }
 
     const getTileBonus = async (x, y) => {
@@ -1084,9 +1117,9 @@ if (occupantPendingClanId > 0) {
 
       this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
         if (deltaY > 0) {
-          zoomLevel = Phaser.Math.Clamp(zoomLevel - 0.04, 0.24, 0.4);
+          zoomLevel = Phaser.Math.Clamp(zoomLevel - 0.04, 0.24, 0.8);
         } else {
-          zoomLevel = Phaser.Math.Clamp(zoomLevel + 0.04, 0.24, 0.4);
+          zoomLevel = Phaser.Math.Clamp(zoomLevel + 0.04, 0.24, 0.8);
         }
         this.cameras.main.setZoom(zoomLevel);
       });
@@ -1135,7 +1168,7 @@ if (occupantPendingClanId > 0) {
   
         // Set up the event listener with a single instance
         contract.on("TileUpdated", (x, y, isOccupied, occupant) => {
-          console.log("Event received:", x, y, isOccupied, occupant); // Debugging log
+
   
           // Convert BigInt coordinates to regular numbers
           const xCoord = Number(x);

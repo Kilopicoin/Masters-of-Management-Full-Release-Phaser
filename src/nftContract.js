@@ -2,7 +2,7 @@
 import { BrowserProvider, Contract, JsonRpcProvider } from 'ethers';
 import nftcontractABI from './nftcontractABI.json'; // Import the ABI JSON file
 
-const nftContractAddress = '0x25a46179b54fBfca292270C7f13f96305CF81cf4';
+const nftContractAddress = '0xCDE76601B84f994A0e9A0A810A909f232131Fbbd';
 const RPC = 'https://api.s0.b.hmny.io';
 
 const getNFTContract = async () => {

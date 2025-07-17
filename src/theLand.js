@@ -989,7 +989,7 @@ const fetchAllBuildings = async (mainX, mainY) => {
                   });
               
                   setBuildingCounts(counts);
-                  console.log(counts)
+               
 
 
 
@@ -1188,13 +1188,68 @@ const fetchAllBuildings = async (mainX, mainY) => {
                             };
             
                             const onTransactionEnd = (success) => {
-                                if (success) {
-                                    tempImage.setAlpha(1); // Make the image permanent
-                                } else {
-                                    tempImage.destroy(); // Remove the image on failure
-                                }
-                                
-                            };
+    if (success) {
+        tempImage.setAlpha(1); // Make the image permanent
+
+        // Add interactivity after placement
+        tempImage.setInteractive({ pixelPerfect: true });
+
+        const imageKey = selectedBuildingRef.current;
+        if (imageKey === 'armory') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('armory');
+                }
+            });
+        } else if (imageKey === 'blacksmith') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('blacksmith');
+                }
+            });
+        } else if (imageKey === 'fightingpit') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('train-soldier');
+                }
+            });
+        } else if (imageKey === 'house') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('house-info');
+                }
+            });
+        } else if (imageKey === 'tower') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('tower-info');
+                }
+            });
+        } else if (imageKey === 'workshop') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('workshop');
+                }
+            });
+        } else if (imageKey === 'market') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('marketplace');
+                }
+            });
+        } else if (imageKey === 'clanhall') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('clanhall');
+                }
+            });
+        }
+
+    } else {
+        tempImage.destroy(); // Remove if placement fails
+    }
+};
+
 
                             
             
@@ -2793,7 +2848,7 @@ style={{
             >
                 <strong>Info Box</strong>
                 <button
-          onClick={goBackToApp}
+          onClick={() => window.location.reload()}
           style={{
             marginTop: '15px',
             padding: '10px',
