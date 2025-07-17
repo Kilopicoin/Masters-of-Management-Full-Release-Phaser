@@ -17,9 +17,9 @@ import playIcon from './assets/play-icon.png';
 import stopIcon from './assets/stop-icon.png';
 import { getAddress } from 'ethers';
 import TheLand from './theLand';
-import { getclanSignerContract } from './clancontract';
+import getclanContract, { getclanSignerContract } from './clancontract';
 import { getTheLandSignerContract } from './TheLandContract';
-import { getNFTSignerContract } from './nftContract';
+import getNFTContract, { getNFTSignerContract } from './nftContract';
 
 function App() {
   const gameRef = useRef(null);
@@ -537,8 +537,9 @@ if (occupantPendingClanId > 0) {
     const fetchAllOccupiedTiles = async () => {
   try {
     const contract = await getContract();
-    const clanContract = await getclanSignerContract();
-    const nftContract = await getNFTSignerContract();
+    const clanContract = metaMaskAccount ? await getclanSignerContract() : await getclanContract();
+const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNFTContract();
+
 
     // Fetch all occupied tiles
     const occupiedTilesRaw = await contract.getAllOccupiedTiles();
@@ -605,7 +606,7 @@ if (occupantPendingClanId > 0) {
 
 
     fetchAllOccupiedTiles();
-}, [appKey, updateTileMap]);
+}, [metaMaskAccount, appKey, updateTileMap]);
 
   
 

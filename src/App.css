@@ -1,45 +1,83 @@
-.message-card {
-  font-family: 'Arial', sans-serif;
-  line-height: 1.5;
-  transition: transform 0.2s ease-in-out;
-  text-align: center; /* Center-align text */
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond&family=MedievalSharp&family=Uncial+Antiqua&display=swap');
+
+
+body {
+  background-color: #1e1e1e;
+  font-family: 'EB Garamond', serif;
+  color: #e0d8c3;
+  font-size: 20px;
 }
 
-.message-card button {
-  background-color: #007bff;
-  color: white;
-  padding: 5px 10px;
-  border: none;
-  border-radius: 5px;
+
+
+
+
+.message-card {
+  background-color: #3e3e3e;
+  border: 2px solid #c4aa70;
+  border-radius: 12px;
+  padding: 15px;
+  margin: 10px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.5);
+  font-family: 'EB Garamond', serif;
+  text-align: center;
+  transition: transform 0.2s ease-in-out;
+}
+
+.message-card button,
+.card-button {
+  background-color: #7a5e3c;
+border: 1px solid #c4aa70;
+color: #f3eacb;
+font-weight: 400;
+font-size: 18px;
+  padding: 8px 16px;
+
+  border-radius: 6px;
+  font-family: 'EB Garamond', serif;
   cursor: pointer;
   transition: background-color 0.2s ease;
 }
 
-.message-card button:hover {
-  background-color: #0056b3;
+.message-card button:hover,
+.card-button:hover {
+  background-color: #5c452e;
+box-shadow: 0 0 6px rgba(196, 170, 112, 0.3);
+
 }
+
 
 .resource-cost {
   display: flex;
   justify-content: space-around;
   width: 100%;
   margin-top: 10px;
+  font-size: 14px;
+  gap: 6px;
+  color: #d4c092;
 }
+
 
 .resource-cost div {
   display: flex;
   align-items: center;
   gap: 5px;
   font-size: 14px;
+  font-size: 14px;
+  gap: 6px;
+  color: #d4c092;
 }
 
 
 .card-title {
   text-align: center;
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 10px;
+  font-size: 20px;
+  font-family: 'EB Garamond', serif;
+  color: #e4d2a3;
+  text-shadow: 1px 1px 2px #000;
+  margin-bottom: 12px;
 }
+
 
 .card-resource-bar {
   display: flex;
@@ -78,60 +116,46 @@
 
 .input-container {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  justify-content: center;
+  width: 100%;
 }
 
 .input-container input {
-  width: 60px;
+  width: 80px;
+  background-color: #2b2b2b;
+  color: #e8dbc0;
+  border: 1px solid #a88f58;
   text-align: center;
+  padding: 6px;
 }
 
-.fancy-input {
+
+
+.fancy-input,
+.fancy-inputX {
   width: 100%;
   padding: 10px;
-  border-radius: 10px;
-  border: 1px solid #007bff;
-  outline: none;
+  border-radius: 8px;
+  border: 1px solid #a88f58;
+  background-color: #2b2b2b;
+  color: #f3eacb;
+  font-family: 'EB Garamond', serif;
   font-size: 14px;
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
-}
-
-.fancy-input:focus {
-  border-color: #0056b3;
-  box-shadow: 0 0 10px rgba(0, 91, 187, 0.3);
-}
-
-.fancy-input::placeholder {
-  color: #ccc;
-  font-style: italic;
   text-align: center;
 }
 
-
-
-.fancy-inputX {
-  width: 90%;
-  border-radius: 10px;
-  border: 1px solid #007bff;
-  outline: none;
-  font-size: 14px;
-  transition: box-shadow 0.3s ease, border-color 0.3s ease;
-  margin-bottom: 10px;
-  padding: 10px;
-}
-
-
+.fancy-input:focus,
 .fancy-inputX:focus {
-  border-color: #0056b3;
-  box-shadow: 0 0 10px rgba(0, 91, 187, 0.3);
+  border-color: #c4aa70;
+  box-shadow: 0 0 8px rgba(196, 170, 112, 0.4);
 }
 
+.fancy-input::placeholder,
 .fancy-inputX::placeholder {
-  color: #ccc;
+  color: #9e967d;
   font-style: italic;
-  text-align: center;
 }
+
 
 
 
@@ -142,14 +166,16 @@
   bottom: 10px;
   left: 10px;
   padding: 15px;
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: rgba(62, 62, 62, 0.95);
+  border: 2px solid #c4aa70;
   border-radius: 10px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  color: #333;
+  box-shadow: 0 0 8px rgba(0,0,0,0.6);
+  font-family: 'EB Garamond', serif;
+  color: #e8dbc0;
   z-index: 100;
   width: 250px;
+  
 }
-
 
 
 .interaction-menuA {
@@ -160,9 +186,13 @@
   display: block;
   z-index: 200;
   padding: 10px;
-  background-color: rgba(255, 255, 255, 0.9);
+  background-color: rgba(62, 62, 62, 0.95);
+  border: 2px solid #c4aa70;
   border-radius: 10px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 0 8px rgba(0,0,0,0.6);
+  font-family: 'EB Garamond', serif;
+  color: #e8dbc0;
+  text-align: center;
 }
 
 
