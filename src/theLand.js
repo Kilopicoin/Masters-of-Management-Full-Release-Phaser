@@ -777,7 +777,7 @@ const listItemForSale = async () => {
             setLoading(false);
             return;
         }
-
+        console.log(x, y, resourceType, amount, price)
         const tx = await contract.listItemForSale(x, y, resourceType, amount, price);
         await tx.wait();
 
@@ -2502,8 +2502,8 @@ style={{
 
                         return (
                             <div className="tech-item" key={tech.id}>
-                                <strong>{tech.name}:</strong> {tech.level}
-                                <button onClick={() => upgradeTech(tech.id)}>Upgrade</button>
+                                <strong>{tech.name}:</strong> {tech.level} &nbsp;
+                                <button className='card-button' style={{ marginleft: '15px', marginTop: '15px' }} onClick={() => upgradeTech(tech.id)}>Upgrade</button>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     <img src={foodImage} alt="Food" style={{ width: '20px' }} />
                                     <span>{foodCost}</span>
@@ -2534,6 +2534,7 @@ style={{
         <div className="card-content">
             <h4>Select a Resource Type</h4>
             <select 
+            className="medieval-select"
                 value={selectedResourceType} 
                 onChange={(e) => setSelectedResourceType(e.target.value)}
             >
@@ -2548,6 +2549,7 @@ style={{
             </select>
             <button 
                 onClick={fetchMarketplaceItemsByType} 
+                className='card-button'
                 style={{ marginTop: '10px', padding: '8px' }}
             >
                 Show Listings
@@ -2593,7 +2595,8 @@ style={{
         {/* Button to List a New Item */}
         <button 
             onClick={() => setinteractionMenuType("marketplaceCreate")}
-            style={{ marginTop: '10px', padding: '8px' }}
+            className='card-button'
+            style={{ marginTop: '10px', padding: '8px', width: '100%' }}
         >
             List an Item for Sale
         </button>
@@ -2634,7 +2637,7 @@ style={{
 
                 <div className="card-content">
                     <h4>List an Item for Sale</h4>
-                    <select value={selectedResource} onChange={(e) => setSelectedResource(e.target.value)}>
+                    <select className="medieval-select" value={selectedResource} onChange={(e) => setSelectedResource(e.target.value)}>
     <option value="1">Food</option>
     <option value="2">Wood</option>
     <option value="3">Stone</option>
@@ -2645,6 +2648,7 @@ style={{
     <option value="8">Defensive Weapon</option>
 </select>
 <input 
+    className='fancy-input'
     type="number" 
     placeholder="Amount" 
     value={sellAmount} 
@@ -2652,13 +2656,14 @@ style={{
 />
 
 <input 
+className='fancy-input'
     type="number" 
     placeholder="Price in LOP" 
     value={sellPrice} 
     onChange={(e) => setSellPrice(e.target.value)} 
 />
 
-                    <button onClick={() => listItemForSale()}>
+                    <button className='card-button' onClick={() => listItemForSale()}>
                         List Item for Sale
                     </button>
                 </div>
@@ -2671,7 +2676,7 @@ style={{
 
 
 {interactionMenuType === "clanhall" && (
-    <div className="interaction-menu">
+    <div className="interaction-menu" style={{ minWidth: '300px' }}>
         <h3>Clan Hall</h3>
         {userClan ? (
             <div>
@@ -2680,14 +2685,14 @@ style={{
                 <p><strong>Members:</strong> {parseInt(clanDetails?.memberCount)}/30</p>
 
             {showFlagSelector && (
-  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto' }}>
+  <div className="interaction-menuA" style={{ minWidth: '900px', maxHeight: '500px', overflowY: 'auto' }}>
     <h3>Select an NFT as your Clan Flag</h3>
-    <button onClick={() => setShowFlagSelector(false)}>Cancel</button>
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+    <button className="card-button" onClick={() => setShowFlagSelector(false)}>Cancel</button>
+    <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
       {ownedFlagNFTs.map(nft => (
         <div key={nft.tokenId} style={{ border: '1px solid #ccc', padding: '5px' }}>
-          <img src={nft.imageUrl} alt="nft" width={100} height={100} />
-          <button onClick={() => handleSetClanFlag(nft.tokenId)}>
+          <img src={nft.imageUrl} alt="nft" width={300} height={300} />
+          <button className="card-button" onClick={() => handleSetClanFlag(nft.tokenId)}>
             Set as Flag
           </button>
         </div>
@@ -2781,7 +2786,7 @@ style={{
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            backgroundColor: 'white',
+            backgroundColor: '#2b2b2b',
             padding: '20px',
             borderRadius: '10px',
             zIndex: 999,
@@ -2791,7 +2796,7 @@ style={{
             boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
         }}
     >
-        <h4 style={{ marginBottom: '10px', textAlign: 'center' }}>All Clans</h4>
+        <h4 style={{ textAlign: 'center' }}>All Clans</h4>
 
         {allClans.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -2823,7 +2828,7 @@ style={{
                         }}
                     >
                         <span>{clan.name}</span>
-                        <span>{clan.leader.slice(0, 6)}...</span>
+                        <span>{clan.leader.slice(0, 6)}...{clan.leader.slice(-3)}</span>
                         <span>{parseInt(clan.memberCount)}/30</span>
                     </div>
                 ))}
@@ -2835,16 +2840,10 @@ style={{
         <button
             onClick={() => setShowAllClansModal(false)}
             style={{
-                marginTop: '12px',
-                padding: '10px 16px',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
                 width: '100%',
-                fontWeight: 'bold',
+                marginTop: '15px'
             }}
+            className='card-button'
         >
             Close
         </button>
