@@ -107,19 +107,24 @@ box-shadow: 0 0 6px rgba(196, 170, 112, 0.3);
 
 .card-button {
   padding: 10px 20px;
-  background-color: #007bff;
-  color: white;
-  border: none;
+  background-color: #7a5e3c;
+  color: #f3eacb;
+  border: 1px solid #c4aa70;
   border-radius: 5px;
   cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.3s ease;
+  font-weight: 400;
+font-size: 18px;
   text-align: center;
+  font-family: 'EB Garamond', serif;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
 .card-button:hover {
-  background-color: #0056b3;
+  background-color: #5c452e;
+box-shadow: 0 0 6px rgba(196, 170, 112, 0.3);
 }
+
 
 .input-container {
   display: flex;
@@ -203,3 +208,33 @@ box-shadow: 0 0 6px rgba(196, 170, 112, 0.3);
 }
 
 
+.medieval-progress-bar {
+  width: 100%;
+  height: 24px;
+  border: 2px solid #c4aa70;
+  background: #3e2f1b; /* Add a parchment texture in your assets */
+  background-size: cover;
+  border-radius: 6px;
+  position: relative;
+  box-shadow: inset 0 0 5px #000000aa;
+}
+
+.medieval-progress-fill {
+  height: 100%;
+  background: linear-gradient(to right, #a88f58, #d1bc8a);
+  border-radius: 4px 0 0 4px;
+  transition: width 0.4s ease;
+  box-shadow: 0 0 5px #c4aa70;
+}
+
+.medieval-progress-label {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: 'Uncial Antiqua', cursive;
+  font-size: 14px;
+  color: #f3eacb;
+  text-shadow: 1px 1px 2px #000;
+}

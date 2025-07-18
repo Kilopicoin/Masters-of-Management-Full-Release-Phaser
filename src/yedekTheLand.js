@@ -989,7 +989,7 @@ const fetchAllBuildings = async (mainX, mainY) => {
                   });
               
                   setBuildingCounts(counts);
-                  console.log(counts)
+               
 
 
 
@@ -1188,13 +1188,68 @@ const fetchAllBuildings = async (mainX, mainY) => {
                             };
             
                             const onTransactionEnd = (success) => {
-                                if (success) {
-                                    tempImage.setAlpha(1); // Make the image permanent
-                                } else {
-                                    tempImage.destroy(); // Remove the image on failure
-                                }
-                                
-                            };
+    if (success) {
+        tempImage.setAlpha(1); // Make the image permanent
+
+        // Add interactivity after placement
+        tempImage.setInteractive({ pixelPerfect: true });
+
+        const imageKey = selectedBuildingRef.current;
+        if (imageKey === 'armory') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('armory');
+                }
+            });
+        } else if (imageKey === 'blacksmith') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('blacksmith');
+                }
+            });
+        } else if (imageKey === 'fightingpit') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('train-soldier');
+                }
+            });
+        } else if (imageKey === 'house') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('house-info');
+                }
+            });
+        } else if (imageKey === 'tower') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('tower-info');
+                }
+            });
+        } else if (imageKey === 'workshop') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('workshop');
+                }
+            });
+        } else if (imageKey === 'market') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('marketplace');
+                }
+            });
+        } else if (imageKey === 'clanhall') {
+            tempImage.on('pointerdown', (pointer) => {
+                if (pointer.button === 2) {
+                    setinteractionMenuType('clanhall');
+                }
+            });
+        }
+
+    } else {
+        tempImage.destroy(); // Remove if placement fails
+    }
+};
+
 
                             
             
@@ -1366,9 +1421,12 @@ const fetchAllBuildings = async (mainX, mainY) => {
         display: 'block', // Initially hidden
         zIndex: 200,
         padding: '10px',
-        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        backgroundColor: 'rgba(62, 62, 62, 0.95)',
         borderRadius: '10px',
         boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
+        border: '2px solid #c4aa70',
+        fontFamily: 'EB Garamond, serif',
+        color: '#e8dbc0',
     }}
 >
 
@@ -1420,21 +1478,21 @@ const fetchAllBuildings = async (mainX, mainY) => {
                     }}
                 >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <img src={offensiveArmorImage} alt="Offensive Armor" style={{ width: '20px' }} />
+                        <img src={offensiveArmorImage} alt="Offensive Armor" style={{ width: '24px' }} />
                         <span>{tileData.offensiveArmor}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <img src={defensiveArmorImage} alt="Defensive Armor" style={{ width: '20px' }} />
+                        <img src={defensiveArmorImage} alt="Defensive Armor" style={{ width: '24px' }} />
                         <span>{tileData.defensiveArmor}</span>
                     </div>
 
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <img src={offensiveWeaponImage} alt="Offensive Weapon" style={{ width: '20px' }} />
+                        <img src={offensiveWeaponImage} alt="Offensive Weapon" style={{ width: '24px' }} />
                         <span>{tileData.offensiveWeapon}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <img src={defensiveWeaponImage} alt="Defensive Weapon" style={{ width: '20px' }} />
+                        <img src={defensiveWeaponImage} alt="Defensive Weapon" style={{ width: '24px' }} />
                         <span>{tileData.defensiveWeapon}</span>
                     </div>
 
@@ -1452,11 +1510,11 @@ const fetchAllBuildings = async (mainX, mainY) => {
                 >
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <img src={offensiveSoldierImage} alt="Offensive Soldier" style={{ width: '20px' }} />
+                <img src={offensiveSoldierImage} alt="Offensive Soldier" style={{ width: '30px' }} />
                 <span>{tileData.offensiveSoldier}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <img src={defensiveSoldierImage} alt="Defensive Soldier" style={{ width: '20px' }} />
+                <img src={defensiveSoldierImage} alt="Defensive Soldier" style={{ width: '30px' }} />
                 <span>{tileData.defensiveSoldier}</span>
             </div>
 
@@ -2783,27 +2841,27 @@ style={{
                     top: 10,
                     left: 10,
                     padding: '15px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    backgroundColor: 'rgba(62, 62, 62, 0.95)',
                     borderRadius: '10px',
                     boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
-                    color: '#333',
                     zIndex: 100,
                     width: '250px',
+                    color: '#e0d8c3',
                 }}
             >
-                <strong>Info Box</strong>
+                <strong >Info Box</strong>
                 <button
           onClick={() => window.location.reload()}
           style={{
             marginTop: '15px',
             padding: '10px',
-            backgroundColor: '#007bff',
+            backgroundColor: '#6c757d',
             color: 'white',
             border: 'none',
             borderRadius: '5px',
             cursor: 'pointer',
             width: '100%',
-            fontSize: '14px',
+            fontSize: '18px',
           }}
         >
           Back to Map
@@ -2858,9 +2916,9 @@ style={{
             style={{
                 marginTop: '10px',
                 padding: '8px',
-                backgroundColor: '#ffc107',
-                color: '#333',
-                border: 'none',
+                backgroundColor: '#7a5e3c',
+                color: '#f3eacb',
+                border: '1px solid #c4aa70',
                 borderRadius: '5px',
                 cursor: 'pointer',
                 width: '100%',
@@ -2876,27 +2934,31 @@ style={{
             <div style={{ marginTop: '10px' }}>
                 <input
                     type="text"
-                    placeholder="Enter Realm Name (10.000 LOP Tokens)"
+                    placeholder="Enter Realm Name (10.000 LOP)"
                     value={tileNameInput}
                     onChange={(e) => setTileNameInput(e.target.value)}
                     style={{
+                        backgroundColor: '#2b2b2b',
+                        width: '90%',
                         padding: '6px',
-                        width: '100%',
                         borderRadius: '5px',
-                        border: '1px solid #ccc',
-                        marginBottom: '8px'
+                        border: '1px solid #a88f58',
+                        marginBottom: '8px',
+                        fontSize: '14px',
+                        color: '#e8dbc0'
                     }}
                 />
                 <button
                     onClick={handleNameTile}
                     style={{
-                        padding: '8px',
-                        backgroundColor: '#28a745',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '5px',
-                        cursor: 'pointer',
-                        width: '100%'
+                padding: '8px',
+                backgroundColor: '#7a5e3c',
+                color: '#f3eacb',
+                border: '1px solid #c4aa70',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                width: '100%',
+                fontWeight: 'bold',
                     }}
                 >
                     Submit

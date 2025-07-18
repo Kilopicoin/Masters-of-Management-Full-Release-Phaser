@@ -1478,21 +1478,21 @@ const fetchAllBuildings = async (mainX, mainY) => {
                     }}
                 >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <img src={offensiveArmorImage} alt="Offensive Armor" style={{ width: '20px' }} />
+                        <img src={offensiveArmorImage} alt="Offensive Armor" style={{ width: '24px' }} />
                         <span>{tileData.offensiveArmor}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <img src={defensiveArmorImage} alt="Defensive Armor" style={{ width: '20px' }} />
+                        <img src={defensiveArmorImage} alt="Defensive Armor" style={{ width: '24px' }} />
                         <span>{tileData.defensiveArmor}</span>
                     </div>
 
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <img src={offensiveWeaponImage} alt="Offensive Weapon" style={{ width: '20px' }} />
+                        <img src={offensiveWeaponImage} alt="Offensive Weapon" style={{ width: '24px' }} />
                         <span>{tileData.offensiveWeapon}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        <img src={defensiveWeaponImage} alt="Defensive Weapon" style={{ width: '20px' }} />
+                        <img src={defensiveWeaponImage} alt="Defensive Weapon" style={{ width: '24px' }} />
                         <span>{tileData.defensiveWeapon}</span>
                     </div>
 
@@ -1510,11 +1510,11 @@ const fetchAllBuildings = async (mainX, mainY) => {
                 >
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <img src={offensiveSoldierImage} alt="Offensive Soldier" style={{ width: '20px' }} />
+                <img src={offensiveSoldierImage} alt="Offensive Soldier" style={{ width: '30px' }} />
                 <span>{tileData.offensiveSoldier}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <img src={defensiveSoldierImage} alt="Defensive Soldier" style={{ width: '20px' }} />
+                <img src={defensiveSoldierImage} alt="Defensive Soldier" style={{ width: '30px' }} />
                 <span>{tileData.defensiveSoldier}</span>
             </div>
 
@@ -1537,41 +1537,16 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
 
         {/* Loading Bar */}
-        <div
-            style={{
-                height: '20px',
-                width: '100%',
-                backgroundColor: '#ddd',
-                borderRadius: '5px',
-                overflow: 'hidden',
-                margin: '10px 0',
-                position: 'relative',
-            }}
-        >
-            <div
-                style={{
-                    height: '100%',
-                    width: `${(tileData.accumulatedTurns / 1000) * 100}%`,
-                    backgroundColor: '#007bff',
-                    transition: 'width 0.3s ease',
-                    position: 'absolute',
-                }}
-            />
-            <span
-                style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    color: '#fff',
-                    fontWeight: 'bold',
-                    fontSize: '12px',
-                    whiteSpace: 'nowrap',
-                }}
-            >
-                Next Level {tileData.accumulatedTurns}/{1000}
-            </span>
-        </div>
+        <div className="medieval-progress-bar">
+  <div
+    className="medieval-progress-fill"
+    style={{ width: `${(tileData.accumulatedTurns / 1000) * 100}%` }}
+  ></div>
+  <div className="medieval-progress-label">
+    Next Level {tileData.accumulatedTurns}/{1000}
+  </div>
+</div>
+
     </>
 )}
 
@@ -1618,14 +1593,7 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
 
 <button
-    style={{
-        padding: '10px 20px',
-        backgroundColor: '#007bff',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        cursor: 'pointer',
-    }}
+    className="card-button"
     onClick={() => {
         const turns = tileData?.inputTurns;
         if (turns && turns > 0) {
@@ -2861,7 +2829,7 @@ style={{
             borderRadius: '5px',
             cursor: 'pointer',
             width: '100%',
-            fontSize: '14px',
+            fontSize: '18px',
           }}
         >
           Back to Map
