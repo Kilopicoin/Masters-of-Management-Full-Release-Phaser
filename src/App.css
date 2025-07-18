@@ -18,6 +18,9 @@ li {
   font-size: 18px;
 }
 
+h3 {
+  text-align: center;
+}
 
 .message-card {
   background-color: #3e3e3e;
@@ -204,6 +207,11 @@ box-shadow: 0 0 6px rgba(196, 170, 112, 0.3);
   box-shadow: 0 0 8px rgba(0,0,0,0.6);
   font-family: 'EB Garamond', serif;
   color: #e8dbc0;
+  text-align: center;
+}
+
+
+.interaction-menu {
   text-align: center;
 }
 

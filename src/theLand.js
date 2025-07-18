@@ -11,12 +11,14 @@ import houseImage from './assets/buildings/house.png';
 import marketImage from './assets/buildings/market.png';
 import towerImage from './assets/buildings/tower.png';
 import workshopImage from './assets/buildings/workshop.png';
-
+import backgroundMusicFile from './assets/background2.mp3';
 import foodImage from './assets/res/food.png';
 import woodImage from './assets/res/wood.png';
 import stoneImage from './assets/res/stone.png';
 import ironImage from './assets/res/iron.png';
 import turnsImage from './assets/res/turns.png';
+import playIcon from './assets/play-icon.png';
+import stopIcon from './assets/stop-icon.png';
 
 import defensiveArmorImage from './assets/armors/defensive.png';
 import offensiveArmorImage from './assets/armors/offensive.png';
@@ -85,9 +87,10 @@ const [tileName, setTileName] = useState('');
 const [showFlagSelector, setShowFlagSelector] = useState(false);
 const [ownedFlagNFTs, setOwnedFlagNFTs] = useState([]);
 
+const musicRef2 = useRef(null);
+const [isMusicPlaying, setIsMusicPlaying] = useState(false);
 
-
-
+const [musicOnce, setmusicOnce] = useState(false);
     const [armorCosts, setArmorCosts] = useState({
         food: 0,
         wood: 0,
@@ -155,6 +158,31 @@ const handleSetClanFlag = async (tokenId) => {
     toast.error("Failed to set flag");
   }
 };
+
+
+useEffect(() => {
+  const tryPlayMusic2 = (e) => {
+    if (musicRef2.current && !isMusicPlaying) {
+      try {
+        musicRef2.current.play();
+        setIsMusicPlaying(true);
+      } catch (err) {
+        console.warn("Music autoplay failed", err);
+      }
+    }
+
+    // Remove listeners after first interaction
+    document.removeEventListener('pointerdown', tryPlayMusic2);
+  };
+
+  if (!musicOnce) {
+  document.addEventListener('pointerdown', tryPlayMusic2);
+  setmusicOnce(true);
+  }
+
+  
+
+}, [isMusicPlaying, musicOnce]);
 
 
 const fetchFlagNFTs = async () => {
@@ -835,6 +863,20 @@ const placeBuildingOnTile = useCallback(
             // Fetch updated tile data after the building is placed
             await fetchTileData(tileCoords.x, tileCoords.y);
 
+
+            const updatedBuildings = await fetchAllBuildings(tileCoords.x - 1, tileCoords.y - 1);
+
+const updatedCounts = {};
+updatedBuildings.forEach((row) => {
+    row.forEach((type) => {
+        if (type > 0) {
+            updatedCounts[type] = (updatedCounts[type] || 0) + 1;
+        }
+    });
+});
+setBuildingCounts(updatedCounts);
+
+
             return true; // Indicate success
         } catch (error) {
             console.error('Error placing building:', error);
@@ -870,7 +912,16 @@ const fetchAllBuildings = async (mainX, mainY) => {
 };
 
 
-
+ const toggleMusic = () => {
+    if (musicRef2.current) {
+      if (isMusicPlaying) {
+        musicRef2.current.pause();
+      } else {
+        musicRef2.current.play();
+      }
+      setIsMusicPlaying(!isMusicPlaying);
+    }
+  };
 
 
     const loginMetaMask = async () => {
@@ -938,6 +989,7 @@ const fetchAllBuildings = async (mainX, mainY) => {
         let zoomLevel = 0.24;
 
         function preload() {
+            this.load.audio('backgroundMusic2', backgroundMusicFile);
             this.load.image('grassX', grassXImage);
             this.load.image('elders', eldersImage);
             this.load.image('armory', armoryImage);
@@ -990,7 +1042,10 @@ const fetchAllBuildings = async (mainX, mainY) => {
               
                   setBuildingCounts(counts);
                
-
+musicRef2.current = this.sound.add('backgroundMusic2', {
+        loop: true,
+        volume: 0.5,
+      });
 
 
 
@@ -1316,6 +1371,7 @@ const fetchAllBuildings = async (mainX, mainY) => {
             gameRef.current.destroy(true); // Destroy the Phaser game instance
             gameRef.current = null; // Reset the reference
           }
+          
           document.body.style.overflow = '';
           document.documentElement.style.overflow = '';
         };
@@ -1753,7 +1809,16 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
 {interactionMenuType === "buildings" && (
     <>
-        <strong>Select Building Type:</strong>
+        
+<div style={{
+                    marginBottom: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '15px',
+                    justifyContent: 'center',
+                }}>
+                Select Building Type
+                </div>
 
         {/* Current Tile Resources */}
         {tileData && (
@@ -1766,6 +1831,7 @@ const fetchAllBuildings = async (mainX, mainY) => {
                     justifyContent: 'center',
                 }}
             >
+                
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <img src={foodImage} alt="Food" style={{ width: '20px' }} />
                     <span>{tileData.food}</span>
@@ -1806,11 +1872,11 @@ const fetchAllBuildings = async (mainX, mainY) => {
                         gap: '6px',
                         padding: '3px',
                         border: `2px solid ${
-                            selectedBuilding === building.image ? '#007bff' : '#f0f0f0'
+                            selectedBuilding === building.image ? '#daccb0ff' : '#c4aa70'
                         }`,
                         borderRadius: '10px',
                         cursor: 'pointer',
-                        backgroundColor: selectedBuilding === building.image ? '#e8f0ff' : 'white',
+                        backgroundColor: selectedBuilding === building.image ? '#575757ff' : '#3e3e3e',
                         minWidth: '120px',
                     }}
                     onClick={() => setSelectedBuilding(building.image)}
@@ -1820,7 +1886,7 @@ const fetchAllBuildings = async (mainX, mainY) => {
                         alt={building.label}
                         style={{ width: '60px', height: '60px' }}
                     />
-                    <strong>{building.label}({buildingCounts[building.no] || 0})</strong>
+                    {building.label}({buildingCounts[building.no] || 0})
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
                             <img src={foodImage} alt="Food" style={{ width: '20px' }} />
@@ -2610,7 +2676,7 @@ style={{
         {userClan ? (
             <div>
                 <p><strong>Clan:</strong> {clanDetails?.name}</p>
-                <p><strong>Leader:</strong> {clanDetails?.leader}</p>
+                <p><strong>Leader:</strong> {clanDetails?.leader.slice(0, 6)}...{clanDetails?.leader.slice(-6)}</p>
                 <p><strong>Members:</strong> {parseInt(clanDetails?.memberCount)}/30</p>
 
             {showFlagSelector && (
@@ -2635,14 +2701,16 @@ style={{
 
                 {clanDetails?.leader?.toLowerCase() === metaMaskAccount?.toLowerCase() && (
 <>
-                    <button onClick={() => fetchFlagNFTs()}>
+<div>
+                    <button className="card-button" onClick={() => fetchFlagNFTs()}>
     Set Clan Flag
   </button>
-
+</div>
                     <button 
                         onClick={handleDisbandClan}
                         style={{
                             marginTop: '10px',
+                            marginBottom: '10px',
                             padding: '10px',
                             backgroundColor: '#dc3545',
                             color: 'white',
@@ -2691,16 +2759,7 @@ style={{
 
         {/* Show this button for both cases */}
         <button
-    style={{
-        marginTop: '15px',
-        padding: '10px',
-        backgroundColor: '#28a745',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        cursor: 'pointer',
-        width: '100%',
-    }}
+    className="card-button"
     onClick={fetchAllClans}
 >
     List All Clans
@@ -2799,6 +2858,35 @@ style={{
 
 
 </div>
+
+
+
+
+      
+      <button
+  onClick={toggleMusic}
+  style={{
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: '10px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    zIndex: 101,
+  }}
+>
+  <img
+    src={isMusicPlaying ? stopIcon : playIcon}
+    alt={isMusicPlaying ? 'Stop Music' : 'Play Music'}
+    style={{ width: '24px', height: '24px' }}
+  />
+</button>
+
+
+
+      
+
 
 
 

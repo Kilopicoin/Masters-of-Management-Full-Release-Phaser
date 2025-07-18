@@ -45,6 +45,7 @@ function App() {
   const [userClan, setUserClan] = useState(null);
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [allclansX, setallclansX] = useState([]);
+  const [musicOnce, setmusicOnce] = useState(false);
   const [interactionMenuTypeA, setinteractionMenuTypeA] = useState("");
 
 const urlToKeyMap = useMemo(() => ({
@@ -79,6 +80,34 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/29.png": "nftflag_29",
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
+
+
+useEffect(() => {
+  const tryPlayMusic = (e) => {
+    if (musicRef.current && !isMusicPlaying) {
+      try {
+        musicRef.current.play();
+        setIsMusicPlaying(true);
+      } catch (err) {
+        console.warn("Music autoplay failed", err);
+      }
+    }
+
+    // Remove listeners after first interaction
+    document.removeEventListener('click', tryPlayMusic);
+    document.removeEventListener('contextmenu', tryPlayMusic);
+  };
+
+  if (!musicOnce) {
+  document.addEventListener('click', tryPlayMusic);
+  document.addEventListener('contextmenu', tryPlayMusic); // for right click
+  console.log("XXX")
+  setmusicOnce(true);
+  }
+
+  
+
+}, [isMusicPlaying, musicOnce]);
 
 
 

@@ -44,6 +44,8 @@ function App() {
   const [appKey, setAppKey] = useState(Date.now());
   const [userClan, setUserClan] = useState(null);
   const [leaderboardData, setLeaderboardData] = useState([]);
+  const [allclansX, setallclansX] = useState([]);
+  const [musicOnce, setmusicOnce] = useState(false);
   const [interactionMenuTypeA, setinteractionMenuTypeA] = useState("");
 
 const urlToKeyMap = useMemo(() => ({
@@ -80,6 +82,34 @@ const urlToKeyMap = useMemo(() => ({
 }), []);
 
 
+useEffect(() => {
+  const tryPlayMusic = (e) => {
+    if (musicRef.current && !isMusicPlaying) {
+      try {
+        musicRef.current.play();
+        setIsMusicPlaying(true);
+      } catch (err) {
+        console.warn("Music autoplay failed", err);
+      }
+    }
+
+    // Remove listeners after first interaction
+    document.removeEventListener('click', tryPlayMusic);
+    document.removeEventListener('contextmenu', tryPlayMusic);
+  };
+
+  if (!musicOnce) {
+  document.addEventListener('click', tryPlayMusic);
+  document.addEventListener('contextmenu', tryPlayMusic); // for right click
+  console.log("XXX")
+  setmusicOnce(true);
+  }
+
+  
+
+}, [isMusicPlaying, musicOnce]);
+
+
 
 
 
@@ -100,13 +130,15 @@ const urlToKeyMap = useMemo(() => ({
                       const occupant = await TileMap.getTileOccupant(x, y);
                       const name = await Clan.getTileName(x, y);
                       const clan = await Clan.getTileClan(x, y);
+                      const clanNo = parseInt(clan) - 1;
+                      const clanName = allclansX[clanNo][0];
                       
                       tiles.push({
                           x: x + 1,
                           y: y + 1,
                           occupant,
                           name,
-                          clan,
+                          clanName,
                           level: tileStats.level.toString(),
                           points,
                       });
@@ -557,6 +589,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
     // Fetch and map all clanId -> flagURL
     const clanList = await clanContract.getAllClans();
+    setallclansX(clanList);
     const clanFlagMap = {};
 
     for (let i = 0; i < clanList.length; i++) {
@@ -805,6 +838,12 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
         const coords = await contract.getOccupiedTileByAddress(metaMaskAccount);
         const [x, y] = coords.map(coord => Number(coord)); // Convert BigInt to regular numbers
         updateTileImage(x, y); // Update the tile image to skyflag
+      } else {
+        const scene = gameRef.current.scene.keys.default;
+        const existingFlag = scene.children.getByName(`flagSky`);
+          if (existingFlag) {
+            existingFlag.destroy();
+          }
       }
 
       
@@ -1315,10 +1354,10 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     top: 10,
     left: 10,
     padding: '15px',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)', // Slightly transparent white background
+    backgroundColor: 'rgba(62, 62, 62, 0.95)', // Slightly transparent white background
     borderRadius: '10px',
     boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)', // Add a soft shadow
-    color: '#333', // Darker text color for contrast
+    color: '#f1e5c6', // Darker text color for contrast
     zIndex: 100,
     width: '250px',
   }}
@@ -1377,7 +1416,8 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
                 borderRadius: '5px',
                 cursor: 'pointer',
                 width: '100%',
-                fontWeight: 'bold',
+                fontWeight: '400',
+                fontSize: '18px',
             }}
             onClick={() => setinteractionMenuTypeA("leaderboardX")}
         >
@@ -1545,7 +1585,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 {tileCoords.occupied && (
   metaMaskAccount ? (
     getAddress(metaMaskAccount) === tileCoords.occupant && (
-      <div>
+      <div >
 <p>
 <button onClick={handleEnterLand}>Enter the Land</button>
       </p>
@@ -1564,7 +1604,6 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
           placeholder="Enter sale price in LOP"
           value={salePrice}
           onChange={(e) => setSalePrice(e.target.value)}
-         
           className="fancy-inputX"
         />
         <button onClick={() => setTileForSale(tileCoords.x, tileCoords.y, true)}>
@@ -1648,16 +1687,18 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
       {isMetaMaskConnected ? (
         <div>
           <p>Occupy this land?</p>
-          <p>Requires 100,000.00 LOP tokens</p>
-          <div className="input-container">
-                  <input
-                    type="text"
-                    placeholder="Enter referrer address (optional)"
-                    value={referrer}
-                    onChange={(e) => setReferrer(e.target.value)}
-                    className="fancy-input" // Applying the fancy style
-                  />
-                </div>
+          <p>Requires 100,000.00 LOP</p>
+          <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+  <input
+    type="text"
+    placeholder="Enter referrer address (optional)"
+    value={referrer}
+    onChange={(e) => setReferrer(e.target.value)}
+    className="fancy-input"
+    style={{ maxWidth: '100%', fontSize: '18px' }}
+  />
+</div>
+
 
 
           <button type="button" onClick={() => occupyTile(tileCoords.x, tileCoords.y)}>
@@ -1683,18 +1724,19 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 {interactionMenuTypeA === "leaderboardX" && (
     <div className="interaction-menuA">
-        <p style={{ marginBottom: '15px', fontWeight: 'bold' }}>
+        <p style={{ marginBottom: '15px', fontWeight: '400' }}>
             Loading Leaderboard requires around 1 minute, do you want to load the Leaderboard?
         </p>
         <button
             style={{
                 padding: '10px 20px',
-                backgroundColor: '#007bff',
+                backgroundColor: '#6c757d',
                 color: 'white',
                 border: 'none',
                 borderRadius: '5px',
                 cursor: 'pointer',
-                fontWeight: 'bold'
+                fontWeight: 'bold',
+                margin: '5px'
             }}
             onClick={() => {
                 setinteractionMenuTypeA("leaderboard");
@@ -1707,12 +1749,13 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
         <button
             style={{
                 padding: '10px 20px',
-                backgroundColor: '#007bff',
+                backgroundColor: '#6c757d',
                 color: 'white',
                 border: 'none',
                 borderRadius: '5px',
                 cursor: 'pointer',
-                fontWeight: 'bold'
+                fontWeight: 'bold',
+                margin: '5px'
             }}
             onClick={() => {
                 setinteractionMenuTypeA("");
@@ -1734,7 +1777,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
         <button
             style={{
                 padding: '8px 12px',
-                backgroundColor: '#007bff',
+                backgroundColor: '#6c757d',
                 color: 'white',
                 border: 'none',
                 borderRadius: '5px',
@@ -1749,9 +1792,9 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
         </button>
 
         {leaderboardData.length > 0 ? (
-            <table style={{ width: '100%', fontSize: '14px', borderCollapse: 'collapse' }}>
+            <table style={{ width: '100%', fontSize: '20px', borderCollapse: 'collapse' }}>
                 <thead>
-                    <tr style={{ backgroundColor: '#f2f2f2' }}>
+                    <tr style={{ backgroundColor: '#6c757d' }}>
                         <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>#</th>
                         <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Realm</th>
                         <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Clan</th>
@@ -1766,7 +1809,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
                         <tr key={index}>
                             <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{index + 1}</td>
                             <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.name || "Unnamed"}</td>
-                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.clan || "None"}</td>
+                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.clanName || "None"}</td>
                             <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.x},{item.y}</td>
                             <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.level}</td>
                             <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.points}</td>

@@ -11,12 +11,14 @@ import houseImage from './assets/buildings/house.png';
 import marketImage from './assets/buildings/market.png';
 import towerImage from './assets/buildings/tower.png';
 import workshopImage from './assets/buildings/workshop.png';
-
+import backgroundMusicFile from './assets/background2.mp3';
 import foodImage from './assets/res/food.png';
 import woodImage from './assets/res/wood.png';
 import stoneImage from './assets/res/stone.png';
 import ironImage from './assets/res/iron.png';
 import turnsImage from './assets/res/turns.png';
+import playIcon from './assets/play-icon.png';
+import stopIcon from './assets/stop-icon.png';
 
 import defensiveArmorImage from './assets/armors/defensive.png';
 import offensiveArmorImage from './assets/armors/offensive.png';
@@ -85,9 +87,10 @@ const [tileName, setTileName] = useState('');
 const [showFlagSelector, setShowFlagSelector] = useState(false);
 const [ownedFlagNFTs, setOwnedFlagNFTs] = useState([]);
 
+const musicRef2 = useRef(null);
+const [isMusicPlaying, setIsMusicPlaying] = useState(false);
 
-
-
+const [musicOnce, setmusicOnce] = useState(false);
     const [armorCosts, setArmorCosts] = useState({
         food: 0,
         wood: 0,
@@ -155,6 +158,31 @@ const handleSetClanFlag = async (tokenId) => {
     toast.error("Failed to set flag");
   }
 };
+
+
+useEffect(() => {
+  const tryPlayMusic2 = (e) => {
+    if (musicRef2.current && !isMusicPlaying) {
+      try {
+        musicRef2.current.play();
+        setIsMusicPlaying(true);
+      } catch (err) {
+        console.warn("Music autoplay failed", err);
+      }
+    }
+
+    // Remove listeners after first interaction
+    document.removeEventListener('pointerdown', tryPlayMusic2);
+  };
+
+  if (!musicOnce) {
+  document.addEventListener('pointerdown', tryPlayMusic2);
+  setmusicOnce(true);
+  }
+
+  
+
+}, [isMusicPlaying, musicOnce]);
 
 
 const fetchFlagNFTs = async () => {
@@ -870,7 +898,16 @@ const fetchAllBuildings = async (mainX, mainY) => {
 };
 
 
-
+ const toggleMusic = () => {
+    if (musicRef2.current) {
+      if (isMusicPlaying) {
+        musicRef2.current.pause();
+      } else {
+        musicRef2.current.play();
+      }
+      setIsMusicPlaying(!isMusicPlaying);
+    }
+  };
 
 
     const loginMetaMask = async () => {
@@ -938,6 +975,7 @@ const fetchAllBuildings = async (mainX, mainY) => {
         let zoomLevel = 0.24;
 
         function preload() {
+            this.load.audio('backgroundMusic2', backgroundMusicFile);
             this.load.image('grassX', grassXImage);
             this.load.image('elders', eldersImage);
             this.load.image('armory', armoryImage);
@@ -990,7 +1028,10 @@ const fetchAllBuildings = async (mainX, mainY) => {
               
                   setBuildingCounts(counts);
                
-
+musicRef2.current = this.sound.add('backgroundMusic2', {
+        loop: true,
+        volume: 0.5,
+      });
 
 
 
@@ -1316,6 +1357,7 @@ const fetchAllBuildings = async (mainX, mainY) => {
             gameRef.current.destroy(true); // Destroy the Phaser game instance
             gameRef.current = null; // Reset the reference
           }
+          
           document.body.style.overflow = '';
           document.documentElement.style.overflow = '';
         };
@@ -1537,41 +1579,16 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
 
         {/* Loading Bar */}
-        <div
-            style={{
-                height: '20px',
-                width: '100%',
-                backgroundColor: '#ddd',
-                borderRadius: '5px',
-                overflow: 'hidden',
-                margin: '10px 0',
-                position: 'relative',
-            }}
-        >
-            <div
-                style={{
-                    height: '100%',
-                    width: `${(tileData.accumulatedTurns / 1000) * 100}%`,
-                    backgroundColor: '#007bff',
-                    transition: 'width 0.3s ease',
-                    position: 'absolute',
-                }}
-            />
-            <span
-                style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
-                    transform: 'translate(-50%, -50%)',
-                    color: '#fff',
-                    fontWeight: 'bold',
-                    fontSize: '12px',
-                    whiteSpace: 'nowrap',
-                }}
-            >
-                Next Level {tileData.accumulatedTurns}/{1000}
-            </span>
-        </div>
+        <div className="medieval-progress-bar">
+  <div
+    className="medieval-progress-fill"
+    style={{ width: `${(tileData.accumulatedTurns / 1000) * 100}%` }}
+  ></div>
+  <div className="medieval-progress-label">
+    Next Level {tileData.accumulatedTurns}/{1000}
+  </div>
+</div>
+
     </>
 )}
 
@@ -1618,14 +1635,7 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
 
 <button
-    style={{
-        padding: '10px 20px',
-        backgroundColor: '#007bff',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        cursor: 'pointer',
-    }}
+    className="card-button"
     onClick={() => {
         const turns = tileData?.inputTurns;
         if (turns && turns > 0) {
@@ -2831,6 +2841,35 @@ style={{
 
 
 </div>
+
+
+
+
+      
+      <button
+  onClick={toggleMusic}
+  style={{
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: '10px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    zIndex: 101,
+  }}
+>
+  <img
+    src={isMusicPlaying ? stopIcon : playIcon}
+    alt={isMusicPlaying ? 'Stop Music' : 'Play Music'}
+    style={{ width: '24px', height: '24px' }}
+  />
+</button>
+
+
+
+      
+
 
 
 
