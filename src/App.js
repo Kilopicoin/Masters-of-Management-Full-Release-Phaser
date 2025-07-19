@@ -20,6 +20,8 @@ import TheLand from './theLand';
 import getclanContract, { getclanSignerContract } from './clancontract';
 import { getTheLandSignerContract } from './TheLandContract';
 import getNFTContract, { getNFTSignerContract } from './nftContract';
+import { getMarketplaceSignerContract } from './MarketplaceContract';
+
 
 function App() {
   const gameRef = useRef(null);
@@ -47,6 +49,11 @@ function App() {
   const [allclansX, setallclansX] = useState([]);
   const [musicOnce, setmusicOnce] = useState(false);
   const [interactionMenuTypeA, setinteractionMenuTypeA] = useState("");
+  const [attackCooldownMessage, setAttackCooldownMessage] = useState("");
+  const [attackerTroops, setAttackerTroops] = useState(null);
+const [attackerTileCoords, setAttackerTileCoords] = useState({ x: null, y: null });
+
+
 
 const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/1.png": "nftflag_1",
@@ -80,6 +87,25 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/29.png": "nftflag_29",
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
+
+
+
+const fetchAttackerMilitary = useCallback(async () => {
+  try {
+    const landContract = await getTheLandSignerContract();
+    const { x, y } = attackerTileCoords;
+    const data = await landContract.getTileData(x, y);
+
+    return {
+      offensiveSoldier: Number(data.offensiveSoldier),
+      defensiveSoldier: Number(data.defensiveSoldier),
+    };
+  } catch (err) {
+    console.error("Error fetching attacker's soldier data", err);
+    return { offensiveSoldier: 0, defensiveSoldier: 0 };
+  }
+}, [attackerTileCoords]);
+
 
 
 useEffect(() => {
@@ -183,6 +209,11 @@ useEffect(() => {
     fetchUserClan();
   }, [metaMaskAccount]);
   
+useEffect(() => {
+  if (interactionMenuTypeA === "attackMenu") {
+    fetchAttackerMilitary().then(setAttackerTroops);
+  }
+}, [interactionMenuTypeA, fetchAttackerMilitary]);
 
 
 
@@ -555,6 +586,39 @@ if (occupantPendingClanId > 0) {
 
 
 
+  try {
+
+    const ax = Number(x);
+    const ay = Number(y);
+
+    const landContract = await getTheLandSignerContract();
+    const marketContract = await getMarketplaceSignerContract();
+
+    const atkTurnsUsed = await parseInt(landContract.getTotalTurnsUsedByTile(ax, ay));
+    const defTurnsUsed = await parseInt(landContract.getTotalTurnsUsedByTile(x, y));
+
+    const lastAtk = await parseInt(marketContract.lastAttackTurn(ax, ay));
+    const lastDef = await parseInt(marketContract.lastDefenseTurn(x, y));
+
+    const cooldown = 300;
+
+    if (atkTurnsUsed < lastAtk + cooldown) {
+      setAttackCooldownMessage("Attacker Cooldown");
+    } else if (defTurnsUsed < lastDef + cooldown) {
+      setAttackCooldownMessage("Defender Cooldown");
+    } else {
+      setAttackCooldownMessage(""); // No cooldown, show button
+    }
+  } catch (err) {
+    console.error("Error checking cooldowns", err);
+    setAttackCooldownMessage(""); // fallback
+  }
+
+
+
+
+
+
 
               }
             });
@@ -837,6 +901,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
         // Fetch the coordinates of the occupied tile
         const coords = await contract.getOccupiedTileByAddress(metaMaskAccount);
         const [x, y] = coords.map(coord => Number(coord)); // Convert BigInt to regular numbers
+        setAttackerTileCoords({ x, y });
         updateTileImage(x, y); // Update the tile image to skyflag
       } else {
         const scene = gameRef.current.scene.keys.default;
@@ -847,6 +912,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
       }
 
       
+
       sethasTileG(hasTile);
     }
   }, [metaMaskAccount]); // Now it depends only on metaMaskAccount
@@ -1543,6 +1609,8 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 
 
+
+
 {tileCoords.occupant &&
   !tileCoords.clan && // Tile has no clan
   userClan?.isLeader && (
@@ -1579,6 +1647,23 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 </>
       )}
+
+
+      {tileCoords.occupied && metaMaskAccount && getAddress(metaMaskAccount) !== tileCoords.occupant && (
+  <div>
+    {attackCooldownMessage ? (
+      <p style={{ fontWeight: 'bold', color: 'orange' }}>{attackCooldownMessage}</p>
+    ) : (
+      <button className='card-button'
+      onClick={() => setinteractionMenuTypeA("attackMenu")}
+      >
+        Attack here
+      </button>
+    )}
+  </div>
+)}
+
+  
 
 
 
@@ -1714,6 +1799,28 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     </div>
   )}
 </div>
+
+
+
+
+
+{interactionMenuTypeA === "attackMenu" && attackerTroops && (
+  <div className="interaction-menuA">
+    <h3>Your Army</h3>
+    <p>🗡 Offensive Soldiers: {attackerTroops.offensiveSoldier}</p>
+    <p>🛡 Defensive Soldiers: {attackerTroops.defensiveSoldier}</p>
+
+    <button
+      onClick={() => {
+        // confirm attack logic here
+      }}
+    >
+      Confirm Attack
+    </button>
+  </div>
+)}
+
+
 
 
 

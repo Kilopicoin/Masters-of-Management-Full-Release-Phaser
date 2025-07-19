@@ -2736,25 +2736,19 @@ className='fancy-input'
                     placeholder="Enter clan name"
                     value={newClanName}
                     onChange={(e) => setNewClanName(e.target.value)}
+                    className='fancy-input'
                     style={{
                         marginBottom: '10px',
                         padding: '8px',
-                        width: '100%',
                         borderRadius: '5px',
-                        border: '1px solid #ccc'
                     }}
                 />
                 <button
                     onClick={createClan}
                     disabled={loading}
+                    className='card-button'
                     style={{
-                        padding: '10px',
-                        backgroundColor: '#007bff',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '5px',
-                        cursor: 'pointer',
-                        width: '100%'
+                        marginBottom: '10px'
                     }}
                 >
                     {loading ? "Creating Clan..." : "Create Clan"}
