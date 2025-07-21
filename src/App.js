@@ -58,6 +58,8 @@ const [attackCost, setAttackCost] = useState(null);
 const [attackerResources, setAttackerResources] = useState(null);
 const [attackDistance, setAttackDistance] = useState(null);
 const [attackerPower, setAttackerPower] = useState(0);
+const [warLogsData, setWarLogsData] = useState([]);
+
 
 const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/1.png": "nftflag_1",
@@ -91,6 +93,38 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/29.png": "nftflag_29",
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
+
+
+
+const fetchRecentWarLogs = async () => {
+  try {
+    setLoading(true);
+    const marketContract = await getMarketplaceSignerContract();
+    const data = await marketContract.getRecentWarHistory();
+    setWarLogsData(data);
+  } catch (err) {
+    console.error("Error fetching recent war logs:", err);
+    toast.error("Failed to fetch recent war logs.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+const fetchAllWarLogs = async () => {
+  try {
+    setLoading(true);
+    const marketContract = await getMarketplaceSignerContract();
+    const data = await marketContract.getAllWarHistory();
+    setWarLogsData(data);
+  } catch (err) {
+    console.error("Error fetching all war logs:", err);
+    toast.error("Failed to fetch all war logs.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
 
 
@@ -148,9 +182,11 @@ const lastAtt = parseInt(lastAttRaw.toString());
 const cooldown = 300;
 
 if (attTurnsUsed < lastAtt + cooldown) {
-  setAttackCooldownMessageX("Attacker Cooldown");
-  return; // prevent attack button
+  const turnsLeft = (lastAtt + cooldown) - attTurnsUsed;
+  setAttackCooldownMessageX(`Attacker Cooldown (${turnsLeft} turns left)`);
+  return;
 }
+
 
 
 
@@ -1292,6 +1328,9 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
           cameraStartY = this.cameras.main.scrollY;
         } else if (pointer.button === 2) {
 
+                        setinteractionMenuTypeA("");
+
+
           if (pointer.flagClicked) {
             // Reset the flag and skip global handling since it was already handled by the flag
             pointer.flagClicked = false;
@@ -1591,6 +1630,25 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
             onClick={() => setinteractionMenuTypeA("leaderboardX")}
         >
             Leaderboard
+        </button>
+
+
+        <button
+            style={{
+                marginTop: '5px',
+                padding: '8px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                width: '100%',
+                fontWeight: '400',
+                fontSize: '18px',
+            }}
+            onClick={() => setinteractionMenuTypeA("warlogsX")}
+        >
+            War Logs
         </button>
 
 
@@ -1954,23 +2012,188 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 
 {attackCooldownMessageX ? (
-      <p style={{ fontWeight: 'bold', color: 'orange' }}>{attackCooldownMessageX}</p>
-    ) : (
-      <button className='card-button'
-      onClick={handleConfirmAttack}
-      >
-        Confirm Attack
-      </button>
-    )}
+  <p style={{ fontWeight: 'bold', color: 'orange' }}>{attackCooldownMessageX}</p>
+) : (
+  <button className='card-button' onClick={handleConfirmAttack}>
+    Confirm Attack
+  </button>
+)}
+
+&nbsp;
+
+<button
+      onClick={() => setinteractionMenuTypeA("")}
+      className='card-button'
+    >
+      Close
+    </button>
+
 
   </div>
 )}
 
 
 
+{interactionMenuTypeA === "warlogsX" && (
+    <div className="interaction-menuA">
+        <p style={{ marginBottom: '15px', fontWeight: '400' }}>
+            Loading War Logs require waiting time, please choose your preference
+        </p>
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                margin: '5px'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("warlogsWeek");
+                fetchRecentWarLogs();
+            }}
+        >
+            Last Week's War Logs (Loading Approx. 1 Minute)
+        </button>
+
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                margin: '5px'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("warlogsAll");
+                fetchAllWarLogs();
+            }}
+        >
+            All War Logs (Loading Up To 10 Minutes)
+        </button>
+
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                margin: '5px'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("");
+            }}
+        >
+            Cancel
+        </button>
+
+    </div>
+)}
+
+
+{interactionMenuTypeA === "warlogsWeek" && (
+  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
+    <h3 style={{ marginBottom: '10px' }}>⚔️ Last Week's War Logs ⚔️</h3>
+
+    <button
+      onClick={() => setinteractionMenuTypeA("")}
+      style={{
+        padding: '8px 12px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        marginBottom: '10px',
+        cursor: 'pointer'
+      }}
+    >
+      Close
+    </button>
+
+    {warLogsData.length > 0 ? (
+      <table style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#6c757d' }}>
+            <th>Attacker</th>
+            <th>Defender</th>
+            <th>Date</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          {warLogsData.map((item, index) => (
+            <tr key={index}>
+              <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
+<td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
+<td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+
+              <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    ) : (
+      <p>No war logs available.</p>
+    )}
+  </div>
+)}
 
 
 
+{interactionMenuTypeA === "warlogsAll" && (
+  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
+    <h3 style={{ marginBottom: '10px' }}>⚔️ All War Logs ⚔️</h3>
+
+    <button
+      onClick={() => setinteractionMenuTypeA("")}
+      style={{
+        padding: '8px 12px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        marginBottom: '10px',
+        cursor: 'pointer'
+      }}
+    >
+      Close
+    </button>
+
+    {warLogsData.length > 0 ? (
+      <table style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#6c757d' }}>
+            <th>Attacker</th>
+            <th>Defender</th>
+            <th>Date</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          {warLogsData.map((item, index) => (
+            <tr key={index}>
+              <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
+<td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
+<td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+
+              <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    ) : (
+      <p>No war logs available.</p>
+    )}
+  </div>
+)}
 
 
 

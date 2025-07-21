@@ -89,6 +89,7 @@ const [ownedFlagNFTs, setOwnedFlagNFTs] = useState([]);
 
 const musicRef2 = useRef(null);
 const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+const [defenderCooldownTurnsLeft, setDefenderCooldownTurnsLeft] = useState(null);
 
 const [musicOnce, setmusicOnce] = useState(false);
     const [armorCosts, setArmorCosts] = useState({
@@ -144,6 +145,38 @@ const [calculatedResources, setCalculatedResources] = useState({
     stone: 0,
     iron: 0,
 });
+
+
+
+const fetchDefenderCooldown = useCallback(async (x, y) => {
+  try {
+    const marketContract = await getMarketplaceSignerContract();
+    const landContract = await getTheLandSignerContract();
+
+    const defTurnsUsedRaw = await landContract.getTotalTurnsUsedByTile(x - 1, y - 1);
+    const defTurnsUsed = parseInt(defTurnsUsedRaw.toString());
+
+    const lastDefRaw = await marketContract.lastDefenseTurn(x - 1, y - 1);
+    const lastDef = parseInt(lastDefRaw.toString());
+
+    const cooldownEnd = lastDef + 300;
+    const turnsLeft = Math.max(0, cooldownEnd - defTurnsUsed);
+
+    setDefenderCooldownTurnsLeft(turnsLeft);
+  } catch (error) {
+    console.error("Error fetching defender cooldown:", error);
+    setDefenderCooldownTurnsLeft(null);
+  }
+}, []);
+
+useEffect(() => {
+  if (tileCoords?.x != null && tileCoords?.y != null) {
+    fetchDefenderCooldown(tileCoords.x, tileCoords.y);
+  }
+}, [tileCoords?.x, tileCoords?.y, fetchDefenderCooldown]);
+
+
+
 
 const handleSetClanFlag = async (tokenId) => {
   try {
@@ -777,7 +810,7 @@ const listItemForSale = async () => {
             setLoading(false);
             return;
         }
-        console.log(x, y, resourceType, amount, price)
+
         const tx = await contract.listItemForSale(x, y, resourceType, amount, price);
         await tx.wait();
 
@@ -1400,7 +1433,8 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 
         // Fetch updated tile data after the transaction
         await fetchTileData(tileCoords.x, tileCoords.y);
-
+        await fetchDefenderCooldown(tileCoords.x, tileCoords.y);
+        
         toast.success(`Successfully used ${turns} turn(s)!`);
     } catch (error) {
         console.error("Error using turns:", error);
@@ -1665,6 +1699,15 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 
 
         </div>
+
+
+{defenderCooldownTurnsLeft !== null && defenderCooldownTurnsLeft > 0 && (
+  <div style={{ marginTop: '5px', textAlign: 'center', color: '#ffcc00' }}>
+    🛡️ Defender Cooldown: {defenderCooldownTurnsLeft} turn(s) remaining
+  </div>
+)}
+
+
 
 
 
