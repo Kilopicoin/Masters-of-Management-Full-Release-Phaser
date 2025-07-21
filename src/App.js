@@ -21,7 +21,8 @@ import getclanContract, { getclanSignerContract } from './clancontract';
 import { getTheLandSignerContract } from './TheLandContract';
 import getNFTContract, { getNFTSignerContract } from './nftContract';
 import { getMarketplaceSignerContract } from './MarketplaceContract';
-
+import defensiveSoldierImage from './assets/soldiers/defensive.png';
+import offensiveSoldierImage from './assets/soldiers/offensive.png';
 
 function App() {
   const gameRef = useRef(null);
@@ -52,8 +53,10 @@ function App() {
   const [attackCooldownMessage, setAttackCooldownMessage] = useState("");
   const [attackerTroops, setAttackerTroops] = useState(null);
 const [attackerTileCoords, setAttackerTileCoords] = useState({ x: null, y: null });
-
-
+const [attackCost, setAttackCost] = useState(null);
+const [attackerResources, setAttackerResources] = useState(null);
+const [attackDistance, setAttackDistance] = useState(null);
+const [attackerPower, setAttackerPower] = useState(0);
 
 const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/1.png": "nftflag_1",
@@ -90,6 +93,83 @@ const urlToKeyMap = useMemo(() => ({
 
 
 
+const handleConfirmAttack = async () => {
+  try {
+    if (!attackerTileCoords || !tileCoords) return;
+
+    const marketContract = await getMarketplaceSignerContract();
+
+    const ax = attackerTileCoords.x;
+    const ay = attackerTileCoords.y;
+    const dx = tileCoords.x - 1;
+    const dy = tileCoords.y - 1;
+
+    const tx = await marketContract.attackTile(ax, ay, dx, dy);
+    await tx.wait();
+
+    toast.success("Attack executed successfully!");
+
+    // Optionally update UI:
+    await fetchAttackerResources();
+    await calculateAttackCost(tileCoords.x, tileCoords.y);
+    await checkIfAccountOccupiedTile(); // re-fetch ownership
+
+    setinteractionMenuTypeA(""); // close attack menu
+  } catch (err) {
+    console.error("Attack failed:", err);
+    toast.error("Attack failed: " + (err.reason || err.message));
+  }
+};
+
+
+
+
+const fetchAttackerResources = useCallback(async () => {
+  try {
+    const landContract = await getTheLandSignerContract();
+    const { x, y } = attackerTileCoords;
+    const data = await landContract.getTileData(x, y);
+    setAttackerResources({
+      food: Number(data.food),
+      wood: Number(data.wood),
+      stone: Number(data.stone),
+      iron: Number(data.iron),
+    });
+  } catch (err) {
+    console.error("Error fetching attacker's resources", err);
+    setAttackerResources(null);
+  }
+}, [attackerTileCoords]);
+
+const calculateAttackCost = useCallback(async (targetX, targetY) => {
+  if (attackerTileCoords.x === null || attackerTileCoords.y === null) return;
+
+  const ax = attackerTileCoords.x;
+  const ay = attackerTileCoords.y;
+  const dx = targetX - 1;
+  const dy = targetY - 1;
+
+  const distance = Math.abs(ax - dx) + Math.abs(ay - dy);
+   setAttackDistance(distance);
+  const ATTACK_COST_FACTOR = 10;
+
+  const landContract = await getTheLandSignerContract();
+  const tileData = await landContract.getTileData(ax, ay);
+  const offensiveSoldier = Number(tileData.offensiveSoldier);
+  const defensiveSoldier = Number(tileData.defensiveSoldier);
+console.log(ax, ay, dx, dy)
+  const totalCost = ATTACK_COST_FACTOR * distance * (offensiveSoldier + defensiveSoldier);
+
+  setAttackCost({
+    food: Math.floor((totalCost * 40) / 100),
+    wood: Math.floor((totalCost * 30) / 100),
+    stone: Math.floor((totalCost * 20) / 100),
+    iron: Math.floor((totalCost * 10) / 100),
+  });
+}, [attackerTileCoords]);
+
+
+
 const fetchAttackerMilitary = useCallback(async () => {
   try {
     const landContract = await getTheLandSignerContract();
@@ -99,6 +179,7 @@ const fetchAttackerMilitary = useCallback(async () => {
     return {
       offensiveSoldier: Number(data.offensiveSoldier),
       defensiveSoldier: Number(data.defensiveSoldier),
+      offensiveTech: Number(data.offensiveTech),
     };
   } catch (err) {
     console.error("Error fetching attacker's soldier data", err);
@@ -210,10 +291,22 @@ useEffect(() => {
   }, [metaMaskAccount]);
   
 useEffect(() => {
-  if (interactionMenuTypeA === "attackMenu") {
-    fetchAttackerMilitary().then(setAttackerTroops);
-  }
-}, [interactionMenuTypeA, fetchAttackerMilitary]);
+  if (interactionMenuTypeA === "attackMenu") {
+    fetchAttackerMilitary().then(data => {
+      setAttackerTroops(data);
+      // Calculate attacker power using the same formula as in the contract
+      console.log((data.offensiveSoldier * 2), (data.defensiveSoldier * 1), (data.offensiveTech + 1))
+      const calculatedPower = (data.offensiveSoldier * 2) + (data.defensiveSoldier * 1) + (data.offensiveTech + 1);
+      setAttackerPower(calculatedPower);
+    });
+    fetchAttackerResources();
+    if (tileCoords.x !== null && tileCoords.y !== null) {
+      calculateAttackCost(tileCoords.x, tileCoords.y);
+    }
+  }
+}, [interactionMenuTypeA, fetchAttackerMilitary, calculateAttackCost, fetchAttackerResources, tileCoords]);
+
+
 
 
 
@@ -1045,6 +1138,8 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
       this.load.image('nftflag_28', "https://kilopi.net/mom/nfts/28.png");
       this.load.image('nftflag_29', "https://kilopi.net/mom/nfts/29.png");
       this.load.image('nftflag_30', "https://kilopi.net/mom/nfts/30.png");
+      this.load.image('defensivesoldier', defensiveSoldierImage);
+      this.load.image('offensivesoldier', offensiveSoldierImage);
 
     }
 
@@ -1806,17 +1901,60 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 {interactionMenuTypeA === "attackMenu" && attackerTroops && (
   <div className="interaction-menuA">
-    <h3>Your Army</h3>
-    <p>🗡 Offensive Soldiers: {attackerTroops.offensiveSoldier}</p>
-    <p>🛡 Defensive Soldiers: {attackerTroops.defensiveSoldier}</p>
+    <h4>Attack Menu</h4>
+    <div>
+      Attacker Soldiers<br/>
+      <img src={offensiveSoldierImage} alt="Defensive Soldier" style={{ width: '20px' }} /> Offensive Soldiers: {attackerTroops.offensiveSoldier} 
+    &nbsp; &nbsp;
+    <img src={defensiveSoldierImage} alt="Defensive Soldier" style={{ width: '20px' }} /> Defensive Soldiers: {attackerTroops.defensiveSoldier}</div>
+
+     <div style={{ marginTop: '10px' }}>
+      Attack Power: {attackerPower} units
+      </div>
+
+    <div style={{ marginTop: '10px' }}>
+       Distance: {attackDistance} units
+      </div>
+
+    {attackCost && attackerResources && (
+  <div style={{ marginTop: '10px' }}>
+    ⚔️ Attack Cost:<br/>
+    <table style={{ width: '100%' }}>
+      <thead>
+        <tr>
+          <th>Resource</th>
+          <th>Current</th>
+          <th>Cost</th>
+          <th>Remaining</th>
+        </tr>
+      </thead>
+      <tbody>
+        {["food", "wood", "stone", "iron"].map((res) => (
+          <tr key={res}>
+            <td>{res.charAt(0).toUpperCase() + res.slice(1)}</td>
+            <td>{attackerResources[res]}</td>
+            <td>{attackCost[res]}</td>
+            <td style={{ color: (attackerResources[res] - attackCost[res]) < 0 ? 'red' : 'inherit' }}>
+              {attackerResources[res] - attackCost[res]}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
+
+
 
     <button
-      onClick={() => {
-        // confirm attack logic here
-      }}
-    >
-      Confirm Attack
-    </button>
+  className='card-button'
+  onClick={handleConfirmAttack}
+>
+  Confirm Attack
+</button>
+
+
+
   </div>
 )}
 
