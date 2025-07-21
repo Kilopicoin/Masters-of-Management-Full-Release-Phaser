@@ -51,6 +51,7 @@ function App() {
   const [musicOnce, setmusicOnce] = useState(false);
   const [interactionMenuTypeA, setinteractionMenuTypeA] = useState("");
   const [attackCooldownMessage, setAttackCooldownMessage] = useState("");
+  const [attackCooldownMessageX, setAttackCooldownMessageX] = useState("");
   const [attackerTroops, setAttackerTroops] = useState(null);
 const [attackerTileCoords, setAttackerTileCoords] = useState({ x: null, y: null });
 const [attackCost, setAttackCost] = useState(null);
@@ -135,6 +136,24 @@ const fetchAttackerResources = useCallback(async () => {
       stone: Number(data.stone),
       iron: Number(data.iron),
     });
+
+    const marketContract = await getMarketplaceSignerContract();
+
+    const attTurnsUsedRaw = await landContract.getTotalTurnsUsedByTile(attackerTileCoords.x, attackerTileCoords.y);
+const attTurnsUsed = parseInt(attTurnsUsedRaw.toString());
+
+const lastAttRaw = await marketContract.lastAttackTurn(attackerTileCoords.x, attackerTileCoords.y);
+const lastAtt = parseInt(lastAttRaw.toString());
+
+const cooldown = 300;
+
+if (attTurnsUsed < lastAtt + cooldown) {
+  setAttackCooldownMessageX("Attacker Cooldown");
+  return; // prevent attack button
+}
+
+
+
   } catch (err) {
     console.error("Error fetching attacker's resources", err);
     setAttackerResources(null);
@@ -678,34 +697,23 @@ if (occupantPendingClanId > 0) {
                 });
 
 
-
-  try {
-
-    const ax = Number(x);
-    const ay = Number(y);
-
-    const landContract = await getTheLandSignerContract();
     const marketContract = await getMarketplaceSignerContract();
 
-    const atkTurnsUsed = await parseInt(landContract.getTotalTurnsUsedByTile(ax, ay));
-    const defTurnsUsed = await parseInt(landContract.getTotalTurnsUsedByTile(x, y));
+    const defTurnsUsedRaw = await landContract.getTotalTurnsUsedByTile(x, y);
+    const defTurnsUsed = parseInt(defTurnsUsedRaw.toString());
+    console.log(defTurnsUsed);
 
-    const lastAtk = await parseInt(marketContract.lastAttackTurn(ax, ay));
-    const lastDef = await parseInt(marketContract.lastDefenseTurn(x, y));
+    const lastDefRaw = await marketContract.lastDefenseTurn(x, y);
+    const lastDef = parseInt(lastDefRaw.toString());
+    console.log(lastDef);
 
     const cooldown = 300;
 
-    if (atkTurnsUsed < lastAtk + cooldown) {
-      setAttackCooldownMessage("Attacker Cooldown");
-    } else if (defTurnsUsed < lastDef + cooldown) {
+    if (defTurnsUsed < lastDef + cooldown) {
       setAttackCooldownMessage("Defender Cooldown");
     } else {
-      setAttackCooldownMessage(""); // No cooldown, show button
+      setAttackCooldownMessage("");
     }
-  } catch (err) {
-    console.error("Error checking cooldowns", err);
-    setAttackCooldownMessage(""); // fallback
-  }
 
 
 
@@ -1945,15 +1953,15 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 )}
 
 
-
-    <button
-  className='card-button'
-  onClick={handleConfirmAttack}
->
-  Confirm Attack
-</button>
-
-
+{attackCooldownMessageX ? (
+      <p style={{ fontWeight: 'bold', color: 'orange' }}>{attackCooldownMessageX}</p>
+    ) : (
+      <button className='card-button'
+      onClick={handleConfirmAttack}
+      >
+        Confirm Attack
+      </button>
+    )}
 
   </div>
 )}
