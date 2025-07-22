@@ -277,3 +277,25 @@ box-shadow: 0 0 6px rgba(196, 170, 112, 0.3);
   border-color: #c4aa70;
   box-shadow: 0 0 8px rgba(196, 170, 112, 0.4);
 }
+
+
+
+/* App.css */
+
+.fancy-table {
+  width: 100%;
+  font-size: 20px;
+  border-collapse: collapse;
+  text-align: center;
+}
+
+.fancy-table th {
+  background-color: #6c757d;
+  padding: 8px;
+  border-bottom: 1px solid #ccc;
+}
+
+.fancy-table td {
+  padding: 6px;
+  border-bottom: 1px solid #eee;
+}

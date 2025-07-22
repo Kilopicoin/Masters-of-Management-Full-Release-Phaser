@@ -96,6 +96,37 @@ const urlToKeyMap = useMemo(() => ({
 
 
 
+const fetchMyRecentWarLogs = async () => {
+  try {
+    setLoading(true);
+    const marketContract = await getMarketplaceSignerContract();
+    const data = await marketContract.getRecentPlayerWars(metaMaskAccount);
+    setWarLogsData(data);
+  } catch (err) {
+    console.error("Error fetching my recent war logs:", err);
+    toast.error("Failed to fetch your recent war logs.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+const fetchMyAllWarLogs = async () => {
+  try {
+    setLoading(true);
+    const marketContract = await getMarketplaceSignerContract();
+    const data = await marketContract.getAllPlayerWars(metaMaskAccount);
+    setWarLogsData(data);
+  } catch (err) {
+    console.error("Error fetching all my war logs:", err);
+    toast.error("Failed to fetch your all war logs.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+
 const fetchRecentWarLogs = async () => {
   try {
     setLoading(true);
@@ -293,7 +324,13 @@ useEffect(() => {
                       const name = await Clan.getTileName(x, y);
                       const clan = await Clan.getTileClan(x, y);
                       const clanNo = parseInt(clan) - 1;
-                      const clanName = allclansX[clanNo][0];
+                      let clanName = "None";
+
+                      if (allclansX[clanNo]) {
+                        clanName = allclansX[clanNo][0];
+                      }
+
+                      
                       
                       tiles.push({
                           x: x + 1,
@@ -1648,7 +1685,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
             }}
             onClick={() => setinteractionMenuTypeA("warlogsX")}
         >
-            War Logs
+            War Logs (World)
         </button>
 
 
@@ -1660,6 +1697,39 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 
         )}
+
+
+
+
+        {tileCoords.occupied && (
+  metaMaskAccount && (
+    getAddress(metaMaskAccount) === tileCoords.occupant && (
+      <div >
+<button
+            style={{
+                marginTop: '5px',
+                padding: '8px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                width: '100%',
+                fontWeight: '400',
+                fontSize: '18px',
+            }}
+            onClick={() => setinteractionMenuTypeA("warlogsMine")}
+        >
+            My War Logs
+        </button>
+
+      </div>
+    )
+  ) 
+)}
+
+
+
   {tileCoords.x !== null && tileCoords.y !== null && (
     <div>
       <p>
@@ -2034,10 +2104,80 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 
 
+{interactionMenuTypeA === "warlogsMine" && (
+    <div className="interaction-menuA">
+        <p style={{ marginBottom: '15px', fontWeight: '400' }}>
+            Loading My War Logs require waiting time, please choose your preference
+        </p>
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                margin: '5px'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("warlogsWeekMine");
+                fetchMyRecentWarLogs();
+
+            }}
+        >
+            Last Week's Logs (Loading Approx. 30 Seconds)
+        </button>
+
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                margin: '5px'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("warlogsAllMine");
+                fetchMyAllWarLogs();
+
+            }}
+        >
+            All Time Logs (Loading Up To 3 Minutes)
+        </button>
+
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                margin: '5px'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("");
+            }}
+        >
+            Cancel
+        </button>
+
+    </div>
+)}
+
+
+
+
+
 {interactionMenuTypeA === "warlogsX" && (
     <div className="interaction-menuA">
         <p style={{ marginBottom: '15px', fontWeight: '400' }}>
-            Loading War Logs require waiting time, please choose your preference
+            Loading War Logs (World) require waiting time, please choose your preference
         </p>
         <button
             style={{
@@ -2055,7 +2195,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
                 fetchRecentWarLogs();
             }}
         >
-            Last Week's War Logs (Loading Approx. 1 Minute)
+            Last Week's Logs (Loading Approx. 1 Minute)
         </button>
 
         <button
@@ -2074,7 +2214,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
                 fetchAllWarLogs();
             }}
         >
-            All War Logs (Loading Up To 10 Minutes)
+            All Time Logs (Loading Up To 10 Minutes)
         </button>
 
         <button
@@ -2101,7 +2241,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 {interactionMenuTypeA === "warlogsWeek" && (
   <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-    <h3 style={{ marginBottom: '10px' }}>⚔️ Last Week's War Logs ⚔️</h3>
+    <h3 style={{ marginBottom: '10px' }}>⚔️ Last Week's War Logs (World) ⚔️</h3>
 
     <button
       onClick={() => setinteractionMenuTypeA("")}
@@ -2119,7 +2259,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     </button>
 
     {warLogsData.length > 0 ? (
-      <table style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ backgroundColor: '#6c757d' }}>
             <th>Attacker</th>
@@ -2150,7 +2290,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 {interactionMenuTypeA === "warlogsAll" && (
   <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-    <h3 style={{ marginBottom: '10px' }}>⚔️ All War Logs ⚔️</h3>
+    <h3 style={{ marginBottom: '10px' }}>⚔️ All War Logs (World) ⚔️</h3>
 
     <button
       onClick={() => setinteractionMenuTypeA("")}
@@ -2168,7 +2308,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     </button>
 
     {warLogsData.length > 0 ? (
-      <table style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ backgroundColor: '#6c757d' }}>
             <th>Attacker</th>
@@ -2194,6 +2334,131 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     )}
   </div>
 )}
+
+
+
+
+{interactionMenuTypeA === "warlogsWeekMine" && (
+  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
+    <h3 style={{ marginBottom: '10px' }}>⚔️ My Last Week's War Logs ⚔️</h3>
+    <button
+      onClick={() => setinteractionMenuTypeA("")}
+      style={{
+        padding: '8px 12px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        marginBottom: '10px',
+        cursor: 'pointer'
+      }}
+    >
+      Close
+    </button>
+
+    {warLogsData.length > 0 ? (
+      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+        <thead>
+  <tr style={{ backgroundColor: '#6c757d' }}>
+    <th>Attacker</th>
+    <th>Defender</th>
+    <th>Date</th>
+    <th>Result</th>
+    <th>Atk Off</th>
+    <th>Atk Def</th>
+    <th>Atk Tech</th>
+    <th>Def Off</th>
+    <th>Def Def</th>
+    <th>Def Tech</th>
+  </tr>
+</thead>
+<tbody>
+  {warLogsData.map((item, index) => (
+    <tr key={index}>
+      <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
+      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
+      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      <td>{item.atkOffSoldier?.toString()}</td>
+      <td>{item.atkDefSoldier?.toString()}</td>
+      <td>{item.atkTech}</td>
+      <td>{item.defOffSoldier?.toString()}</td>
+      <td>{item.defDefSoldier?.toString()}</td>
+      <td>{item.defTech}</td>
+    </tr>
+  ))}
+</tbody>
+
+      </table>
+    ) : (
+      <p>No war logs available.</p>
+    )}
+  </div>
+)}
+
+
+
+
+{interactionMenuTypeA === "warlogsAllMine" && (
+  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
+    <h3 style={{ marginBottom: '10px' }}>⚔️ My All-Time War Logs ⚔️</h3>
+
+    <button
+      onClick={() => setinteractionMenuTypeA("")}
+      style={{
+        padding: '8px 12px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        marginBottom: '10px',
+        cursor: 'pointer'
+      }}
+    >
+      Close
+    </button>
+
+    {warLogsData.length > 0 ? (
+      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+        <thead>
+  <tr style={{ backgroundColor: '#6c757d' }}>
+    <th>Attacker</th>
+    <th>Defender</th>
+    <th>Date</th>
+    <th>Result</th>
+    <th>Atk Off</th>
+    <th>Atk Def</th>
+    <th>Atk Tech</th>
+    <th>Def Off</th>
+    <th>Def Def</th>
+    <th>Def Tech</th>
+  </tr>
+</thead>
+<tbody>
+  {warLogsData.map((item, index) => (
+    <tr key={index}>
+      <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
+      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
+      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      <td>{item.atkOffSoldier?.toString()}</td>
+      <td>{item.atkDefSoldier?.toString()}</td>
+      <td>{item.atkTech}</td>
+      <td>{item.defOffSoldier?.toString()}</td>
+      <td>{item.defDefSoldier?.toString()}</td>
+      <td>{item.defTech}</td>
+    </tr>
+  ))}
+</tbody>
+
+      </table>
+    ) : (
+      <p>No war logs available.</p>
+    )}
+  </div>
+)}
+
+
 
 
 
