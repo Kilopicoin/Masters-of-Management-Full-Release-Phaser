@@ -161,6 +161,7 @@ const fetchAllWarLogs = async () => {
 
 const handleConfirmAttack = async () => {
   try {
+    setLoading(true);
     if (!attackerTileCoords || !tileCoords) return;
 
     const marketContract = await getMarketplaceSignerContract();
@@ -175,17 +176,26 @@ const handleConfirmAttack = async () => {
 
     toast.success("Attack executed successfully!");
 
-    // Optionally update UI:
+    // Refresh resources/costs/cooldowns
     await fetchAttackerResources();
     await calculateAttackCost(tileCoords.x, tileCoords.y);
-    await checkIfAccountOccupiedTile(); // re-fetch ownership
+    await checkIfAccountOccupiedTile();
 
-    setinteractionMenuTypeA(""); // close attack menu
+    // ✅ Immediately fetch updated war logs
+    const updatedLogs = await marketContract.getAllPlayerWars(metaMaskAccount);
+    const latest = updatedLogs[updatedLogs.length - 1];
+
+    // Update state and show result
+    setWarLogsData([latest]); // show only this result
+    setinteractionMenuTypeA("warlogsAllMineX");
+    setLoading(false);
   } catch (err) {
     console.error("Attack failed:", err);
     toast.error("Attack failed: " + (err.reason || err.message));
+    setLoading(false);
   }
 };
+
 
 
 
@@ -1530,38 +1540,33 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 {loading && (
   <>
-    {/* Dark background overlay */}
     <div
       style={{
-        position: 'absolute',
+        position: 'fixed',
         top: 0,
         left: 0,
         width: '100%',
         height: '100%',
-        backgroundColor: 'rgba(0, 0, 0, 0.7)', // Dark overlay with some transparency
-        zIndex: 99, // Below the spinner, but above the rest of the content
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        zIndex: 9999,
+        pointerEvents: 'all',
       }}
     ></div>
 
-    {/* Loading spinner */}
     <div
       style={{
-        position: 'absolute',
+        position: 'fixed',
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        zIndex: 100, // Above everything
+        zIndex: 10000,
       }}
     >
-      <Circles
-        height="100"
-        width="100"
-        color="#ffffff"
-        ariaLabel="loading-indicator"
-      />
+      <Circles height="100" width="100" color="#ffffff" ariaLabel="loading-indicator" />
     </div>
   </>
 )}
+
 
       <div
         id="phaser-container"
@@ -2361,30 +2366,34 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
         <thead>
   <tr style={{ backgroundColor: '#6c757d' }}>
     <th>Attacker</th>
+    <th>Offensive Soldiers</th>
+    <th>Defensive Soldiers</th>
+    <th>Attack Tech</th>
     <th>Defender</th>
+    <th>Offensive Soldiers</th>
+    <th>Defensive Soldiers</th>
+    <th>Defensive Tech</th>
     <th>Date</th>
     <th>Result</th>
-    <th>Atk Off</th>
-    <th>Atk Def</th>
-    <th>Atk Tech</th>
-    <th>Def Off</th>
-    <th>Def Def</th>
-    <th>Def Tech</th>
+    
+    
   </tr>
 </thead>
 <tbody>
   {warLogsData.map((item, index) => (
     <tr key={index}>
       <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
-      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
       <td>{item.atkOffSoldier?.toString()}</td>
       <td>{item.atkDefSoldier?.toString()}</td>
-      <td>{item.atkTech}</td>
+      <td>{item.atkTech?.toString()}</td>
+      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
       <td>{item.defOffSoldier?.toString()}</td>
       <td>{item.defDefSoldier?.toString()}</td>
-      <td>{item.defTech}</td>
+      <td>{item.defTech?.toString()}</td>
+      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      
+      
     </tr>
   ))}
 </tbody>
@@ -2423,30 +2432,32 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
         <thead>
   <tr style={{ backgroundColor: '#6c757d' }}>
     <th>Attacker</th>
+    <th>Offensive Soldiers</th>
+    <th>Defensive Soldiers</th>
+    <th>Offensive Tech</th>
     <th>Defender</th>
+    <th>Offensive Soldiers</th>
+    <th>Defensive Soldiers</th>
+    <th>Defensive Tech</th>
     <th>Date</th>
     <th>Result</th>
-    <th>Atk Off</th>
-    <th>Atk Def</th>
-    <th>Atk Tech</th>
-    <th>Def Off</th>
-    <th>Def Def</th>
-    <th>Def Tech</th>
   </tr>
 </thead>
 <tbody>
   {warLogsData.map((item, index) => (
     <tr key={index}>
       <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
-      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
       <td>{item.atkOffSoldier?.toString()}</td>
       <td>{item.atkDefSoldier?.toString()}</td>
-      <td>{item.atkTech}</td>
+      <td>{item.atkTech?.toString()}</td>
+      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
       <td>{item.defOffSoldier?.toString()}</td>
       <td>{item.defDefSoldier?.toString()}</td>
-      <td>{item.defTech}</td>
+      <td>{item.defTech?.toString()}</td>
+      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      
+      
     </tr>
   ))}
 </tbody>
@@ -2458,6 +2469,69 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
   </div>
 )}
 
+
+
+
+{interactionMenuTypeA === "warlogsAllMineX" && (
+  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
+    <h3 style={{ marginBottom: '10px' }}>⚔️ Result of the Recent War ⚔️</h3>
+
+    <button
+      onClick={() => setinteractionMenuTypeA("")}
+      style={{
+        padding: '8px 12px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        marginBottom: '10px',
+        cursor: 'pointer'
+      }}
+    >
+      Close
+    </button>
+
+    {warLogsData.length > 0 ? (
+      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+        <thead>
+  <tr style={{ backgroundColor: '#6c757d' }}>
+    <th>Attacker</th>
+    <th>Offensive Soldiers</th>
+    <th>Defensive Soldiers</th>
+    <th>Offensive Tech</th>
+    <th>Defender</th>
+    <th>Offensive Soldiers</th>
+    <th>Defensive Soldiers</th>
+    <th>Defensive Tech</th>
+    <th>Date</th>
+    <th>Result</th>
+  </tr>
+</thead>
+<tbody>
+  {warLogsData.map((item, index) => (
+    <tr key={index}>
+      <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
+      <td>{item.atkOffSoldier?.toString()}</td>
+      <td>{item.atkDefSoldier?.toString()}</td>
+      <td>{item.atkTech?.toString()}</td>
+      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
+      <td>{item.defOffSoldier?.toString()}</td>
+      <td>{item.defDefSoldier?.toString()}</td>
+      <td>{item.defTech?.toString()}</td>
+      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      
+      
+    </tr>
+  ))}
+</tbody>
+
+      </table>
+    ) : (
+      <p>No war logs available.</p>
+    )}
+  </div>
+)}
 
 
 

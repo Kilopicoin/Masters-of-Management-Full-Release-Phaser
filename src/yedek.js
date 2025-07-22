@@ -20,6 +20,9 @@ import TheLand from './theLand';
 import getclanContract, { getclanSignerContract } from './clancontract';
 import { getTheLandSignerContract } from './TheLandContract';
 import getNFTContract, { getNFTSignerContract } from './nftContract';
+import { getMarketplaceSignerContract } from './MarketplaceContract';
+import defensiveSoldierImage from './assets/soldiers/defensive.png';
+import offensiveSoldierImage from './assets/soldiers/offensive.png';
 
 function App() {
   const gameRef = useRef(null);
@@ -47,6 +50,16 @@ function App() {
   const [allclansX, setallclansX] = useState([]);
   const [musicOnce, setmusicOnce] = useState(false);
   const [interactionMenuTypeA, setinteractionMenuTypeA] = useState("");
+  const [attackCooldownMessage, setAttackCooldownMessage] = useState("");
+  const [attackCooldownMessageX, setAttackCooldownMessageX] = useState("");
+  const [attackerTroops, setAttackerTroops] = useState(null);
+const [attackerTileCoords, setAttackerTileCoords] = useState({ x: null, y: null });
+const [attackCost, setAttackCost] = useState(null);
+const [attackerResources, setAttackerResources] = useState(null);
+const [attackDistance, setAttackDistance] = useState(null);
+const [attackerPower, setAttackerPower] = useState(0);
+const [warLogsData, setWarLogsData] = useState([]);
+
 
 const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/1.png": "nftflag_1",
@@ -80,6 +93,196 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/29.png": "nftflag_29",
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
+
+
+
+const fetchMyRecentWarLogs = async () => {
+  try {
+    setLoading(true);
+    const marketContract = await getMarketplaceSignerContract();
+    const data = await marketContract.getRecentPlayerWars(metaMaskAccount);
+    setWarLogsData(data);
+  } catch (err) {
+    console.error("Error fetching my recent war logs:", err);
+    toast.error("Failed to fetch your recent war logs.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+const fetchMyAllWarLogs = async () => {
+  try {
+    setLoading(true);
+    const marketContract = await getMarketplaceSignerContract();
+    const data = await marketContract.getAllPlayerWars(metaMaskAccount);
+    setWarLogsData(data);
+  } catch (err) {
+    console.error("Error fetching all my war logs:", err);
+    toast.error("Failed to fetch your all war logs.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+
+const fetchRecentWarLogs = async () => {
+  try {
+    setLoading(true);
+    const marketContract = await getMarketplaceSignerContract();
+    const data = await marketContract.getRecentWarHistory();
+    setWarLogsData(data);
+  } catch (err) {
+    console.error("Error fetching recent war logs:", err);
+    toast.error("Failed to fetch recent war logs.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+const fetchAllWarLogs = async () => {
+  try {
+    setLoading(true);
+    const marketContract = await getMarketplaceSignerContract();
+    const data = await marketContract.getAllWarHistory();
+    setWarLogsData(data);
+  } catch (err) {
+    console.error("Error fetching all war logs:", err);
+    toast.error("Failed to fetch all war logs.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+
+
+const handleConfirmAttack = async () => {
+  try {
+    setLoading(true);
+    if (!attackerTileCoords || !tileCoords) return;
+
+    const marketContract = await getMarketplaceSignerContract();
+
+    const ax = attackerTileCoords.x;
+    const ay = attackerTileCoords.y;
+    const dx = tileCoords.x - 1;
+    const dy = tileCoords.y - 1;
+
+    const tx = await marketContract.attackTile(ax, ay, dx, dy);
+    await tx.wait();
+
+    toast.success("Attack executed successfully!");
+
+    // Refresh resources/costs/cooldowns
+    await fetchAttackerResources();
+    await calculateAttackCost(tileCoords.x, tileCoords.y);
+    await checkIfAccountOccupiedTile();
+
+    // ✅ Immediately fetch updated war logs
+    const updatedLogs = await marketContract.getAllPlayerWars(metaMaskAccount);
+    const latest = updatedLogs[updatedLogs.length - 1];
+
+    // Update state and show result
+    setWarLogsData([latest]); // show only this result
+    setinteractionMenuTypeA("warlogsAllMineX");
+    setLoading(false);
+  } catch (err) {
+    console.error("Attack failed:", err);
+    toast.error("Attack failed: " + (err.reason || err.message));
+    setLoading(false);
+  }
+};
+
+
+
+
+
+const fetchAttackerResources = useCallback(async () => {
+  try {
+    const landContract = await getTheLandSignerContract();
+    const { x, y } = attackerTileCoords;
+    const data = await landContract.getTileData(x, y);
+    setAttackerResources({
+      food: Number(data.food),
+      wood: Number(data.wood),
+      stone: Number(data.stone),
+      iron: Number(data.iron),
+    });
+
+    const marketContract = await getMarketplaceSignerContract();
+
+    const attTurnsUsedRaw = await landContract.getTotalTurnsUsedByTile(attackerTileCoords.x, attackerTileCoords.y);
+const attTurnsUsed = parseInt(attTurnsUsedRaw.toString());
+
+const lastAttRaw = await marketContract.lastAttackTurn(attackerTileCoords.x, attackerTileCoords.y);
+const lastAtt = parseInt(lastAttRaw.toString());
+
+const cooldown = 300;
+
+if (attTurnsUsed < lastAtt + cooldown) {
+  const turnsLeft = (lastAtt + cooldown) - attTurnsUsed;
+  setAttackCooldownMessageX(`Attacker Cooldown (${turnsLeft} turns left)`);
+  return;
+}
+
+
+
+
+  } catch (err) {
+    console.error("Error fetching attacker's resources", err);
+    setAttackerResources(null);
+  }
+}, [attackerTileCoords]);
+
+const calculateAttackCost = useCallback(async (targetX, targetY) => {
+  if (attackerTileCoords.x === null || attackerTileCoords.y === null) return;
+
+  const ax = attackerTileCoords.x;
+  const ay = attackerTileCoords.y;
+  const dx = targetX - 1;
+  const dy = targetY - 1;
+
+  const distance = Math.abs(ax - dx) + Math.abs(ay - dy);
+   setAttackDistance(distance);
+  const ATTACK_COST_FACTOR = 10;
+
+  const landContract = await getTheLandSignerContract();
+  const tileData = await landContract.getTileData(ax, ay);
+  const offensiveSoldier = Number(tileData.offensiveSoldier);
+  const defensiveSoldier = Number(tileData.defensiveSoldier);
+console.log(ax, ay, dx, dy)
+  const totalCost = ATTACK_COST_FACTOR * distance * (offensiveSoldier + defensiveSoldier);
+
+  setAttackCost({
+    food: Math.floor((totalCost * 40) / 100),
+    wood: Math.floor((totalCost * 30) / 100),
+    stone: Math.floor((totalCost * 20) / 100),
+    iron: Math.floor((totalCost * 10) / 100),
+  });
+}, [attackerTileCoords]);
+
+
+
+const fetchAttackerMilitary = useCallback(async () => {
+  try {
+    const landContract = await getTheLandSignerContract();
+    const { x, y } = attackerTileCoords;
+    const data = await landContract.getTileData(x, y);
+
+    return {
+      offensiveSoldier: Number(data.offensiveSoldier),
+      defensiveSoldier: Number(data.defensiveSoldier),
+      offensiveTech: Number(data.offensiveTech),
+    };
+  } catch (err) {
+    console.error("Error fetching attacker's soldier data", err);
+    return { offensiveSoldier: 0, defensiveSoldier: 0 };
+  }
+}, [attackerTileCoords]);
+
 
 
 useEffect(() => {
@@ -131,7 +334,13 @@ useEffect(() => {
                       const name = await Clan.getTileName(x, y);
                       const clan = await Clan.getTileClan(x, y);
                       const clanNo = parseInt(clan) - 1;
-                      const clanName = allclansX[clanNo][0];
+                      let clanName = "None";
+
+                      if (allclansX[clanNo]) {
+                        clanName = allclansX[clanNo][0];
+                      }
+
+                      
                       
                       tiles.push({
                           x: x + 1,
@@ -183,6 +392,23 @@ useEffect(() => {
     fetchUserClan();
   }, [metaMaskAccount]);
   
+useEffect(() => {
+  if (interactionMenuTypeA === "attackMenu") {
+    fetchAttackerMilitary().then(data => {
+      setAttackerTroops(data);
+      // Calculate attacker power using the same formula as in the contract
+      console.log((data.offensiveSoldier * 2), (data.defensiveSoldier * 1), (data.offensiveTech + 1))
+      const calculatedPower = (data.offensiveSoldier * 2) + (data.defensiveSoldier * 1) + (data.offensiveTech + 1);
+      setAttackerPower(calculatedPower);
+    });
+    fetchAttackerResources();
+    if (tileCoords.x !== null && tileCoords.y !== null) {
+      calculateAttackCost(tileCoords.x, tileCoords.y);
+    }
+  }
+}, [interactionMenuTypeA, fetchAttackerMilitary, calculateAttackCost, fetchAttackerResources, tileCoords]);
+
+
 
 
 
@@ -554,6 +780,28 @@ if (occupantPendingClanId > 0) {
                 });
 
 
+    const marketContract = await getMarketplaceSignerContract();
+
+    const defTurnsUsedRaw = await landContract.getTotalTurnsUsedByTile(x, y);
+    const defTurnsUsed = parseInt(defTurnsUsedRaw.toString());
+    console.log(defTurnsUsed);
+
+    const lastDefRaw = await marketContract.lastDefenseTurn(x, y);
+    const lastDef = parseInt(lastDefRaw.toString());
+    console.log(lastDef);
+
+    const cooldown = 300;
+
+    if (defTurnsUsed < lastDef + cooldown) {
+      setAttackCooldownMessage("Defender Cooldown");
+    } else {
+      setAttackCooldownMessage("");
+    }
+
+
+
+
+
 
 
               }
@@ -837,6 +1085,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
         // Fetch the coordinates of the occupied tile
         const coords = await contract.getOccupiedTileByAddress(metaMaskAccount);
         const [x, y] = coords.map(coord => Number(coord)); // Convert BigInt to regular numbers
+        setAttackerTileCoords({ x, y });
         updateTileImage(x, y); // Update the tile image to skyflag
       } else {
         const scene = gameRef.current.scene.keys.default;
@@ -847,6 +1096,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
       }
 
       
+
       sethasTileG(hasTile);
     }
   }, [metaMaskAccount]); // Now it depends only on metaMaskAccount
@@ -979,6 +1229,8 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
       this.load.image('nftflag_28', "https://kilopi.net/mom/nfts/28.png");
       this.load.image('nftflag_29', "https://kilopi.net/mom/nfts/29.png");
       this.load.image('nftflag_30', "https://kilopi.net/mom/nfts/30.png");
+      this.load.image('defensivesoldier', defensiveSoldierImage);
+      this.load.image('offensivesoldier', offensiveSoldierImage);
 
     }
 
@@ -1122,6 +1374,9 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
           cameraStartX = this.cameras.main.scrollX;
           cameraStartY = this.cameras.main.scrollY;
         } else if (pointer.button === 2) {
+
+                        setinteractionMenuTypeA("");
+
 
           if (pointer.flagClicked) {
             // Reset the flag and skip global handling since it was already handled by the flag
@@ -1425,6 +1680,25 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
         </button>
 
 
+        <button
+            style={{
+                marginTop: '5px',
+                padding: '8px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                width: '100%',
+                fontWeight: '400',
+                fontSize: '18px',
+            }}
+            onClick={() => setinteractionMenuTypeA("warlogsX")}
+        >
+            War Logs (World)
+        </button>
+
+
 
 
 
@@ -1433,6 +1707,39 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 
         )}
+
+
+
+
+        {tileCoords.occupied && (
+  metaMaskAccount && (
+    getAddress(metaMaskAccount) === tileCoords.occupant && (
+      <div >
+<button
+            style={{
+                marginTop: '5px',
+                padding: '8px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                width: '100%',
+                fontWeight: '400',
+                fontSize: '18px',
+            }}
+            onClick={() => setinteractionMenuTypeA("warlogsMine")}
+        >
+            My War Logs
+        </button>
+
+      </div>
+    )
+  ) 
+)}
+
+
+
   {tileCoords.x !== null && tileCoords.y !== null && (
     <div>
       <p>
@@ -1543,6 +1850,8 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 
 
+
+
 {tileCoords.occupant &&
   !tileCoords.clan && // Tile has no clan
   userClan?.isLeader && (
@@ -1579,6 +1888,23 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 </>
       )}
+
+
+      {tileCoords.occupied && metaMaskAccount && getAddress(metaMaskAccount) !== tileCoords.occupant && (
+  <div>
+    {attackCooldownMessage ? (
+      <p style={{ fontWeight: 'bold', color: 'orange' }}>{attackCooldownMessage}</p>
+    ) : (
+      <button className='card-button'
+      onClick={() => setinteractionMenuTypeA("attackMenu")}
+      >
+        Attack here
+      </button>
+    )}
+  </div>
+)}
+
+  
 
 
 
@@ -1717,6 +2043,500 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 
 
+
+
+{interactionMenuTypeA === "attackMenu" && attackerTroops && (
+  <div className="interaction-menuA">
+    <h4>Attack Menu</h4>
+    <div>
+      Attacker Soldiers<br/>
+      <img src={offensiveSoldierImage} alt="Defensive Soldier" style={{ width: '20px' }} /> Offensive Soldiers: {attackerTroops.offensiveSoldier} 
+    &nbsp; &nbsp;
+    <img src={defensiveSoldierImage} alt="Defensive Soldier" style={{ width: '20px' }} /> Defensive Soldiers: {attackerTroops.defensiveSoldier}</div>
+
+     <div style={{ marginTop: '10px' }}>
+      Attack Power: {attackerPower} units
+      </div>
+
+    <div style={{ marginTop: '10px' }}>
+       Distance: {attackDistance} units
+      </div>
+
+    {attackCost && attackerResources && (
+  <div style={{ marginTop: '10px' }}>
+    ⚔️ Attack Cost:<br/>
+    <table style={{ width: '100%' }}>
+      <thead>
+        <tr>
+          <th>Resource</th>
+          <th>Current</th>
+          <th>Cost</th>
+          <th>Remaining</th>
+        </tr>
+      </thead>
+      <tbody>
+        {["food", "wood", "stone", "iron"].map((res) => (
+          <tr key={res}>
+            <td>{res.charAt(0).toUpperCase() + res.slice(1)}</td>
+            <td>{attackerResources[res]}</td>
+            <td>{attackCost[res]}</td>
+            <td style={{ color: (attackerResources[res] - attackCost[res]) < 0 ? 'red' : 'inherit' }}>
+              {attackerResources[res] - attackCost[res]}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+)}
+
+
+{attackCooldownMessageX ? (
+  <p style={{ fontWeight: 'bold', color: 'orange' }}>{attackCooldownMessageX}</p>
+) : (
+  <button className='card-button' onClick={handleConfirmAttack}>
+    Confirm Attack
+  </button>
+)}
+
+&nbsp;
+
+<button
+      onClick={() => setinteractionMenuTypeA("")}
+      className='card-button'
+    >
+      Close
+    </button>
+
+
+  </div>
+)}
+
+
+
+{interactionMenuTypeA === "warlogsMine" && (
+    <div className="interaction-menuA">
+        <p style={{ marginBottom: '15px', fontWeight: '400' }}>
+            Loading My War Logs require waiting time, please choose your preference
+        </p>
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                margin: '5px'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("warlogsWeekMine");
+                fetchMyRecentWarLogs();
+
+            }}
+        >
+            Last Week's Logs (Loading Approx. 30 Seconds)
+        </button>
+
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                margin: '5px'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("warlogsAllMine");
+                fetchMyAllWarLogs();
+
+            }}
+        >
+            All Time Logs (Loading Up To 3 Minutes)
+        </button>
+
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                margin: '5px'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("");
+            }}
+        >
+            Cancel
+        </button>
+
+    </div>
+)}
+
+
+
+
+
+{interactionMenuTypeA === "warlogsX" && (
+    <div className="interaction-menuA">
+        <p style={{ marginBottom: '15px', fontWeight: '400' }}>
+            Loading War Logs (World) require waiting time, please choose your preference
+        </p>
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                margin: '5px'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("warlogsWeek");
+                fetchRecentWarLogs();
+            }}
+        >
+            Last Week's Logs (Loading Approx. 1 Minute)
+        </button>
+
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                margin: '5px'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("warlogsAll");
+                fetchAllWarLogs();
+            }}
+        >
+            All Time Logs (Loading Up To 10 Minutes)
+        </button>
+
+        <button
+            style={{
+                padding: '10px 20px',
+                backgroundColor: '#6c757d',
+                color: 'white',
+                border: 'none',
+                borderRadius: '5px',
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                margin: '5px'
+            }}
+            onClick={() => {
+                setinteractionMenuTypeA("");
+            }}
+        >
+            Cancel
+        </button>
+
+    </div>
+)}
+
+
+{interactionMenuTypeA === "warlogsWeek" && (
+  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
+    <h3 style={{ marginBottom: '10px' }}>⚔️ Last Week's War Logs (World) ⚔️</h3>
+
+    <button
+      onClick={() => setinteractionMenuTypeA("")}
+      style={{
+        padding: '8px 12px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        marginBottom: '10px',
+        cursor: 'pointer'
+      }}
+    >
+      Close
+    </button>
+
+    {warLogsData.length > 0 ? (
+      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#6c757d' }}>
+            <th>Attacker</th>
+            <th>Defender</th>
+            <th>Date</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          {warLogsData.map((item, index) => (
+            <tr key={index}>
+              <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
+<td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
+<td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+
+              <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    ) : (
+      <p>No war logs available.</p>
+    )}
+  </div>
+)}
+
+
+
+{interactionMenuTypeA === "warlogsAll" && (
+  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
+    <h3 style={{ marginBottom: '10px' }}>⚔️ All War Logs (World) ⚔️</h3>
+
+    <button
+      onClick={() => setinteractionMenuTypeA("")}
+      style={{
+        padding: '8px 12px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        marginBottom: '10px',
+        cursor: 'pointer'
+      }}
+    >
+      Close
+    </button>
+
+    {warLogsData.length > 0 ? (
+      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#6c757d' }}>
+            <th>Attacker</th>
+            <th>Defender</th>
+            <th>Date</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          {warLogsData.map((item, index) => (
+            <tr key={index}>
+              <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
+<td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
+<td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+
+              <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    ) : (
+      <p>No war logs available.</p>
+    )}
+  </div>
+)}
+
+
+
+
+{interactionMenuTypeA === "warlogsWeekMine" && (
+  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
+    <h3 style={{ marginBottom: '10px' }}>⚔️ My Last Week's War Logs ⚔️</h3>
+    <button
+      onClick={() => setinteractionMenuTypeA("")}
+      style={{
+        padding: '8px 12px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        marginBottom: '10px',
+        cursor: 'pointer'
+      }}
+    >
+      Close
+    </button>
+
+    {warLogsData.length > 0 ? (
+      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+        <thead>
+  <tr style={{ backgroundColor: '#6c757d' }}>
+    <th>Attacker</th>
+    <th>Offensive Soldiers</th>
+    <th>Defensive Soldiers</th>
+    <th>Attack Tech</th>
+    <th>Defender</th>
+    <th>Offensive Soldiers</th>
+    <th>Defensive Soldiers</th>
+    <th>Defensive Tech</th>
+    <th>Date</th>
+    <th>Result</th>
+    
+    
+  </tr>
+</thead>
+<tbody>
+  {warLogsData.map((item, index) => (
+    <tr key={index}>
+      <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
+      <td>{item.atkOffSoldier?.toString()}</td>
+      <td>{item.atkDefSoldier?.toString()}</td>
+      <td>{item.atkTech?.toString()}</td>
+      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
+      <td>{item.defOffSoldier?.toString()}</td>
+      <td>{item.defDefSoldier?.toString()}</td>
+      <td>{item.defTech?.toString()}</td>
+      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      
+      
+    </tr>
+  ))}
+</tbody>
+
+      </table>
+    ) : (
+      <p>No war logs available.</p>
+    )}
+  </div>
+)}
+
+
+
+
+{interactionMenuTypeA === "warlogsAllMine" && (
+  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
+    <h3 style={{ marginBottom: '10px' }}>⚔️ My All-Time War Logs ⚔️</h3>
+
+    <button
+      onClick={() => setinteractionMenuTypeA("")}
+      style={{
+        padding: '8px 12px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        marginBottom: '10px',
+        cursor: 'pointer'
+      }}
+    >
+      Close
+    </button>
+
+    {warLogsData.length > 0 ? (
+      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+        <thead>
+  <tr style={{ backgroundColor: '#6c757d' }}>
+    <th>Attacker</th>
+    <th>Offensive Soldiers</th>
+    <th>Defensive Soldiers</th>
+    <th>Offensive Tech</th>
+    <th>Defender</th>
+    <th>Offensive Soldiers</th>
+    <th>Defensive Soldiers</th>
+    <th>Defensive Tech</th>
+    <th>Date</th>
+    <th>Result</th>
+  </tr>
+</thead>
+<tbody>
+  {warLogsData.map((item, index) => (
+    <tr key={index}>
+      <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
+      <td>{item.atkOffSoldier?.toString()}</td>
+      <td>{item.atkDefSoldier?.toString()}</td>
+      <td>{item.atkTech?.toString()}</td>
+      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
+      <td>{item.defOffSoldier?.toString()}</td>
+      <td>{item.defDefSoldier?.toString()}</td>
+      <td>{item.defTech?.toString()}</td>
+      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      
+      
+    </tr>
+  ))}
+</tbody>
+
+      </table>
+    ) : (
+      <p>No war logs available.</p>
+    )}
+  </div>
+)}
+
+
+
+
+{interactionMenuTypeA === "warlogsAllMineX" && (
+  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
+    <h3 style={{ marginBottom: '10px' }}>⚔️ Result of the Recent War ⚔️</h3>
+
+    <button
+      onClick={() => setinteractionMenuTypeA("")}
+      style={{
+        padding: '8px 12px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        marginBottom: '10px',
+        cursor: 'pointer'
+      }}
+    >
+      Close
+    </button>
+
+    {warLogsData.length > 0 ? (
+      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+        <thead>
+  <tr style={{ backgroundColor: '#6c757d' }}>
+    <th>Attacker</th>
+    <th>Offensive Soldiers</th>
+    <th>Defensive Soldiers</th>
+    <th>Offensive Tech</th>
+    <th>Defender</th>
+    <th>Offensive Soldiers</th>
+    <th>Defensive Soldiers</th>
+    <th>Defensive Tech</th>
+    <th>Date</th>
+    <th>Result</th>
+  </tr>
+</thead>
+<tbody>
+  {warLogsData.map((item, index) => (
+    <tr key={index}>
+      <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
+      <td>{item.atkOffSoldier?.toString()}</td>
+      <td>{item.atkDefSoldier?.toString()}</td>
+      <td>{item.atkTech?.toString()}</td>
+      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
+      <td>{item.defOffSoldier?.toString()}</td>
+      <td>{item.defDefSoldier?.toString()}</td>
+      <td>{item.defTech?.toString()}</td>
+      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      
+      
+    </tr>
+  ))}
+</tbody>
+
+      </table>
+    ) : (
+      <p>No war logs available.</p>
+    )}
+  </div>
+)}
 
 
 

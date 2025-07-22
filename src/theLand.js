@@ -148,6 +148,26 @@ const [calculatedResources, setCalculatedResources] = useState({
 
 
 
+useEffect(() => {
+  if (window.ethereum) {
+    const handleAccountsChanged = (accounts) => {
+      if (accounts.length === 0) return;
+      if (accounts[0] !== metaMaskAccount) {
+        window.location.reload(); // 👈 Same effect as your "Back to Map" button
+      }
+    };
+
+    window.ethereum.on("accountsChanged", handleAccountsChanged);
+
+    return () => {
+      window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
+    };
+  }
+}, [metaMaskAccount]);
+
+
+
+
 const fetchDefenderCooldown = useCallback(async (x, y) => {
   try {
     const marketContract = await getMarketplaceSignerContract();
@@ -1466,35 +1486,29 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 
 {loading && (
   <>
-    {/* Dark background overlay */}
     <div
       style={{
-        position: 'absolute',
+        position: 'fixed',
         top: 0,
         left: 0,
         width: '100%',
         height: '100%',
-        backgroundColor: 'rgba(0, 0, 0, 0.7)', // Dark overlay with some transparency
-        zIndex: 99, // Below the spinner, but above the rest of the content
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        zIndex: 9999,
+        pointerEvents: 'all',
       }}
     ></div>
 
-    {/* Loading spinner */}
     <div
       style={{
-        position: 'absolute',
+        position: 'fixed',
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        zIndex: 100, // Above everything
+        zIndex: 10000,
       }}
     >
-      <Circles
-        height="100"
-        width="100"
-        color="#ffffff"
-        ariaLabel="loading-indicator"
-      />
+      <Circles height="100" width="100" color="#ffffff" ariaLabel="loading-indicator" />
     </div>
   </>
 )}
