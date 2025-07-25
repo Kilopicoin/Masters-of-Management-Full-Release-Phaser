@@ -89,6 +89,9 @@ const [ownedFlagNFTs, setOwnedFlagNFTs] = useState([]);
 
 const musicRef2 = useRef(null);
 const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+const [defenderCooldownTurnsLeft, setDefenderCooldownTurnsLeft] = useState(null);
+const [selectedInteriorCoords, setSelectedInteriorCoords] = useState(null);
+
 
 const [musicOnce, setmusicOnce] = useState(false);
     const [armorCosts, setArmorCosts] = useState({
@@ -144,6 +147,105 @@ const [calculatedResources, setCalculatedResources] = useState({
     stone: 0,
     iron: 0,
 });
+
+
+
+const demolishBuilding = async (interiorX, interiorY) => {
+  try {
+    setLoading(true);
+    const contract = await getTheLandSignerContract();
+    const tx = await contract.demolishBuilding(
+      tileCoords.x - 1,
+      tileCoords.y - 1,
+      interiorX,
+      interiorY
+    );
+    await tx.wait();
+    toast.success(`Building at (${interiorX}, ${interiorY}) demolished successfully!`);
+
+    // Fetch updated tile data after the building is placed
+            await fetchTileData(tileCoords.x, tileCoords.y);
+
+
+            const updatedBuildings = await fetchAllBuildings(tileCoords.x - 1, tileCoords.y - 1);
+
+const updatedCounts = {};
+updatedBuildings.forEach((row) => {
+    row.forEach((type) => {
+        if (type > 0) {
+            updatedCounts[type] = (updatedCounts[type] || 0) + 1;
+        }
+    });
+});
+setBuildingCounts(updatedCounts);
+
+    // 3. Reset interaction menu
+    setinteractionMenuType('home');
+
+
+
+
+  } catch (error) {
+    console.error("Failed to demolish building:", error);
+    toast.error("Failed to demolish building.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+
+
+useEffect(() => {
+  if (window.ethereum) {
+    const handleAccountsChanged = (accounts) => {
+      if (accounts.length === 0) return;
+      if (accounts[0] !== metaMaskAccount) {
+        window.location.reload(); // 👈 Same effect as your "Back to Map" button
+      }
+    };
+
+    window.ethereum.on("accountsChanged", handleAccountsChanged);
+
+    return () => {
+      window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
+    };
+  }
+}, [metaMaskAccount]);
+
+
+
+
+const fetchDefenderCooldown = useCallback(async (x, y) => {
+  try {
+    const marketContract = await getMarketplaceSignerContract();
+    const landContract = await getTheLandSignerContract();
+
+    const defTurnsUsedRaw = await landContract.getTotalTurnsUsedByTile(x - 1, y - 1);
+    const defTurnsUsed = parseInt(defTurnsUsedRaw.toString());
+
+    const lastDefRaw = await marketContract.lastDefenseTurn(x - 1, y - 1);
+    const lastDef = parseInt(lastDefRaw.toString());
+
+    const cooldownEnd = lastDef + 300;
+    const turnsLeft = Math.max(0, cooldownEnd - defTurnsUsed);
+
+    setDefenderCooldownTurnsLeft(turnsLeft);
+  } catch (error) {
+    console.error("Error fetching defender cooldown:", error);
+    setDefenderCooldownTurnsLeft(null);
+  }
+}, []);
+
+useEffect(() => {
+  if (tileCoords?.x != null && tileCoords?.y != null) {
+    fetchDefenderCooldown(tileCoords.x, tileCoords.y);
+  }
+}, [tileCoords?.x, tileCoords?.y, fetchDefenderCooldown]);
+
+
+
 
 const handleSetClanFlag = async (tokenId) => {
   try {
@@ -863,6 +965,20 @@ const placeBuildingOnTile = useCallback(
             // Fetch updated tile data after the building is placed
             await fetchTileData(tileCoords.x, tileCoords.y);
 
+
+            const updatedBuildings = await fetchAllBuildings(tileCoords.x - 1, tileCoords.y - 1);
+
+const updatedCounts = {};
+updatedBuildings.forEach((row) => {
+    row.forEach((type) => {
+        if (type > 0) {
+            updatedCounts[type] = (updatedCounts[type] || 0) + 1;
+        }
+    });
+});
+setBuildingCounts(updatedCounts);
+
+
             return true; // Indicate success
         } catch (error) {
             console.error('Error placing building:', error);
@@ -1063,6 +1179,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('armory'); // Set the menu type to armory
                                 }
                             });
@@ -1386,7 +1503,8 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 
         // Fetch updated tile data after the transaction
         await fetchTileData(tileCoords.x, tileCoords.y);
-
+        await fetchDefenderCooldown(tileCoords.x, tileCoords.y);
+        
         toast.success(`Successfully used ${turns} turn(s)!`);
     } catch (error) {
         console.error("Error using turns:", error);
@@ -1418,35 +1536,29 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 
 {loading && (
   <>
-    {/* Dark background overlay */}
     <div
       style={{
-        position: 'absolute',
+        position: 'fixed',
         top: 0,
         left: 0,
         width: '100%',
         height: '100%',
-        backgroundColor: 'rgba(0, 0, 0, 0.7)', // Dark overlay with some transparency
-        zIndex: 99, // Below the spinner, but above the rest of the content
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        zIndex: 9999,
+        pointerEvents: 'all',
       }}
     ></div>
 
-    {/* Loading spinner */}
     <div
       style={{
-        position: 'absolute',
+        position: 'fixed',
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        zIndex: 100, // Above everything
+        zIndex: 10000,
       }}
     >
-      <Circles
-        height="100"
-        width="100"
-        color="#ffffff"
-        ariaLabel="loading-indicator"
-      />
+      <Circles height="100" width="100" color="#ffffff" ariaLabel="loading-indicator" />
     </div>
   </>
 )}
@@ -1653,6 +1765,15 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
         </div>
 
 
+{defenderCooldownTurnsLeft !== null && defenderCooldownTurnsLeft > 0 && (
+  <div style={{ marginTop: '5px', textAlign: 'center', color: '#ffcc00' }}>
+    🛡️ Defender Cooldown: {defenderCooldownTurnsLeft} turn(s) remaining
+  </div>
+)}
+
+
+
+
 
         {pendingInviteClanId && (
     <div style={{ marginTop: '15px', textAlign: 'center' }}>
@@ -1795,7 +1916,16 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 
 {interactionMenuType === "buildings" && (
     <>
-        <strong>Select Building Type:</strong>
+        
+<div style={{
+                    marginBottom: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '15px',
+                    justifyContent: 'center',
+                }}>
+                Select Building Type
+                </div>
 
         {/* Current Tile Resources */}
         {tileData && (
@@ -1808,6 +1938,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                     justifyContent: 'center',
                 }}
             >
+                
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                     <img src={foodImage} alt="Food" style={{ width: '20px' }} />
                     <span>{tileData.food}</span>
@@ -1848,11 +1979,11 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                         gap: '6px',
                         padding: '3px',
                         border: `2px solid ${
-                            selectedBuilding === building.image ? '#007bff' : '#f0f0f0'
+                            selectedBuilding === building.image ? '#daccb0ff' : '#c4aa70'
                         }`,
                         borderRadius: '10px',
                         cursor: 'pointer',
-                        backgroundColor: selectedBuilding === building.image ? '#e8f0ff' : 'white',
+                        backgroundColor: selectedBuilding === building.image ? '#575757ff' : '#3e3e3e',
                         minWidth: '120px',
                     }}
                     onClick={() => setSelectedBuilding(building.image)}
@@ -1862,7 +1993,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                         alt={building.label}
                         style={{ width: '60px', height: '60px' }}
                     />
-                    <strong>{building.label}({buildingCounts[building.no] || 0})</strong>
+                    {building.label}({buildingCounts[building.no] || 0})
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
                             <img src={foodImage} alt="Food" style={{ width: '20px' }} />
@@ -1891,7 +2022,23 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 
 {interactionMenuType === "armory" && (
   <div>
+
+    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', marginBottom: '10px', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
+
+
     <div className="card-title">Produce Armor</div>
+
+   
+
+
+
     {tileData && (
         <>
       <div className="card-resource-bar">
@@ -2478,8 +2625,8 @@ style={{
 
                         return (
                             <div className="tech-item" key={tech.id}>
-                                <strong>{tech.name}:</strong> {tech.level}
-                                <button onClick={() => upgradeTech(tech.id)}>Upgrade</button>
+                                <strong>{tech.name}:</strong> {tech.level} &nbsp;
+                                <button className='card-button' style={{ marginleft: '15px', marginTop: '15px' }} onClick={() => upgradeTech(tech.id)}>Upgrade</button>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     <img src={foodImage} alt="Food" style={{ width: '20px' }} />
                                     <span>{foodCost}</span>
@@ -2510,6 +2657,7 @@ style={{
         <div className="card-content">
             <h4>Select a Resource Type</h4>
             <select 
+            className="medieval-select"
                 value={selectedResourceType} 
                 onChange={(e) => setSelectedResourceType(e.target.value)}
             >
@@ -2524,6 +2672,7 @@ style={{
             </select>
             <button 
                 onClick={fetchMarketplaceItemsByType} 
+                className='card-button'
                 style={{ marginTop: '10px', padding: '8px' }}
             >
                 Show Listings
@@ -2569,7 +2718,8 @@ style={{
         {/* Button to List a New Item */}
         <button 
             onClick={() => setinteractionMenuType("marketplaceCreate")}
-            style={{ marginTop: '10px', padding: '8px' }}
+            className='card-button'
+            style={{ marginTop: '10px', padding: '8px', width: '100%' }}
         >
             List an Item for Sale
         </button>
@@ -2610,7 +2760,7 @@ style={{
 
                 <div className="card-content">
                     <h4>List an Item for Sale</h4>
-                    <select value={selectedResource} onChange={(e) => setSelectedResource(e.target.value)}>
+                    <select className="medieval-select" value={selectedResource} onChange={(e) => setSelectedResource(e.target.value)}>
     <option value="1">Food</option>
     <option value="2">Wood</option>
     <option value="3">Stone</option>
@@ -2621,6 +2771,7 @@ style={{
     <option value="8">Defensive Weapon</option>
 </select>
 <input 
+    className='fancy-input'
     type="number" 
     placeholder="Amount" 
     value={sellAmount} 
@@ -2628,13 +2779,14 @@ style={{
 />
 
 <input 
+className='fancy-input'
     type="number" 
     placeholder="Price in LOP" 
     value={sellPrice} 
     onChange={(e) => setSellPrice(e.target.value)} 
 />
 
-                    <button onClick={() => listItemForSale()}>
+                    <button className='card-button' onClick={() => listItemForSale()}>
                         List Item for Sale
                     </button>
                 </div>
@@ -2647,23 +2799,23 @@ style={{
 
 
 {interactionMenuType === "clanhall" && (
-    <div className="interaction-menu">
+    <div className="interaction-menu" style={{ minWidth: '300px' }}>
         <h3>Clan Hall</h3>
         {userClan ? (
             <div>
                 <p><strong>Clan:</strong> {clanDetails?.name}</p>
-                <p><strong>Leader:</strong> {clanDetails?.leader}</p>
+                <p><strong>Leader:</strong> {clanDetails?.leader.slice(0, 6)}...{clanDetails?.leader.slice(-6)}</p>
                 <p><strong>Members:</strong> {parseInt(clanDetails?.memberCount)}/30</p>
 
             {showFlagSelector && (
-  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto' }}>
+  <div className="interaction-menuA" style={{ minWidth: '900px', maxHeight: '500px', overflowY: 'auto' }}>
     <h3>Select an NFT as your Clan Flag</h3>
-    <button onClick={() => setShowFlagSelector(false)}>Cancel</button>
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+    <button className="card-button" onClick={() => setShowFlagSelector(false)}>Cancel</button>
+    <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
       {ownedFlagNFTs.map(nft => (
         <div key={nft.tokenId} style={{ border: '1px solid #ccc', padding: '5px' }}>
-          <img src={nft.imageUrl} alt="nft" width={100} height={100} />
-          <button onClick={() => handleSetClanFlag(nft.tokenId)}>
+          <img src={nft.imageUrl} alt="nft" width={300} height={300} />
+          <button className="card-button" onClick={() => handleSetClanFlag(nft.tokenId)}>
             Set as Flag
           </button>
         </div>
@@ -2677,14 +2829,16 @@ style={{
 
                 {clanDetails?.leader?.toLowerCase() === metaMaskAccount?.toLowerCase() && (
 <>
-                    <button onClick={() => fetchFlagNFTs()}>
+<div>
+                    <button className="card-button" onClick={() => fetchFlagNFTs()}>
     Set Clan Flag
   </button>
-
+</div>
                     <button 
                         onClick={handleDisbandClan}
                         style={{
                             marginTop: '10px',
+                            marginBottom: '10px',
                             padding: '10px',
                             backgroundColor: '#dc3545',
                             color: 'white',
@@ -2705,25 +2859,19 @@ style={{
                     placeholder="Enter clan name"
                     value={newClanName}
                     onChange={(e) => setNewClanName(e.target.value)}
+                    className='fancy-input'
                     style={{
                         marginBottom: '10px',
                         padding: '8px',
-                        width: '100%',
                         borderRadius: '5px',
-                        border: '1px solid #ccc'
                     }}
                 />
                 <button
                     onClick={createClan}
                     disabled={loading}
+                    className='card-button'
                     style={{
-                        padding: '10px',
-                        backgroundColor: '#007bff',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '5px',
-                        cursor: 'pointer',
-                        width: '100%'
+                        marginBottom: '10px'
                     }}
                 >
                     {loading ? "Creating Clan..." : "Create Clan"}
@@ -2733,16 +2881,7 @@ style={{
 
         {/* Show this button for both cases */}
         <button
-    style={{
-        marginTop: '15px',
-        padding: '10px',
-        backgroundColor: '#28a745',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        cursor: 'pointer',
-        width: '100%',
-    }}
+    className="card-button"
     onClick={fetchAllClans}
 >
     List All Clans
@@ -2764,7 +2903,7 @@ style={{
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            backgroundColor: 'white',
+            backgroundColor: '#2b2b2b',
             padding: '20px',
             borderRadius: '10px',
             zIndex: 999,
@@ -2774,7 +2913,7 @@ style={{
             boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
         }}
     >
-        <h4 style={{ marginBottom: '10px', textAlign: 'center' }}>All Clans</h4>
+        <h4 style={{ textAlign: 'center' }}>All Clans</h4>
 
         {allClans.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -2806,7 +2945,7 @@ style={{
                         }}
                     >
                         <span>{clan.name}</span>
-                        <span>{clan.leader.slice(0, 6)}...</span>
+                        <span>{clan.leader.slice(0, 6)}...{clan.leader.slice(-3)}</span>
                         <span>{parseInt(clan.memberCount)}/30</span>
                     </div>
                 ))}
@@ -2818,16 +2957,10 @@ style={{
         <button
             onClick={() => setShowAllClansModal(false)}
             style={{
-                marginTop: '12px',
-                padding: '10px 16px',
-                backgroundColor: '#007bff',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
                 width: '100%',
-                fontWeight: 'bold',
+                marginTop: '15px'
             }}
+            className='card-button'
         >
             Close
         </button>

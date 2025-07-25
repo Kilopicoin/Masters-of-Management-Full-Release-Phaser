@@ -90,6 +90,8 @@ const [ownedFlagNFTs, setOwnedFlagNFTs] = useState([]);
 const musicRef2 = useRef(null);
 const [isMusicPlaying, setIsMusicPlaying] = useState(false);
 const [defenderCooldownTurnsLeft, setDefenderCooldownTurnsLeft] = useState(null);
+const [selectedInteriorCoords, setSelectedInteriorCoords] = useState(null);
+
 
 const [musicOnce, setmusicOnce] = useState(false);
     const [armorCosts, setArmorCosts] = useState({
@@ -145,6 +147,63 @@ const [calculatedResources, setCalculatedResources] = useState({
     stone: 0,
     iron: 0,
 });
+
+
+
+const demolishBuilding = async (interiorX, interiorY) => {
+  try {
+    setLoading(true);
+    const contract = await getTheLandSignerContract();
+    const tx = await contract.demolishBuilding(
+      tileCoords.x - 1,
+      tileCoords.y - 1,
+      interiorX,
+      interiorY
+    );
+    await tx.wait();
+    toast.success(`Building at (${interiorX}, ${interiorY}) demolished successfully!`);
+
+    // Fetch updated tile data after the building is placed
+            await fetchTileData(tileCoords.x, tileCoords.y);
+
+
+            const updatedBuildings = await fetchAllBuildings(tileCoords.x - 1, tileCoords.y - 1);
+
+const updatedCounts = {};
+updatedBuildings.forEach((row) => {
+    row.forEach((type) => {
+        if (type > 0) {
+            updatedCounts[type] = (updatedCounts[type] || 0) + 1;
+        }
+    });
+});
+setBuildingCounts(updatedCounts);
+
+
+if (gameRef.current && gameRef.current.scene && gameRef.current.scene.keys && gameRef.current.scene.keys.default) {
+  const scene = gameRef.current.scene.keys.default;
+  const sprite = scene.buildingSprites?.[interiorX]?.[interiorY];
+  if (sprite) {
+    sprite.destroy();
+    scene.buildingSprites[interiorX][interiorY] = null;
+  }
+}
+
+    // 3. Reset interaction menu
+    setinteractionMenuType('home');
+
+
+
+
+  } catch (error) {
+    console.error("Failed to demolish building:", error);
+    toast.error("Failed to demolish building.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
 
 
@@ -1072,6 +1131,8 @@ const fetchAllBuildings = async (mainX, mainY) => {
         }
 
         async function create() {
+            this.buildingSprites = Array(mapSize).fill(null).map(() => Array(mapSize).fill(null));
+
             const tileWidth = 386;
             const visibleTileHeight = 193;
             const overlap = visibleTileHeight / 2;
@@ -1124,12 +1185,14 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                     if (buildingType > 0 && buildingImageMap[buildingType]) {
                         const buildingImage = buildingImageMap[buildingType];
                         const building = this.add.image(worldX, worldY, buildingImage).setDepth(worldY + 1);
+                        this.buildingSprites[x][y] = building;
             
                         // Add interactivity specifically for the armory
                         if (buildingImage === 'armory') {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('armory'); // Set the menu type to armory
                                 }
                             });
@@ -1137,6 +1200,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('blacksmith'); // Set the menu type to blacksmith
                                 }
                             });
@@ -1144,6 +1208,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('train-soldier'); // Set the menu type to train soldiers
                                 }
                             });
@@ -1151,6 +1216,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('house-info'); // Set the menu type to train soldiers
                                 }
                             });
@@ -1158,6 +1224,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('tower-info'); // Set the menu type to train soldiers
                                 }
                             });
@@ -1165,6 +1232,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('workshop'); // Set the menu type to train soldiers
                                 }
                             });
@@ -1172,6 +1240,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('marketplace'); // Set the menu type to train soldiers
                                 }
                             });
@@ -1179,6 +1248,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('clanhall'); // Set the menu type to train soldiers
                                 }
                             });
@@ -1290,6 +1360,8 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             const tempImage = this.add.image(worldX, worldY, selectedBuildingRef.current)
                                 .setAlpha(0.5)
                                 .setDepth(worldY + 1);
+
+                                this.buildingSprites[x][y] = tempImage;
             
                             const onTransactionStart = () => {
                                 tempImage.setVisible(true);
@@ -1306,48 +1378,56 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
         if (imageKey === 'armory') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('armory');
                 }
             });
         } else if (imageKey === 'blacksmith') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('blacksmith');
                 }
             });
         } else if (imageKey === 'fightingpit') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('train-soldier');
                 }
             });
         } else if (imageKey === 'house') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('house-info');
                 }
             });
         } else if (imageKey === 'tower') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('tower-info');
                 }
             });
         } else if (imageKey === 'workshop') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('workshop');
                 }
             });
         } else if (imageKey === 'market') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('marketplace');
                 }
             });
         } else if (imageKey === 'clanhall') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('clanhall');
                 }
             });
@@ -1972,7 +2052,23 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 
 {interactionMenuType === "armory" && (
   <div>
+
+    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', marginBottom: '10px', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
+
+
     <div className="card-title">Produce Armor</div>
+
+   
+
+
+
     {tileData && (
         <>
       <div className="card-resource-bar">
@@ -2144,6 +2240,14 @@ style={{
 
 {interactionMenuType === "blacksmith" && (
   <div>
+    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', marginBottom: '10px', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
     <div className="card-title">Produce Weapon</div>
     {tileData && (
         <>
@@ -2310,6 +2414,14 @@ style={{
 
 {interactionMenuType === "train-soldier" && (
   <div>
+    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', marginBottom: '10px', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
     <div className="card-title">Train Soldiers</div>
     {tileData && (
         <>
@@ -2481,6 +2593,14 @@ style={{
 
 {interactionMenuType === "house-info" && (
     <div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', marginBottom: '10px', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
     <div className="card-title">House</div>
     {tileData && (
         <>
@@ -2501,6 +2621,14 @@ style={{
 
 {interactionMenuType === "tower-info" && (
     <div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', marginBottom: '10px', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
     <div className="card-title">Tower</div>
     {tileData && (
         <>
@@ -2521,6 +2649,14 @@ style={{
 
 {interactionMenuType === "workshop" && (
     <div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', marginBottom: '10px', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
         <div className="card-title">Workshop</div>
 
         {tileData && (
@@ -2585,6 +2721,14 @@ style={{
 
 {interactionMenuType === "marketplace" && (
     <div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', marginBottom: '10px', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
         <div className="card-title">Marketplace</div>
 
         {/* Resource Selection */}
@@ -2734,7 +2878,18 @@ className='fancy-input'
 
 {interactionMenuType === "clanhall" && (
     <div className="interaction-menu" style={{ minWidth: '300px' }}>
-        <h3>Clan Hall</h3>
+
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
+
+
+        <h4>Clan Hall</h4>
         {userClan ? (
             <div>
                 <p><strong>Clan:</strong> {clanDetails?.name}</p>

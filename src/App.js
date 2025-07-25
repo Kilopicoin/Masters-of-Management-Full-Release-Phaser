@@ -23,6 +23,7 @@ import getNFTContract, { getNFTSignerContract } from './nftContract';
 import { getMarketplaceSignerContract } from './MarketplaceContract';
 import defensiveSoldierImage from './assets/soldiers/defensive.png';
 import offensiveSoldierImage from './assets/soldiers/offensive.png';
+import { BrowserProvider } from 'ethers';
 
 function App() {
   const gameRef = useRef(null);
@@ -59,6 +60,10 @@ const [attackerResources, setAttackerResources] = useState(null);
 const [attackDistance, setAttackDistance] = useState(null);
 const [attackerPower, setAttackerPower] = useState(0);
 const [warLogsData, setWarLogsData] = useState([]);
+const [twitterHandleX, setTwitterHandleX] = useState("");
+
+
+
 
 
 const urlToKeyMap = useMemo(() => ({
@@ -94,6 +99,86 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
 
+
+const handleTwitterConnect = async () => {
+  try {
+    setLoading(true);
+    const provider = new BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const address = await signer.getAddress();
+    const signature = await signer.signMessage(`Linking wallet ${address}`);
+
+    window.location.href = `http://localhost:4000/twitter/login?wallet=${address}&signature=${signature}`;
+  } catch (err) {
+    console.error("Twitter connection failed", err);
+    toast.error("Failed to connect Twitter");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+
+useEffect(() => {
+  const fetchTwitterHandle = async () => {
+    if (!metaMaskAccount) return;
+    try {
+      const landContract = await getTheLandSignerContract();
+      const handle = await landContract.getTwitterHandle(metaMaskAccount);
+      if (handle && handle.length > 0) {
+        setTwitterHandleX(handle);
+      }
+    } catch (error) {
+      console.error("Error fetching Twitter handle:", error);
+    }
+  };
+
+  fetchTwitterHandle();
+}, [metaMaskAccount]);
+
+
+
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const twitterHandle = params.get('handle');
+
+  if (twitterHandle) {
+    console.log("Redirected back with Twitter handle:", twitterHandle);
+    
+    
+    // Optionally send the handle to the smart contract
+    sendToSmartContract(twitterHandle);
+
+    // Remove query from URL
+    window.history.replaceState(null, '', window.location.pathname);
+  }
+}, []);
+
+
+async function sendToSmartContract(twitterHandle) {
+  try {
+    
+
+    const landContract = await getTheLandSignerContract();
+    
+    const tx = await landContract.setTwitterHandle(twitterHandle);
+    setLoading(true); // show loader
+    await tx.wait();
+
+    
+
+    setTwitterHandleX(twitterHandle);
+
+    toast.success(`Twitter handle @${twitterHandle} saved on-chain!`);
+    console.log('Twitter handle saved on-chain!');
+  } catch (error) {
+    console.error("Error sending to smart contract:", error);
+    toast.error("Failed to save Twitter handle.");
+  } finally {
+    setLoading(false); // hide loader
+  }
+}
 
 
 const fetchMyRecentWarLogs = async () => {
@@ -1727,6 +1812,25 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
         >
             My War Logs
         </button>
+
+        {twitterHandleX ? (
+  <p>
+    🐦 <strong>Twitter:</strong>{' '}
+    <a
+      href={`https://twitter.com/${twitterHandleX}`}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={{ color: '#1DA1F2', textDecoration: 'underline' }}
+    >
+      @{twitterHandleX}
+    </a>
+  </p>
+) : (
+  <button onClick={handleTwitterConnect}>Connect Twitter</button>
+)}
+
+
+
 
       </div>
     )
