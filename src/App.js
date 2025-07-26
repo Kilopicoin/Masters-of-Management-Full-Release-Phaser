@@ -60,9 +60,8 @@ const [attackerResources, setAttackerResources] = useState(null);
 const [attackDistance, setAttackDistance] = useState(null);
 const [attackerPower, setAttackerPower] = useState(0);
 const [warLogsData, setWarLogsData] = useState([]);
-const [twitterHandleX, setTwitterHandleX] = useState("");
 
-
+const [defenderHandle, setdefenderHandle] = useState("");
 
 
 
@@ -120,22 +119,28 @@ const handleTwitterConnect = async () => {
 
 
 
-useEffect(() => {
-  const fetchTwitterHandle = async () => {
-    if (!metaMaskAccount) return;
-    try {
-      const landContract = await getTheLandSignerContract();
-      const handle = await landContract.getTwitterHandle(metaMaskAccount);
-      if (handle && handle.length > 0) {
-        setTwitterHandleX(handle);
-      }
-    } catch (error) {
-      console.error("Error fetching Twitter handle:", error);
-    }
-  };
+const createTwitterStoryShareLink = (log, defenderHandle = null) => {
+  const attackerCoords = `(${Number(log.attackerX) + 1},${Number(log.attackerY) + 1})`;
+  const defenderCoords = `(${Number(log.defenderX) + 1},${Number(log.defenderY) + 1})`;
 
-  fetchTwitterHandle();
-}, [metaMaskAccount]);
+  const attackerArmy = `${log.atkOffSoldier} OffensiveSoldier and ${log.atkDefSoldier} DefensiveSoldier`;
+  const defenderArmy = `${log.defOffSoldier} OffensiveSoldier and ${log.defDefSoldier} DefensiveSoldier`;
+
+  const result = log.attackerWon ? "🔥 I claimed victory!" : "🛡️ The defender held strong!";
+
+  const defenderMention = defenderHandle ? `@${defenderHandle}` : `an unknown warrior`;
+  const gameUrl = "https://kilopi.net/mom/full/"; // Replace with your real URL
+  const tutorialUrl = "https://youtu.be/rSffsKpfmDQ?si=_8EsxA-MNu3a-EEK"; // Replace with your real URL
+
+  const tweet = `I ${attackerCoords} attacked ${defenderMention} at ${defenderCoords} \nwith ${attackerArmy}\n` +
+                `\nDefender had \n${defenderArmy}\n` +
+                `\nResult: ${result}\n\n` +
+                `🌍 Join the competition: ${gameUrl}\n📺 Tutorial: ${tutorialUrl}`;
+
+  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`;
+};
+
+
 
 
 
@@ -166,9 +171,7 @@ async function sendToSmartContract(twitterHandle) {
     setLoading(true); // show loader
     await tx.wait();
 
-    
-
-    setTwitterHandleX(twitterHandle);
+  
 
     toast.success(`Twitter handle @${twitterHandle} saved on-chain!`);
     console.log('Twitter handle saved on-chain!');
@@ -269,6 +272,11 @@ const handleConfirmAttack = async () => {
     // ✅ Immediately fetch updated war logs
     const updatedLogs = await marketContract.getAllPlayerWars(metaMaskAccount);
     const latest = updatedLogs[updatedLogs.length - 1];
+
+    const defenderAddress = await getContract().then(c => c.getTileOccupant(dx, dy));
+const defenderHandleX = await getTheLandSignerContract().then(c => c.getTwitterHandle(defenderAddress));
+
+setdefenderHandle([defenderHandleX]);
 
     // Update state and show result
     setWarLogsData([latest]); // show only this result
@@ -848,7 +856,7 @@ if (occupantPendingClanId > 0) {
           bonusTypeX = 'None';
       }
 
-
+const twitterHandle = await landContract.getTwitterHandle(occupant);
 
                 setTileCoords({
                   x: x + 1,
@@ -862,6 +870,7 @@ if (occupantPendingClanId > 0) {
                   hasPendingInviteToClan: hasPendingInvite,
                   tileName: tileName && tileName.trim().length > 0 ? tileName : null,
                   points: totalPoints,
+                  twitterHandle: twitterHandle || null,
                 });
 
 
@@ -1813,21 +1822,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
             My War Logs
         </button>
 
-        {twitterHandleX ? (
-  <p>
-    🐦 <strong>Twitter:</strong>{' '}
-    <a
-      href={`https://twitter.com/${twitterHandleX}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      style={{ color: '#1DA1F2', textDecoration: 'underline' }}
-    >
-      @{twitterHandleX}
-    </a>
-  </p>
-) : (
-  <button onClick={handleTwitterConnect}>Connect Twitter</button>
-)}
+        
 
 
 
@@ -1836,6 +1831,49 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     )
   ) 
 )}
+
+
+
+{tileCoords.occupant && (
+  <div>
+    {metaMaskAccount && getAddress(metaMaskAccount) === tileCoords.occupant ? (
+      tileCoords.twitterHandle ? (
+        <p>
+          🐦 <strong>Twitter:</strong>{' '}
+          <a
+            href={`https://twitter.com/${tileCoords.twitterHandle}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline' }}
+          >
+            @{tileCoords.twitterHandle}
+          </a>
+        </p>
+      ) : (
+        <button onClick={handleTwitterConnect}>Connect Twitter</button>
+      )
+    ) : (
+      tileCoords.twitterHandle ? (
+        <p>
+          🐦 <strong>Twitter:</strong>{' '}
+          <a
+            href={`https://twitter.com/${tileCoords.twitterHandle}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline' }}
+          >
+            @{tileCoords.twitterHandle}
+          </a>
+        </p>
+      ) : (
+        <p>🐦 Not connected to Twitter</p>
+      )
+    )}
+  </div>
+)}
+
+
+
 
 
 
@@ -2596,6 +2634,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     </button>
 
     {warLogsData.length > 0 ? (
+      <>
       <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
         <thead>
   <tr style={{ backgroundColor: '#6c757d' }}>
@@ -2631,6 +2670,27 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 </tbody>
 
       </table>
+
+<a
+  href={createTwitterStoryShareLink(warLogsData[0], defenderHandle)}
+  target="_blank"
+  rel="noopener noreferrer"
+  style={{
+    display: 'inline-block',
+    marginTop: '15px',
+    padding: '10px 20px',
+    backgroundColor: '#1DA1F2',
+    color: '#fff',
+    borderRadius: '5px',
+    textDecoration: 'none',
+    fontWeight: 'bold'
+  }}
+>
+  🐦 Share on Twitter
+</a>
+
+
+</>
     ) : (
       <p>No war logs available.</p>
     )}

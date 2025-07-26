@@ -831,11 +831,14 @@ const fetchTileData = useCallback(async (x, y) => {
 const fetchTileTurns = async (x, y) => {
     try {
         const contract = await getTheLandSignerContract();
-        const updatedTurns = await contract.getTurn(x - 1, y - 1); // Fetch real-time turns
+        const updatedTurnsX = await contract.getTurn(x - 1, y - 1); // Fetch real-time turns
+        const updatedTurns = updatedTurnsX.toString();
+
+        console.log(updatedTurns)
 
         setTileData((prev) => ({
             ...prev,
-            turns: updatedTurns.toString(), // Update turns in the state
+            turns: updatedTurns, // Update turns in the state
         }));
 
         toast.success("Turns updated!");

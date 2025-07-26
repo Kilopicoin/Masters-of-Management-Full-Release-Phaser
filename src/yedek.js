@@ -23,6 +23,7 @@ import getNFTContract, { getNFTSignerContract } from './nftContract';
 import { getMarketplaceSignerContract } from './MarketplaceContract';
 import defensiveSoldierImage from './assets/soldiers/defensive.png';
 import offensiveSoldierImage from './assets/soldiers/offensive.png';
+import { BrowserProvider } from 'ethers';
 
 function App() {
   const gameRef = useRef(null);
@@ -59,6 +60,10 @@ const [attackerResources, setAttackerResources] = useState(null);
 const [attackDistance, setAttackDistance] = useState(null);
 const [attackerPower, setAttackerPower] = useState(0);
 const [warLogsData, setWarLogsData] = useState([]);
+const [twitterHandleX, setTwitterHandleX] = useState("");
+
+
+
 
 
 const urlToKeyMap = useMemo(() => ({
@@ -94,6 +99,86 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
 
+
+const handleTwitterConnect = async () => {
+  try {
+    setLoading(true);
+    const provider = new BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const address = await signer.getAddress();
+    const signature = await signer.signMessage(`Linking wallet ${address}`);
+
+    window.location.href = `http://localhost:4000/twitter/login?wallet=${address}&signature=${signature}`;
+  } catch (err) {
+    console.error("Twitter connection failed", err);
+    toast.error("Failed to connect Twitter");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+
+useEffect(() => {
+  const fetchTwitterHandle = async () => {
+    if (!metaMaskAccount) return;
+    try {
+      const landContract = await getTheLandSignerContract();
+      const handle = await landContract.getTwitterHandle(metaMaskAccount);
+      if (handle && handle.length > 0) {
+        setTwitterHandleX(handle);
+      }
+    } catch (error) {
+      console.error("Error fetching Twitter handle:", error);
+    }
+  };
+
+  fetchTwitterHandle();
+}, [metaMaskAccount]);
+
+
+
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const twitterHandle = params.get('handle');
+
+  if (twitterHandle) {
+    console.log("Redirected back with Twitter handle:", twitterHandle);
+    
+    
+    // Optionally send the handle to the smart contract
+    sendToSmartContract(twitterHandle);
+
+    // Remove query from URL
+    window.history.replaceState(null, '', window.location.pathname);
+  }
+}, []);
+
+
+async function sendToSmartContract(twitterHandle) {
+  try {
+    
+
+    const landContract = await getTheLandSignerContract();
+    
+    const tx = await landContract.setTwitterHandle(twitterHandle);
+    setLoading(true); // show loader
+    await tx.wait();
+
+    
+
+    setTwitterHandleX(twitterHandle);
+
+    toast.success(`Twitter handle @${twitterHandle} saved on-chain!`);
+    console.log('Twitter handle saved on-chain!');
+  } catch (error) {
+    console.error("Error sending to smart contract:", error);
+    toast.error("Failed to save Twitter handle.");
+  } finally {
+    setLoading(false); // hide loader
+  }
+}
 
 
 const fetchMyRecentWarLogs = async () => {
@@ -763,7 +848,7 @@ if (occupantPendingClanId > 0) {
           bonusTypeX = 'None';
       }
 
-
+const twitterHandle = await landContract.getTwitterHandle(occupant);
 
                 setTileCoords({
                   x: x + 1,
@@ -777,6 +862,7 @@ if (occupantPendingClanId > 0) {
                   hasPendingInviteToClan: hasPendingInvite,
                   tileName: tileName && tileName.trim().length > 0 ? tileName : null,
                   points: totalPoints,
+                  twitterHandle: twitterHandle || null,
                 });
 
 
@@ -1540,38 +1626,33 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 {loading && (
   <>
-    {/* Dark background overlay */}
     <div
       style={{
-        position: 'absolute',
+        position: 'fixed',
         top: 0,
         left: 0,
         width: '100%',
         height: '100%',
-        backgroundColor: 'rgba(0, 0, 0, 0.7)', // Dark overlay with some transparency
-        zIndex: 99, // Below the spinner, but above the rest of the content
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        zIndex: 9999,
+        pointerEvents: 'all',
       }}
     ></div>
 
-    {/* Loading spinner */}
     <div
       style={{
-        position: 'absolute',
+        position: 'fixed',
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        zIndex: 100, // Above everything
+        zIndex: 10000,
       }}
     >
-      <Circles
-        height="100"
-        width="100"
-        color="#ffffff"
-        ariaLabel="loading-indicator"
-      />
+      <Circles height="100" width="100" color="#ffffff" ariaLabel="loading-indicator" />
     </div>
   </>
 )}
+
 
       <div
         id="phaser-container"
@@ -1733,10 +1814,58 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
             My War Logs
         </button>
 
+        
+
+
+
+
       </div>
     )
   ) 
 )}
+
+
+
+{tileCoords.occupant && (
+  <div>
+    {metaMaskAccount && getAddress(metaMaskAccount) === tileCoords.occupant ? (
+      twitterHandleX ? (
+        <p>
+          🐦 <strong>Twitter:</strong>{' '}
+          <a
+            href={`https://twitter.com/${twitterHandleX}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline' }}
+          >
+            @{twitterHandleX}
+          </a>
+        </p>
+      ) : (
+        <button onClick={handleTwitterConnect}>Connect Twitter</button>
+      )
+    ) : (
+      tileCoords.twitterHandle ? (
+        <p>
+          🐦 <strong>Twitter:</strong>{' '}
+          <a
+            href={`https://twitter.com/${tileCoords.twitterHandle}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline' }}
+          >
+            @{tileCoords.twitterHandle}
+          </a>
+        </p>
+      ) : (
+        <p>🐦 Not connected to Twitter</p>
+      )
+    )}
+  </div>
+)}
+
+
+
 
 
 
