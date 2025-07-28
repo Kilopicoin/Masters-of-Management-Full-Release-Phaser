@@ -62,6 +62,7 @@ const [attackerPower, setAttackerPower] = useState(0);
 const [warLogsData, setWarLogsData] = useState([]);
 
 const [defenderHandle, setdefenderHandle] = useState("");
+const [showJournal, setShowJournal] = useState(true);
 
 
 
@@ -1369,22 +1370,37 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     
 
     async function create() {
-
-
-       // const oceanImage = this.add.image((window.innerWidth / 2) - 80, (window.innerHeight * 2) + 190, 'ocean');
-        //  oceanImage.setDisplaySize(19200, 10800); // Set the map image size
-
-       const mapImage = this.add.image((window.innerWidth / 2) , (window.innerHeight * 2) + 150, 'largemap');
-      mapImage.setDisplaySize(8000, 4600); // Set the map image size
-
-
-      const tileWidth = 386;
+const tileWidth = 386;
       const visibleTileHeight = 193;
       const overlap = visibleTileHeight / 2;
       const halfTileWidth = tileWidth / 2;
 
+
       const totalMapHeight = ((mapSize - 1) * overlap + visibleTileHeight / 2) * 2;
       const offsetX = window.innerWidth / 2;
+
+
+      function tileToWorldPosition(x, y) {
+        const worldX = (x - y) * halfTileWidth + offsetX;
+        const worldY = (x + y) * overlap;
+        return { worldX, worldY };
+      }
+       // const oceanImage = this.add.image((window.innerWidth / 2) - 80, (window.innerHeight * 2) + 190, 'ocean');
+        //  oceanImage.setDisplaySize(19200, 10800); // Set the map image size
+
+       const centerTileX = Math.floor(mapSize / 2);
+const centerTileY = Math.floor(mapSize / 2);
+const { worldX: centerX, worldY: centerY } = tileToWorldPosition(centerTileX, centerTileY);
+
+// Center the large map image there
+const mapImage = this.add.image(centerX, centerY, 'largemap');
+mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .setScale() instead
+
+
+
+      
+
+      
 
       this.lights.enable();
       this.lights.setAmbientColor(0x9999);
@@ -1395,11 +1411,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
       sunGraphics.fillStyle(0xfff8e1, 1);
       sunGraphics.fillCircle(window.innerWidth * 2.5, -1500, 500);
 
-      function tileToWorldPosition(x, y) {
-        const worldX = (x - y) * halfTileWidth + offsetX;
-        const worldY = (x + y) * overlap;
-        return { worldX, worldY };
-      }
+      
 
 
       musicRef.current = this.sound.add('backgroundMusic', {
@@ -2835,14 +2847,32 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 
 
-<div className="journal-card">
-  <strong>Journal</strong>
-  <ul>
-    {journalEntries.map((entry, index) => (
-      <li key={index}>{entry}</li>
-    ))}
-  </ul>
-</div>
+{showJournal && (
+  <div className="journal-card">
+    <div>
+     Journal
+      <button
+        onClick={() => setShowJournal(false)}
+        style={{
+          backgroundColor: 'transparent',
+          border: 'none',
+          color: '#e8dbc0',
+          fontSize: '16px',
+          cursor: 'pointer',
+        }}
+        aria-label="Close Journal"
+      >
+        ❌
+      </button>
+    </div>
+    <ul>
+      {journalEntries.map((entry, index) => (
+        <li key={index}>{entry}</li>
+      ))}
+    </ul>
+  </div>
+)}
+
 
     </div>
   );

@@ -1500,14 +1500,34 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
       
 
       this.input.on('pointermove', function (pointer) {
-        if (isDragging) {
-          const zoom = this.cameras.main.zoom;
-          const dragX = (dragStartX - pointer.x) / zoom;
-          const dragY = (dragStartY - pointer.y) / zoom;
-          this.cameras.main.scrollX = cameraStartX + dragX;
-          this.cameras.main.scrollY = cameraStartY + dragY;
-        }
-      }, this);
+  if (isDragging) {
+    const zoom = this.cameras.main.zoom;
+    const dragX = (dragStartX - pointer.x) / zoom;
+    const dragY = (dragStartY - pointer.y) / zoom;
+
+    let newScrollX = cameraStartX + dragX;
+    let newScrollY = cameraStartY + dragY;
+
+    // Get dimensions of the full map (after scaling)
+    const mapWidth = 8000; // your large map image width
+    const mapHeight = 4600; // your large map image height
+
+    const viewWidth = this.scale.width / zoom;
+    const viewHeight = this.scale.height / zoom;
+
+    // Calculate scroll limits
+    const minScrollX = (- mapWidth - viewWidth) / 2;
+    const maxScrollX = (mapWidth + viewWidth) / 2;
+
+    const minScrollY = (- mapHeight - viewHeight) / 2;
+    const maxScrollY = (mapHeight + viewHeight);
+
+    // Clamp camera position
+    this.cameras.main.scrollX = Phaser.Math.Clamp(newScrollX, minScrollX, maxScrollX);
+    this.cameras.main.scrollY = Phaser.Math.Clamp(newScrollY, minScrollY, maxScrollY);
+  }
+}, this);
+
 
       this.input.on('pointerup', function (pointer) {
         if (pointer.button === 0) {
