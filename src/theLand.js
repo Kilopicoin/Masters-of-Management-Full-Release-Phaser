@@ -118,15 +118,18 @@ const [musicOnce, setmusicOnce] = useState(false);
     
 
     const buildingTypes = [
-        { key: 'armory', no: 1, label: 'Armory', image: 'armory', cost: { food: 100, wood: 50, stone: 30, iron: 20 } },
-        { key: 'blacksmith', no: 2, label: 'Blacksmith', image: 'blacksmith', cost: { food: 200, wood: 100, stone: 50, iron: 40 } },
-        { key: 'clanhall', no: 3, label: 'Clan Hall', image: 'clanhall', cost: { food: 300, wood: 100, stone: 50, iron: 40 } },
-        { key: 'fightingpit', no: 4, label: 'Fighting Pit', image: 'fightingpit', cost: { food: 400, wood: 100, stone: 50, iron: 40 } },
-        { key: 'house', no: 5, label: 'House', image: 'house', cost: { food: 500, wood: 100, stone: 50, iron: 40 } },
-        { key: 'market', no: 6, label: 'Market', image: 'market', cost: { food: 600, wood: 100, stone: 50, iron: 40 } },
-        { key: 'tower', no: 7, label: 'Tower', image: 'tower', cost: { food: 700, wood: 100, stone: 50, iron: 40 } },
-        { key: 'workshop', no: 8, label: 'Workshop', image: 'workshop', cost: { food: 800, wood: 100, stone: 50, iron: 40 } },
-    ];
+    { key: 'armory', no: 1, label: 'Armory', image: 'armory', cost: { wood: 3200, stone: 1440, food: 1240, iron: 880 } },
+    { key: 'blacksmith', no: 2, label: 'Blacksmith', image: 'blacksmith', cost: { wood: 3000, stone: 1300, food: 1300, iron: 900 } },
+    { key: 'clanhall', no: 3, label: 'Clan Hall', image: 'clanhall', cost: { wood: 4200, stone: 1960, food: 1760, iron: 1320 } },
+    { key: 'fightingpit', no: 4, label: 'Fighting Pit', image: 'fightingpit', cost: { wood: 2800, stone: 1240, food: 1240, iron: 940 } },
+    { key: 'house', no: 5, label: 'House', image: 'house', cost: { wood: 1040, stone: 450, food: 400, iron: 230 } }, // unchanged
+    { key: 'market', no: 6, label: 'Market', image: 'market', cost: { wood: 3120, stone: 1460, food: 1460, iron: 880 } },
+    { key: 'tower', no: 7, label: 'Tower', image: 'tower', cost: { wood: 6400, stone: 12200, food: 2780, iron: 2340 } },
+    { key: 'workshop', no: 8, label: 'Workshop', image: 'workshop', cost: { wood: 3680, stone: 1880, food: 1680, iron: 1360 } },
+];
+
+
+
     
 
 
@@ -614,8 +617,8 @@ const calculateArmorCost = useCallback((armorType, quantity) => {
     if (!tileData) return;
 
     const baseCost = armorType === 1
-        ? { food: 50, wood: 30, stone: 20, iron: 10 } // Base costs for offensive armor
-        : { food: 40, wood: 20, stone: 30, iron: 15 }; // Base costs for defensive armor
+        ? { food: 100, wood: 100, stone: 50, iron: 150 } // Base costs for offensive armor
+        : { food: 150, wood: 150, stone: 100, iron: 400 }; // Base costs for defensive armor
 
     // Adjust the cost if armories exist
     const armoryCount = 1; // You may want to dynamically calculate this based on your interior map data
@@ -636,8 +639,8 @@ const calculateWeaponCost = useCallback((weaponType, quantity) => {
     if (!tileData) return;
 
     const baseCost = weaponType === 1
-        ? { food: 50, wood: 30, stone: 20, iron: 10 } // Base costs for offensive armor
-        : { food: 40, wood: 20, stone: 30, iron: 15 }; // Base costs for defensive armor
+        ? { food: 100, wood: 150, stone: 50, iron: 300 } // Base costs for offensive armor
+        : { food: 150, wood: 200, stone: 100, iron: 250 }; // Base costs for defensive armor
 
     // Adjust the cost if armories exist
     const blacksmithCount = 1; // You may want to dynamically calculate this based on your interior map data
@@ -656,8 +659,8 @@ const calculateSoldierCost = useCallback((soldierType, quantity) => {
     if (!tileData) return;
 
     const baseCost = soldierType === 1
-        ? { food: 60, wood: 60, stone: 60, iron: 60 } // Base costs for offensive soldier
-        : { food: 60, wood: 60, stone: 60, iron: 60 }; // Base costs for defensive soldier
+        ? { food: 400, wood: 150, stone: 100, iron: 50 } // Base costs for offensive soldier
+        : { food: 400, wood: 150, stone: 100, iron: 50 }; // Base costs for defensive soldier
 
     // Adjust cost if a Fighting Pit exists
     const fightingPitCount = 1; // Replace this with dynamic logic if needed
@@ -2691,10 +2694,10 @@ style={{
                         // Calculate upgrade costs dynamically
                         const workshopCount = buildingCounts[8] || 1; // Ensure at least 1 workshop exists
                         const costMultiplier = parseInt(tech.level) + 1;
-                        const foodCost = Math.ceil((100 * costMultiplier) / workshopCount);
-                        const woodCost = Math.ceil((80 * costMultiplier) / workshopCount);
-                        const stoneCost = Math.ceil((60 * costMultiplier) / workshopCount);
-                        const ironCost = Math.ceil((50 * costMultiplier) / workshopCount);
+                        const foodCost = Math.ceil((70 * costMultiplier) / workshopCount);
+                        const woodCost = Math.ceil((60 * costMultiplier) / workshopCount);
+                        const stoneCost = Math.ceil((90 * costMultiplier) / workshopCount);
+                        const ironCost = Math.ceil((60 * costMultiplier) / workshopCount);
 
                         return (
                             <div className="tech-item" key={tech.id}>
