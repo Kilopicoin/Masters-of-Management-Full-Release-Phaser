@@ -6,7 +6,7 @@ import oceanImage from './assets/ocean.png';
 import whiteflagImage from './assets/whiteFlag.png';
 import skyflagImage from './assets/skyFlag.png';
 import largemapImage from './assets/file.png';
-import getContract, { getSignerContract, contractAddress } from './contract';
+import getContract, { getSignerContract, contractAddress, RPC } from './contract';
 import getTokenContract, { getTokenSignerContract } from './Tokencontract';
 import { Circles } from 'react-loader-spinner';
 import './App.css';
@@ -20,7 +20,7 @@ import TheLand from './theLand';
 import getclanContract, { getclanSignerContract } from './clancontract';
 import { getTheLandSignerContract } from './TheLandContract';
 import getNFTContract, { getNFTSignerContract } from './nftContract';
-import { getMarketplaceSignerContract } from './MarketplaceContract';
+import getMarketplaceContract, { getMarketplaceSignerContract } from './MarketplaceContract';
 import defensiveSoldierImage from './assets/soldiers/defensive.png';
 import offensiveSoldierImage from './assets/soldiers/offensive.png';
 import { BrowserProvider } from 'ethers';
@@ -60,9 +60,8 @@ const [attackerResources, setAttackerResources] = useState(null);
 const [attackDistance, setAttackDistance] = useState(null);
 const [attackerPower, setAttackerPower] = useState(0);
 const [warLogsData, setWarLogsData] = useState([]);
-const [twitterHandleX, setTwitterHandleX] = useState("");
 
-
+const [defenderHandle, setdefenderHandle] = useState("");
 
 
 
@@ -120,22 +119,28 @@ const handleTwitterConnect = async () => {
 
 
 
-useEffect(() => {
-  const fetchTwitterHandle = async () => {
-    if (!metaMaskAccount) return;
-    try {
-      const landContract = await getTheLandSignerContract();
-      const handle = await landContract.getTwitterHandle(metaMaskAccount);
-      if (handle && handle.length > 0) {
-        setTwitterHandleX(handle);
-      }
-    } catch (error) {
-      console.error("Error fetching Twitter handle:", error);
-    }
-  };
+const createTwitterStoryShareLink = (log, defenderHandle = null) => {
+  const attackerCoords = `(${Number(log.attackerX) + 1},${Number(log.attackerY) + 1})`;
+  const defenderCoords = `(${Number(log.defenderX) + 1},${Number(log.defenderY) + 1})`;
 
-  fetchTwitterHandle();
-}, [metaMaskAccount]);
+  const attackerArmy = `${log.atkOffSoldier} OffensiveSoldier and ${log.atkDefSoldier} DefensiveSoldier`;
+  const defenderArmy = `${log.defOffSoldier} OffensiveSoldier and ${log.defDefSoldier} DefensiveSoldier`;
+
+  const result = log.attackerWon ? "🔥 I claimed victory!" : "🛡️ The defender held strong!";
+
+  const defenderMention = defenderHandle ? `@${defenderHandle}` : `an unknown warrior`;
+  const gameUrl = "https://kilopi.net/mom/full/"; // Replace with your real URL
+  const tutorialUrl = "https://youtu.be/rSffsKpfmDQ?si=_8EsxA-MNu3a-EEK"; // Replace with your real URL
+
+  const tweet = `I ${attackerCoords} attacked ${defenderMention} at ${defenderCoords} \nwith ${attackerArmy}\n` +
+                `\nDefender had \n${defenderArmy}\n` +
+                `\nResult: ${result}\n\n` +
+                `🌍 Join the competition: ${gameUrl}\n📺 Tutorial: ${tutorialUrl}`;
+
+  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`;
+};
+
+
 
 
 
@@ -166,9 +171,7 @@ async function sendToSmartContract(twitterHandle) {
     setLoading(true); // show loader
     await tx.wait();
 
-    
-
-    setTwitterHandleX(twitterHandle);
+  
 
     toast.success(`Twitter handle @${twitterHandle} saved on-chain!`);
     console.log('Twitter handle saved on-chain!');
@@ -269,6 +272,11 @@ const handleConfirmAttack = async () => {
     // ✅ Immediately fetch updated war logs
     const updatedLogs = await marketContract.getAllPlayerWars(metaMaskAccount);
     const latest = updatedLogs[updatedLogs.length - 1];
+
+    const defenderAddress = await getContract().then(c => c.getTileOccupant(dx, dy));
+const defenderHandleX = await getTheLandSignerContract().then(c => c.getTwitterHandle(defenderAddress));
+
+setdefenderHandle([defenderHandleX]);
 
     // Update state and show result
     setWarLogsData([latest]); // show only this result
@@ -389,7 +397,6 @@ useEffect(() => {
   if (!musicOnce) {
   document.addEventListener('click', tryPlayMusic);
   document.addEventListener('contextmenu', tryPlayMusic); // for right click
-  console.log("XXX")
   setmusicOnce(true);
   }
 
@@ -1543,9 +1550,11 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     const setupEventListener = async () => {
       try {
         const contract = await getContract();
+        const marketcontract = await getMarketplaceContract();
   
         // Clear existing listeners for "TileUpdated" to prevent duplicates
         contract.removeAllListeners("TileUpdated");
+        marketcontract.removeAllListeners("TileAttacked");
   
         // Set up the event listener with a single instance
         contract.on("TileUpdated", (x, y, isOccupied, occupant) => {
@@ -1572,20 +1581,43 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
           });
 
         });
+
+
+
+        marketcontract.on("TileAttacked", (attacker, ax, ay, defender, dx, dy, attackerWon) => {
+
+      const msg = `(${Number(ax) + 1},${Number(ay) + 1}) attacked (${Number(dx) + 1},${Number(dy) + 1})`;
+      
+      setJournalEntries((prevEntries) => {
+        let newEntries = [msg, ...prevEntries];
+        if (newEntries.length > 3) {
+          newEntries = newEntries.slice(0, 3);
+        }
+        return newEntries;
+      });
+    });
+
+
       } catch (error) {
         console.error("Error setting up event listener:", error);
       }
     };
   
-    if (!loading) {
-      setupEventListener();
-    }
-  
+
+     if (RPC !== 'https://api.s0.b.hmny.io') {
+    setupEventListener();
+  }
+
     // Cleanup listener on unmount
     return () => {
       getContract().then((contract) => {
         contract.removeAllListeners("TileUpdated");
       });
+
+      getMarketplaceContract().then((marketcontract) => {
+    marketcontract.removeAllListeners("TileAttacked");
+  });
+
     };
   }, [loading, appKey]);
   
@@ -1829,16 +1861,16 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 {tileCoords.occupant && (
   <div>
     {metaMaskAccount && getAddress(metaMaskAccount) === tileCoords.occupant ? (
-      twitterHandleX ? (
+      tileCoords.twitterHandle ? (
         <p>
           🐦 <strong>Twitter:</strong>{' '}
           <a
-            href={`https://twitter.com/${twitterHandleX}`}
+            href={`https://twitter.com/${tileCoords.twitterHandle}`}
             target="_blank"
             rel="noopener noreferrer"
             style={{ color: '#1DA1F2', textDecoration: 'underline' }}
           >
-            @{twitterHandleX}
+            @{tileCoords.twitterHandle}
           </a>
         </p>
       ) : (
@@ -2626,6 +2658,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     </button>
 
     {warLogsData.length > 0 ? (
+      <>
       <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
         <thead>
   <tr style={{ backgroundColor: '#6c757d' }}>
@@ -2661,6 +2694,27 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 </tbody>
 
       </table>
+
+<a
+  href={createTwitterStoryShareLink(warLogsData[0], defenderHandle)}
+  target="_blank"
+  rel="noopener noreferrer"
+  style={{
+    display: 'inline-block',
+    marginTop: '15px',
+    padding: '10px 20px',
+    backgroundColor: '#1DA1F2',
+    color: '#fff',
+    borderRadius: '5px',
+    textDecoration: 'none',
+    fontWeight: 'bold'
+  }}
+>
+  🐦 Share on Twitter
+</a>
+
+
+</>
     ) : (
       <p>No war logs available.</p>
     )}

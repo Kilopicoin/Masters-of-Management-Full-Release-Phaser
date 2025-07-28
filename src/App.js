@@ -6,7 +6,7 @@ import oceanImage from './assets/ocean.png';
 import whiteflagImage from './assets/whiteFlag.png';
 import skyflagImage from './assets/skyFlag.png';
 import largemapImage from './assets/file.png';
-import getContract, { getSignerContract, contractAddress } from './contract';
+import getContract, { getSignerContract, contractAddress, RPC } from './contract';
 import getTokenContract, { getTokenSignerContract } from './Tokencontract';
 import { Circles } from 'react-loader-spinner';
 import './App.css';
@@ -20,7 +20,7 @@ import TheLand from './theLand';
 import getclanContract, { getclanSignerContract } from './clancontract';
 import { getTheLandSignerContract } from './TheLandContract';
 import getNFTContract, { getNFTSignerContract } from './nftContract';
-import { getMarketplaceSignerContract } from './MarketplaceContract';
+import getMarketplaceContract, { getMarketplaceSignerContract } from './MarketplaceContract';
 import defensiveSoldierImage from './assets/soldiers/defensive.png';
 import offensiveSoldierImage from './assets/soldiers/offensive.png';
 import { BrowserProvider } from 'ethers';
@@ -62,6 +62,7 @@ const [attackerPower, setAttackerPower] = useState(0);
 const [warLogsData, setWarLogsData] = useState([]);
 
 const [defenderHandle, setdefenderHandle] = useState("");
+const [showJournal, setShowJournal] = useState(true);
 
 
 
@@ -397,7 +398,6 @@ useEffect(() => {
   if (!musicOnce) {
   document.addEventListener('click', tryPlayMusic);
   document.addEventListener('contextmenu', tryPlayMusic); // for right click
-  console.log("XXX")
   setmusicOnce(true);
   }
 
@@ -1370,22 +1370,37 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     
 
     async function create() {
-
-
-       // const oceanImage = this.add.image((window.innerWidth / 2) - 80, (window.innerHeight * 2) + 190, 'ocean');
-        //  oceanImage.setDisplaySize(19200, 10800); // Set the map image size
-
-       const mapImage = this.add.image((window.innerWidth / 2) , (window.innerHeight * 2) + 150, 'largemap');
-      mapImage.setDisplaySize(8000, 4600); // Set the map image size
-
-
-      const tileWidth = 386;
+const tileWidth = 386;
       const visibleTileHeight = 193;
       const overlap = visibleTileHeight / 2;
       const halfTileWidth = tileWidth / 2;
 
+
       const totalMapHeight = ((mapSize - 1) * overlap + visibleTileHeight / 2) * 2;
       const offsetX = window.innerWidth / 2;
+
+
+      function tileToWorldPosition(x, y) {
+        const worldX = (x - y) * halfTileWidth + offsetX;
+        const worldY = (x + y) * overlap;
+        return { worldX, worldY };
+      }
+       // const oceanImage = this.add.image((window.innerWidth / 2) - 80, (window.innerHeight * 2) + 190, 'ocean');
+        //  oceanImage.setDisplaySize(19200, 10800); // Set the map image size
+
+       const centerTileX = Math.floor(mapSize / 2);
+const centerTileY = Math.floor(mapSize / 2);
+const { worldX: centerX, worldY: centerY } = tileToWorldPosition(centerTileX, centerTileY);
+
+// Center the large map image there
+const mapImage = this.add.image(centerX, centerY, 'largemap');
+mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .setScale() instead
+
+
+
+      
+
+      
 
       this.lights.enable();
       this.lights.setAmbientColor(0x9999);
@@ -1396,11 +1411,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
       sunGraphics.fillStyle(0xfff8e1, 1);
       sunGraphics.fillCircle(window.innerWidth * 2.5, -1500, 500);
 
-      function tileToWorldPosition(x, y) {
-        const worldX = (x - y) * halfTileWidth + offsetX;
-        const worldY = (x + y) * overlap;
-        return { worldX, worldY };
-      }
+      
 
 
       musicRef.current = this.sound.add('backgroundMusic', {
@@ -1551,9 +1562,11 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     const setupEventListener = async () => {
       try {
         const contract = await getContract();
+        const marketcontract = await getMarketplaceContract();
   
         // Clear existing listeners for "TileUpdated" to prevent duplicates
         contract.removeAllListeners("TileUpdated");
+        marketcontract.removeAllListeners("TileAttacked");
   
         // Set up the event listener with a single instance
         contract.on("TileUpdated", (x, y, isOccupied, occupant) => {
@@ -1580,20 +1593,43 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
           });
 
         });
+
+
+
+        marketcontract.on("TileAttacked", (attacker, ax, ay, defender, dx, dy, attackerWon) => {
+
+      const msg = `(${Number(ax) + 1},${Number(ay) + 1}) attacked (${Number(dx) + 1},${Number(dy) + 1})`;
+      
+      setJournalEntries((prevEntries) => {
+        let newEntries = [msg, ...prevEntries];
+        if (newEntries.length > 3) {
+          newEntries = newEntries.slice(0, 3);
+        }
+        return newEntries;
+      });
+    });
+
+
       } catch (error) {
         console.error("Error setting up event listener:", error);
       }
     };
   
-    if (!loading) {
-      setupEventListener();
-    }
-  
+
+     if (RPC !== 'https://api.s0.b.hmny.io') {
+    setupEventListener();
+  }
+
     // Cleanup listener on unmount
     return () => {
       getContract().then((contract) => {
         contract.removeAllListeners("TileUpdated");
       });
+
+      getMarketplaceContract().then((marketcontract) => {
+    marketcontract.removeAllListeners("TileAttacked");
+  });
+
     };
   }, [loading, appKey]);
   
@@ -2811,14 +2847,32 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
 
 
 
-<div className="journal-card">
-  <strong>Journal</strong>
-  <ul>
-    {journalEntries.map((entry, index) => (
-      <li key={index}>{entry}</li>
-    ))}
-  </ul>
-</div>
+{showJournal && (
+  <div className="journal-card">
+    <div>
+     Journal
+      <button
+        onClick={() => setShowJournal(false)}
+        style={{
+          backgroundColor: 'transparent',
+          border: 'none',
+          color: '#e8dbc0',
+          fontSize: '16px',
+          cursor: 'pointer',
+        }}
+        aria-label="Close Journal"
+      >
+        ❌
+      </button>
+    </div>
+    <ul>
+      {journalEntries.map((entry, index) => (
+        <li key={index}>{entry}</li>
+      ))}
+    </ul>
+  </div>
+)}
+
 
     </div>
   );
