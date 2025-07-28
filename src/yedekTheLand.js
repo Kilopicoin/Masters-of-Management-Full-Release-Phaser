@@ -118,15 +118,18 @@ const [musicOnce, setmusicOnce] = useState(false);
     
 
     const buildingTypes = [
-        { key: 'armory', no: 1, label: 'Armory', image: 'armory', cost: { food: 100, wood: 50, stone: 30, iron: 20 } },
-        { key: 'blacksmith', no: 2, label: 'Blacksmith', image: 'blacksmith', cost: { food: 200, wood: 100, stone: 50, iron: 40 } },
-        { key: 'clanhall', no: 3, label: 'Clan Hall', image: 'clanhall', cost: { food: 300, wood: 100, stone: 50, iron: 40 } },
-        { key: 'fightingpit', no: 4, label: 'Fighting Pit', image: 'fightingpit', cost: { food: 400, wood: 100, stone: 50, iron: 40 } },
-        { key: 'house', no: 5, label: 'House', image: 'house', cost: { food: 500, wood: 100, stone: 50, iron: 40 } },
-        { key: 'market', no: 6, label: 'Market', image: 'market', cost: { food: 600, wood: 100, stone: 50, iron: 40 } },
-        { key: 'tower', no: 7, label: 'Tower', image: 'tower', cost: { food: 700, wood: 100, stone: 50, iron: 40 } },
-        { key: 'workshop', no: 8, label: 'Workshop', image: 'workshop', cost: { food: 800, wood: 100, stone: 50, iron: 40 } },
-    ];
+    { key: 'armory', no: 1, label: 'Armory', image: 'armory', cost: { wood: 3200, stone: 1440, food: 1240, iron: 880 } },
+    { key: 'blacksmith', no: 2, label: 'Blacksmith', image: 'blacksmith', cost: { wood: 3000, stone: 1300, food: 1300, iron: 900 } },
+    { key: 'clanhall', no: 3, label: 'Clan Hall', image: 'clanhall', cost: { wood: 4200, stone: 1960, food: 1760, iron: 1320 } },
+    { key: 'fightingpit', no: 4, label: 'Fighting Pit', image: 'fightingpit', cost: { wood: 2800, stone: 1240, food: 1240, iron: 940 } },
+    { key: 'house', no: 5, label: 'House', image: 'house', cost: { wood: 1040, stone: 450, food: 400, iron: 230 } }, // unchanged
+    { key: 'market', no: 6, label: 'Market', image: 'market', cost: { wood: 3120, stone: 1460, food: 1460, iron: 880 } },
+    { key: 'tower', no: 7, label: 'Tower', image: 'tower', cost: { wood: 6400, stone: 12200, food: 2780, iron: 2340 } },
+    { key: 'workshop', no: 8, label: 'Workshop', image: 'workshop', cost: { wood: 3680, stone: 1880, food: 1680, iron: 1360 } },
+];
+
+
+
     
 
 
@@ -178,6 +181,16 @@ updatedBuildings.forEach((row) => {
     });
 });
 setBuildingCounts(updatedCounts);
+
+
+if (gameRef.current && gameRef.current.scene && gameRef.current.scene.keys && gameRef.current.scene.keys.default) {
+  const scene = gameRef.current.scene.keys.default;
+  const sprite = scene.buildingSprites?.[interiorX]?.[interiorY];
+  if (sprite) {
+    sprite.destroy();
+    scene.buildingSprites[interiorX][interiorY] = null;
+  }
+}
 
     // 3. Reset interaction menu
     setinteractionMenuType('home');
@@ -604,8 +617,8 @@ const calculateArmorCost = useCallback((armorType, quantity) => {
     if (!tileData) return;
 
     const baseCost = armorType === 1
-        ? { food: 50, wood: 30, stone: 20, iron: 10 } // Base costs for offensive armor
-        : { food: 40, wood: 20, stone: 30, iron: 15 }; // Base costs for defensive armor
+        ? { food: 100, wood: 100, stone: 50, iron: 150 } // Base costs for offensive armor
+        : { food: 150, wood: 150, stone: 100, iron: 400 }; // Base costs for defensive armor
 
     // Adjust the cost if armories exist
     const armoryCount = 1; // You may want to dynamically calculate this based on your interior map data
@@ -626,8 +639,8 @@ const calculateWeaponCost = useCallback((weaponType, quantity) => {
     if (!tileData) return;
 
     const baseCost = weaponType === 1
-        ? { food: 50, wood: 30, stone: 20, iron: 10 } // Base costs for offensive armor
-        : { food: 40, wood: 20, stone: 30, iron: 15 }; // Base costs for defensive armor
+        ? { food: 100, wood: 150, stone: 50, iron: 300 } // Base costs for offensive armor
+        : { food: 150, wood: 200, stone: 100, iron: 250 }; // Base costs for defensive armor
 
     // Adjust the cost if armories exist
     const blacksmithCount = 1; // You may want to dynamically calculate this based on your interior map data
@@ -646,8 +659,8 @@ const calculateSoldierCost = useCallback((soldierType, quantity) => {
     if (!tileData) return;
 
     const baseCost = soldierType === 1
-        ? { food: 60, wood: 60, stone: 60, iron: 60 } // Base costs for offensive soldier
-        : { food: 60, wood: 60, stone: 60, iron: 60 }; // Base costs for defensive soldier
+        ? { food: 400, wood: 150, stone: 100, iron: 50 } // Base costs for offensive soldier
+        : { food: 400, wood: 150, stone: 100, iron: 50 }; // Base costs for defensive soldier
 
     // Adjust cost if a Fighting Pit exists
     const fightingPitCount = 1; // Replace this with dynamic logic if needed
@@ -821,11 +834,14 @@ const fetchTileData = useCallback(async (x, y) => {
 const fetchTileTurns = async (x, y) => {
     try {
         const contract = await getTheLandSignerContract();
-        const updatedTurns = await contract.getTurn(x - 1, y - 1); // Fetch real-time turns
+        const updatedTurnsX = await contract.getTurn(x - 1, y - 1); // Fetch real-time turns
+        const updatedTurns = updatedTurnsX.toString();
+
+        console.log(updatedTurns)
 
         setTileData((prev) => ({
             ...prev,
-            turns: updatedTurns.toString(), // Update turns in the state
+            turns: updatedTurns, // Update turns in the state
         }));
 
         toast.success("Turns updated!");
@@ -1121,6 +1137,8 @@ const fetchAllBuildings = async (mainX, mainY) => {
         }
 
         async function create() {
+            this.buildingSprites = Array(mapSize).fill(null).map(() => Array(mapSize).fill(null));
+
             const tileWidth = 386;
             const visibleTileHeight = 193;
             const overlap = visibleTileHeight / 2;
@@ -1173,6 +1191,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                     if (buildingType > 0 && buildingImageMap[buildingType]) {
                         const buildingImage = buildingImageMap[buildingType];
                         const building = this.add.image(worldX, worldY, buildingImage).setDepth(worldY + 1);
+                        this.buildingSprites[x][y] = building;
             
                         // Add interactivity specifically for the armory
                         if (buildingImage === 'armory') {
@@ -1187,6 +1206,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('blacksmith'); // Set the menu type to blacksmith
                                 }
                             });
@@ -1194,6 +1214,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('train-soldier'); // Set the menu type to train soldiers
                                 }
                             });
@@ -1201,6 +1222,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('house-info'); // Set the menu type to train soldiers
                                 }
                             });
@@ -1208,6 +1230,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('tower-info'); // Set the menu type to train soldiers
                                 }
                             });
@@ -1215,6 +1238,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('workshop'); // Set the menu type to train soldiers
                                 }
                             });
@@ -1222,6 +1246,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('marketplace'); // Set the menu type to train soldiers
                                 }
                             });
@@ -1229,6 +1254,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
                                 if (pointer.button === 2) { // Right-click
+                                    setSelectedInteriorCoords({ x, y });
                                     setinteractionMenuType('clanhall'); // Set the menu type to train soldiers
                                 }
                             });
@@ -1340,6 +1366,8 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             const tempImage = this.add.image(worldX, worldY, selectedBuildingRef.current)
                                 .setAlpha(0.5)
                                 .setDepth(worldY + 1);
+
+                                this.buildingSprites[x][y] = tempImage;
             
                             const onTransactionStart = () => {
                                 tempImage.setVisible(true);
@@ -1356,48 +1384,56 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
         if (imageKey === 'armory') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('armory');
                 }
             });
         } else if (imageKey === 'blacksmith') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('blacksmith');
                 }
             });
         } else if (imageKey === 'fightingpit') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('train-soldier');
                 }
             });
         } else if (imageKey === 'house') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('house-info');
                 }
             });
         } else if (imageKey === 'tower') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('tower-info');
                 }
             });
         } else if (imageKey === 'workshop') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('workshop');
                 }
             });
         } else if (imageKey === 'market') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('marketplace');
                 }
             });
         } else if (imageKey === 'clanhall') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
+                    setSelectedInteriorCoords({ x, y });
                     setinteractionMenuType('clanhall');
                 }
             });
@@ -2210,6 +2246,14 @@ style={{
 
 {interactionMenuType === "blacksmith" && (
   <div>
+    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', marginBottom: '10px', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
     <div className="card-title">Produce Weapon</div>
     {tileData && (
         <>
@@ -2376,6 +2420,14 @@ style={{
 
 {interactionMenuType === "train-soldier" && (
   <div>
+    <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', marginBottom: '10px', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
     <div className="card-title">Train Soldiers</div>
     {tileData && (
         <>
@@ -2547,6 +2599,14 @@ style={{
 
 {interactionMenuType === "house-info" && (
     <div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', marginBottom: '10px', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
     <div className="card-title">House</div>
     {tileData && (
         <>
@@ -2567,6 +2627,14 @@ style={{
 
 {interactionMenuType === "tower-info" && (
     <div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', marginBottom: '10px', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
     <div className="card-title">Tower</div>
     {tileData && (
         <>
@@ -2587,6 +2655,14 @@ style={{
 
 {interactionMenuType === "workshop" && (
     <div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', marginBottom: '10px', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
         <div className="card-title">Workshop</div>
 
         {tileData && (
@@ -2618,10 +2694,10 @@ style={{
                         // Calculate upgrade costs dynamically
                         const workshopCount = buildingCounts[8] || 1; // Ensure at least 1 workshop exists
                         const costMultiplier = parseInt(tech.level) + 1;
-                        const foodCost = Math.ceil((100 * costMultiplier) / workshopCount);
-                        const woodCost = Math.ceil((80 * costMultiplier) / workshopCount);
-                        const stoneCost = Math.ceil((60 * costMultiplier) / workshopCount);
-                        const ironCost = Math.ceil((50 * costMultiplier) / workshopCount);
+                        const foodCost = Math.ceil((70 * costMultiplier) / workshopCount);
+                        const woodCost = Math.ceil((60 * costMultiplier) / workshopCount);
+                        const stoneCost = Math.ceil((90 * costMultiplier) / workshopCount);
+                        const ironCost = Math.ceil((60 * costMultiplier) / workshopCount);
 
                         return (
                             <div className="tech-item" key={tech.id}>
@@ -2651,6 +2727,14 @@ style={{
 
 {interactionMenuType === "marketplace" && (
     <div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', marginBottom: '10px', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
         <div className="card-title">Marketplace</div>
 
         {/* Resource Selection */}
@@ -2800,7 +2884,18 @@ className='fancy-input'
 
 {interactionMenuType === "clanhall" && (
     <div className="interaction-menu" style={{ minWidth: '300px' }}>
-        <h3>Clan Hall</h3>
+
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+  <button
+    style={{ backgroundColor: '#3b0000ff', color: 'gray' }}
+    onClick={() => demolishBuilding(selectedInteriorCoords.x, selectedInteriorCoords.y)}
+  >
+    Demolish This Building
+  </button>
+</div>
+
+
+        <h4>Clan Hall</h4>
         {userClan ? (
             <div>
                 <p><strong>Clan:</strong> {clanDetails?.name}</p>

@@ -1385,8 +1385,7 @@ const tileWidth = 386;
         const worldY = (x + y) * overlap;
         return { worldX, worldY };
       }
-       // const oceanImage = this.add.image((window.innerWidth / 2) - 80, (window.innerHeight * 2) + 190, 'ocean');
-        //  oceanImage.setDisplaySize(19200, 10800); // Set the map image size
+       
 
        const centerTileX = Math.floor(mapSize / 2);
 const centerTileY = Math.floor(mapSize / 2);
@@ -1395,7 +1394,6 @@ const { worldX: centerX, worldY: centerY } = tileToWorldPosition(centerTileX, ce
 // Center the large map image there
 const mapImage = this.add.image(centerX, centerY, 'largemap');
 mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .setScale() instead
-
 
 
       

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { toast, ToastContainer } from 'react-toastify';
 import Phaser from 'phaser';
 import grassXImage from './assets/grassX.png';
+import foodXImage from './assets/foodX.png';
 import eldersImage from './assets/elders.png';
 import armoryImage from './assets/buildings/armory.png';
 import blacksmithImage from './assets/buildings/blacksmith.png';
@@ -1104,11 +1105,12 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
         gameRef.current = new Phaser.Game(config);
 
-        let zoomLevel = 0.24;
+        let zoomLevel = 0.4;
 
         function preload() {
             this.load.audio('backgroundMusic2', backgroundMusicFile);
             this.load.image('grassX', grassXImage);
+            this.load.image('foodX', foodXImage);
             this.load.image('elders', eldersImage);
             this.load.image('armory', armoryImage);
             this.load.image('blacksmith', blacksmithImage);
@@ -1182,10 +1184,19 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                 return { worldX, worldY };
             }
 
+
+ for (let y = -mapSize * 4; y < mapSize * 8; y++) {
+                for (let x = -mapSize * 4; x < mapSize * 8; x++) {
+                    const { worldX, worldY } = tileToWorldPosition(x, y);
+            this.add.image(worldX, worldY, 'foodX').setDepth(worldY - 1000);
+                }}
+
+
             for (let y = 0; y < mapSize; y++) {
                 for (let x = 0; x < mapSize; x++) {
                     const { worldX, worldY } = tileToWorldPosition(x, y);
                     this.add.image(worldX, worldY, 'grassX').setDepth(worldY);
+                    
 
                     const buildingType = buildings[x][y]; // Get building type from the fetched data
                     if (buildingType > 0 && buildingImageMap[buildingType]) {
@@ -1478,13 +1489,38 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 
             this.input.on('pointermove', function (pointer) {
 
-                if (isDragging) {
+    
+
+                 if (isDragging) {
                     const zoom = this.cameras.main.zoom;
                     const dragX = (dragStartX - pointer.x) / zoom;
                     const dragY = (dragStartY - pointer.y) / zoom;
-                    this.cameras.main.scrollX = cameraStartX + dragX;
-                    this.cameras.main.scrollY = cameraStartY + dragY;
-                }
+                
+                    let newScrollX = cameraStartX + dragX;
+                    let newScrollY = cameraStartY + dragY;
+                
+                    // Get dimensions of the full map (after scaling)
+                    const mapWidth = 8000; // your large map image width
+                    const mapHeight = 4600; // your large map image height
+                
+                    const viewWidth = this.scale.width / zoom;
+                    const viewHeight = this.scale.height / zoom;
+                
+                    // Calculate scroll limits
+                    const minScrollX = (- mapWidth - viewWidth) / 3;
+                    const maxScrollX = (mapWidth + viewWidth) / 3;
+                
+                    const minScrollY = (- mapHeight - viewHeight) / 4;
+                    const maxScrollY = (mapHeight + viewHeight) / 2;
+                
+                    // Clamp camera position
+                    this.cameras.main.scrollX = Phaser.Math.Clamp(newScrollX, minScrollX, maxScrollX);
+                    this.cameras.main.scrollY = Phaser.Math.Clamp(newScrollY, minScrollY, maxScrollY);
+                  }
+
+
+
+
             }, this);
 
             this.input.on('pointerup', function (pointer) {
@@ -1495,9 +1531,9 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 
             this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
                 if (deltaY > 0) {
-                    zoomLevel = Phaser.Math.Clamp(zoomLevel - 0.04, 0.24, 0.4);
+                    zoomLevel = Phaser.Math.Clamp(zoomLevel - 0.04, 0.4, 0.8);
                 } else {
-                    zoomLevel = Phaser.Math.Clamp(zoomLevel + 0.04, 0.24, 0.4);
+                    zoomLevel = Phaser.Math.Clamp(zoomLevel + 0.04, 0.4, 0.8);
                 }
                 this.cameras.main.setZoom(zoomLevel);
             });
