@@ -172,6 +172,15 @@ const demolishBuilding = async (interiorX, interiorY) => {
 
     // Fetch updated tile data after the building is placed
             await fetchTileData(tileCoords.x, tileCoords.y);
+            setArmorQuantities({ offensive: 0, defensive: 0 });
+setWeaponQuantities({ offensive: 0, defensive: 0 });
+setSoldierQuantities({ offensive: 0, defensive: 0 });
+setArmorCosts({ food: 0, wood: 0, stone: 0, iron: 0 });
+setWeaponCosts({ food: 0, wood: 0, stone: 0, iron: 0 });
+setSoldierCosts({ food: 0, wood: 0, stone: 0, iron: 0 });
+setShowArmorCosts(false);
+setWeaponCosts(false);
+setSoldierCosts(false);
 
 
             const updatedBuildings = await fetchAllBuildings(tileCoords.x - 1, tileCoords.y - 1);
@@ -621,11 +630,11 @@ const calculateArmorCost = useCallback((armorType, quantity) => {
     if (!tileData) return;
 
     const baseCost = armorType === 1
-        ? { food: 100, wood: 100, stone: 50, iron: 150 } // Base costs for offensive armor
+        ? { food: 120, wood: 120, stone: 100, iron: 180 } // Base costs for offensive armor
         : { food: 150, wood: 150, stone: 100, iron: 400 }; // Base costs for defensive armor
 
     // Adjust the cost if armories exist
-    const armoryCount = 1; // You may want to dynamically calculate this based on your interior map data
+     const armoryCount = buildingCounts[1] || 1; // You may want to dynamically calculate this based on your interior map data
     const multiplier = quantity / armoryCount;
 
     return {
@@ -634,7 +643,7 @@ const calculateArmorCost = useCallback((armorType, quantity) => {
         stone: Math.ceil(baseCost.stone * multiplier),
         iron: Math.ceil(baseCost.iron * multiplier),
     };
-}, [tileData]);
+}, [tileData, buildingCounts]);
 
 
 
@@ -643,7 +652,7 @@ const calculateWeaponCost = useCallback((weaponType, quantity) => {
     if (!tileData) return;
 
     const baseCost = weaponType === 1
-        ? { food: 100, wood: 150, stone: 50, iron: 300 } // Base costs for offensive armor
+        ? { food: 120, wood: 180, stone: 100, iron: 300 } // Base costs for offensive armor
         : { food: 150, wood: 200, stone: 100, iron: 250 }; // Base costs for defensive armor
 
     // Adjust the cost if armories exist
@@ -663,8 +672,8 @@ const calculateSoldierCost = useCallback((soldierType, quantity) => {
     if (!tileData) return;
 
     const baseCost = soldierType === 1
-        ? { food: 400, wood: 150, stone: 100, iron: 50 } // Base costs for offensive soldier
-        : { food: 400, wood: 150, stone: 100, iron: 50 }; // Base costs for defensive soldier
+        ? { food: 400, wood: 200, stone: 150, iron: 100 } // Base costs for offensive soldier
+        : { food: 400, wood: 200, stone: 150, iron: 100 }; // Base costs for defensive soldier
 
     // Adjust cost if a Fighting Pit exists
     const fightingPitCount = 1; // Replace this with dynamic logic if needed
@@ -985,7 +994,15 @@ const placeBuildingOnTile = useCallback(
 
             // Fetch updated tile data after the building is placed
             await fetchTileData(tileCoords.x, tileCoords.y);
-
+            setArmorQuantities({ offensive: 0, defensive: 0 });
+setWeaponQuantities({ offensive: 0, defensive: 0 });
+setSoldierQuantities({ offensive: 0, defensive: 0 });
+setArmorCosts({ food: 0, wood: 0, stone: 0, iron: 0 });
+setWeaponCosts({ food: 0, wood: 0, stone: 0, iron: 0 });
+setSoldierCosts({ food: 0, wood: 0, stone: 0, iron: 0 });
+setShowArmorCosts(false);
+setWeaponCosts(false);
+setSoldierCosts(false);
 
             const updatedBuildings = await fetchAllBuildings(tileCoords.x - 1, tileCoords.y - 1);
 
@@ -2757,10 +2774,10 @@ style={{
                         // Calculate upgrade costs dynamically
                         const workshopCount = buildingCounts[8] || 1; // Ensure at least 1 workshop exists
                         const costMultiplier = parseInt(tech.level) + 1;
-                        const foodCost = Math.ceil((70 * costMultiplier) / workshopCount);
-                        const woodCost = Math.ceil((60 * costMultiplier) / workshopCount);
-                        const stoneCost = Math.ceil((90 * costMultiplier) / workshopCount);
-                        const ironCost = Math.ceil((60 * costMultiplier) / workshopCount);
+                        const foodCost = Math.ceil((140 * costMultiplier) / workshopCount);
+                        const woodCost = Math.ceil((120 * costMultiplier) / workshopCount);
+                        const stoneCost = Math.ceil((180 * costMultiplier) / workshopCount);
+                        const ironCost = Math.ceil((120 * costMultiplier) / workshopCount);
 
                         return (
                             <div className="tech-item" key={tech.id}>
