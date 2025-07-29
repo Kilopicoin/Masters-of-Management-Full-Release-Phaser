@@ -2,6 +2,10 @@ import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { toast, ToastContainer } from 'react-toastify';
 import Phaser from 'phaser';
 import grassXImage from './assets/grassX.png';
+import foodXImage from './assets/foodX.png';
+import woodXImage from './assets/woodX.png';
+import stoneXImage from './assets/stoneX.png';
+import ironXImage from './assets/ironX.png';
 import eldersImage from './assets/elders.png';
 import armoryImage from './assets/buildings/armory.png';
 import blacksmithImage from './assets/buildings/blacksmith.png';
@@ -168,6 +172,15 @@ const demolishBuilding = async (interiorX, interiorY) => {
 
     // Fetch updated tile data after the building is placed
             await fetchTileData(tileCoords.x, tileCoords.y);
+            setArmorQuantities({ offensive: 0, defensive: 0 });
+setWeaponQuantities({ offensive: 0, defensive: 0 });
+setSoldierQuantities({ offensive: 0, defensive: 0 });
+setArmorCosts({ food: 0, wood: 0, stone: 0, iron: 0 });
+setWeaponCosts({ food: 0, wood: 0, stone: 0, iron: 0 });
+setSoldierCosts({ food: 0, wood: 0, stone: 0, iron: 0 });
+setShowArmorCosts(false);
+setWeaponCosts(false);
+setSoldierCosts(false);
 
 
             const updatedBuildings = await fetchAllBuildings(tileCoords.x - 1, tileCoords.y - 1);
@@ -617,11 +630,11 @@ const calculateArmorCost = useCallback((armorType, quantity) => {
     if (!tileData) return;
 
     const baseCost = armorType === 1
-        ? { food: 100, wood: 100, stone: 50, iron: 150 } // Base costs for offensive armor
+        ? { food: 120, wood: 120, stone: 100, iron: 180 } // Base costs for offensive armor
         : { food: 150, wood: 150, stone: 100, iron: 400 }; // Base costs for defensive armor
 
     // Adjust the cost if armories exist
-    const armoryCount = 1; // You may want to dynamically calculate this based on your interior map data
+     const armoryCount = buildingCounts[1] || 1; // You may want to dynamically calculate this based on your interior map data
     const multiplier = quantity / armoryCount;
 
     return {
@@ -630,7 +643,7 @@ const calculateArmorCost = useCallback((armorType, quantity) => {
         stone: Math.ceil(baseCost.stone * multiplier),
         iron: Math.ceil(baseCost.iron * multiplier),
     };
-}, [tileData]);
+}, [tileData, buildingCounts]);
 
 
 
@@ -639,7 +652,7 @@ const calculateWeaponCost = useCallback((weaponType, quantity) => {
     if (!tileData) return;
 
     const baseCost = weaponType === 1
-        ? { food: 100, wood: 150, stone: 50, iron: 300 } // Base costs for offensive armor
+        ? { food: 120, wood: 180, stone: 100, iron: 300 } // Base costs for offensive armor
         : { food: 150, wood: 200, stone: 100, iron: 250 }; // Base costs for defensive armor
 
     // Adjust the cost if armories exist
@@ -659,8 +672,8 @@ const calculateSoldierCost = useCallback((soldierType, quantity) => {
     if (!tileData) return;
 
     const baseCost = soldierType === 1
-        ? { food: 400, wood: 150, stone: 100, iron: 50 } // Base costs for offensive soldier
-        : { food: 400, wood: 150, stone: 100, iron: 50 }; // Base costs for defensive soldier
+        ? { food: 400, wood: 200, stone: 150, iron: 100 } // Base costs for offensive soldier
+        : { food: 400, wood: 200, stone: 150, iron: 100 }; // Base costs for defensive soldier
 
     // Adjust cost if a Fighting Pit exists
     const fightingPitCount = 1; // Replace this with dynamic logic if needed
@@ -776,6 +789,7 @@ const calculateResources = useCallback((turns) => {
         default:
             break;
     }
+
 
     setCalculatedResources({ food, wood, stone, iron });
 }, [tileData, tileCoords.bonusType, buildingCounts]);
@@ -972,6 +986,8 @@ const placeBuildingOnTile = useCallback(
         try {
             onTransactionStart(); // Temporarily place the transparent image
             const contract = await getTheLandSignerContract();
+
+            
             const tx = await contract.placeBuilding(mainX, mainY, interiorX, interiorY, buildingType);
             await tx.wait();
 
@@ -980,7 +996,15 @@ const placeBuildingOnTile = useCallback(
 
             // Fetch updated tile data after the building is placed
             await fetchTileData(tileCoords.x, tileCoords.y);
-
+            setArmorQuantities({ offensive: 0, defensive: 0 });
+setWeaponQuantities({ offensive: 0, defensive: 0 });
+setSoldierQuantities({ offensive: 0, defensive: 0 });
+setArmorCosts({ food: 0, wood: 0, stone: 0, iron: 0 });
+setWeaponCosts({ food: 0, wood: 0, stone: 0, iron: 0 });
+setSoldierCosts({ food: 0, wood: 0, stone: 0, iron: 0 });
+setShowArmorCosts(false);
+setWeaponCosts(false);
+setSoldierCosts(false);
 
             const updatedBuildings = await fetchAllBuildings(tileCoords.x - 1, tileCoords.y - 1);
 
@@ -1104,11 +1128,15 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
         gameRef.current = new Phaser.Game(config);
 
-        let zoomLevel = 0.24;
+        let zoomLevel = 0.4;
 
         function preload() {
             this.load.audio('backgroundMusic2', backgroundMusicFile);
             this.load.image('grassX', grassXImage);
+            this.load.image('foodX', foodXImage);
+            this.load.image('woodX', woodXImage);
+            this.load.image('stoneX', stoneXImage);
+            this.load.image('ironX', ironXImage);
             this.load.image('elders', eldersImage);
             this.load.image('armory', armoryImage);
             this.load.image('blacksmith', blacksmithImage);
@@ -1182,10 +1210,39 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                 return { worldX, worldY };
             }
 
+
+            let landX = 'grassX';
+
+
+            switch (tileCoords.bonusType) {
+        case "Food":
+            landX = 'foodX';
+            break;
+        case "Wood":
+            landX = 'woodX';
+            break;
+        case "Stone":
+            landX = 'stoneX';
+            break;
+        case "Iron":
+            landX = 'ironX';
+            break;
+        default:
+            break;
+    }
+
+ for (let y = -mapSize * 4; y < mapSize * 8; y++) {
+                for (let x = -mapSize * 4; x < mapSize * 8; x++) {
+                    const { worldX, worldY } = tileToWorldPosition(x, y);
+            this.add.image(worldX, worldY, landX).setDepth(worldY - 1000);
+                }}
+
+
             for (let y = 0; y < mapSize; y++) {
                 for (let x = 0; x < mapSize; x++) {
                     const { worldX, worldY } = tileToWorldPosition(x, y);
                     this.add.image(worldX, worldY, 'grassX').setDepth(worldY);
+                    
 
                     const buildingType = buildings[x][y]; // Get building type from the fetched data
                     if (buildingType > 0 && buildingImageMap[buildingType]) {
@@ -1478,13 +1535,38 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 
             this.input.on('pointermove', function (pointer) {
 
-                if (isDragging) {
+    
+
+                 if (isDragging) {
                     const zoom = this.cameras.main.zoom;
                     const dragX = (dragStartX - pointer.x) / zoom;
                     const dragY = (dragStartY - pointer.y) / zoom;
-                    this.cameras.main.scrollX = cameraStartX + dragX;
-                    this.cameras.main.scrollY = cameraStartY + dragY;
-                }
+                
+                    let newScrollX = cameraStartX + dragX;
+                    let newScrollY = cameraStartY + dragY;
+                
+                    // Get dimensions of the full map (after scaling)
+                    const mapWidth = 8000; // your large map image width
+                    const mapHeight = 4600; // your large map image height
+                
+                    const viewWidth = this.scale.width / zoom;
+                    const viewHeight = this.scale.height / zoom;
+                
+                    // Calculate scroll limits
+                    const minScrollX = (- mapWidth - viewWidth) / 3;
+                    const maxScrollX = (mapWidth + viewWidth) / 3;
+                
+                    const minScrollY = (- mapHeight - viewHeight) / 4;
+                    const maxScrollY = (mapHeight + viewHeight) / 2;
+                
+                    // Clamp camera position
+                    this.cameras.main.scrollX = Phaser.Math.Clamp(newScrollX, minScrollX, maxScrollX);
+                    this.cameras.main.scrollY = Phaser.Math.Clamp(newScrollY, minScrollY, maxScrollY);
+                  }
+
+
+
+
             }, this);
 
             this.input.on('pointerup', function (pointer) {
@@ -1495,9 +1577,9 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 
             this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
                 if (deltaY > 0) {
-                    zoomLevel = Phaser.Math.Clamp(zoomLevel - 0.04, 0.24, 0.4);
+                    zoomLevel = Phaser.Math.Clamp(zoomLevel - 0.04, 0.4, 0.8);
                 } else {
-                    zoomLevel = Phaser.Math.Clamp(zoomLevel + 0.04, 0.24, 0.4);
+                    zoomLevel = Phaser.Math.Clamp(zoomLevel + 0.04, 0.4, 0.8);
                 }
                 this.cameras.main.setZoom(zoomLevel);
             });
@@ -2694,10 +2776,10 @@ style={{
                         // Calculate upgrade costs dynamically
                         const workshopCount = buildingCounts[8] || 1; // Ensure at least 1 workshop exists
                         const costMultiplier = parseInt(tech.level) + 1;
-                        const foodCost = Math.ceil((70 * costMultiplier) / workshopCount);
-                        const woodCost = Math.ceil((60 * costMultiplier) / workshopCount);
-                        const stoneCost = Math.ceil((90 * costMultiplier) / workshopCount);
-                        const ironCost = Math.ceil((60 * costMultiplier) / workshopCount);
+                        const foodCost = Math.ceil((140 * costMultiplier) / workshopCount);
+                        const woodCost = Math.ceil((120 * costMultiplier) / workshopCount);
+                        const stoneCost = Math.ceil((180 * costMultiplier) / workshopCount);
+                        const ironCost = Math.ceil((120 * costMultiplier) / workshopCount);
 
                         return (
                             <div className="tech-item" key={tech.id}>

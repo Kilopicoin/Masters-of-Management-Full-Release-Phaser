@@ -986,6 +986,8 @@ const placeBuildingOnTile = useCallback(
         try {
             onTransactionStart(); // Temporarily place the transparent image
             const contract = await getTheLandSignerContract();
+
+            
             const tx = await contract.placeBuilding(mainX, mainY, interiorX, interiorY, buildingType);
             await tx.wait();
 
