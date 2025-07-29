@@ -3,6 +3,9 @@ import { toast, ToastContainer } from 'react-toastify';
 import Phaser from 'phaser';
 import grassXImage from './assets/grassX.png';
 import foodXImage from './assets/foodX.png';
+import woodXImage from './assets/woodX.png';
+import stoneXImage from './assets/stoneX.png';
+import ironXImage from './assets/ironX.png';
 import eldersImage from './assets/elders.png';
 import armoryImage from './assets/buildings/armory.png';
 import blacksmithImage from './assets/buildings/blacksmith.png';
@@ -778,6 +781,7 @@ const calculateResources = useCallback((turns) => {
             break;
     }
 
+
     setCalculatedResources({ food, wood, stone, iron });
 }, [tileData, tileCoords.bonusType, buildingCounts]);
 
@@ -1111,6 +1115,9 @@ const fetchAllBuildings = async (mainX, mainY) => {
             this.load.audio('backgroundMusic2', backgroundMusicFile);
             this.load.image('grassX', grassXImage);
             this.load.image('foodX', foodXImage);
+            this.load.image('woodX', woodXImage);
+            this.load.image('stoneX', stoneXImage);
+            this.load.image('ironX', ironXImage);
             this.load.image('elders', eldersImage);
             this.load.image('armory', armoryImage);
             this.load.image('blacksmith', blacksmithImage);
@@ -1185,10 +1192,30 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
             }
 
 
+            let landX = 'grassX';
+
+
+            switch (tileCoords.bonusType) {
+        case "Food":
+            landX = 'foodX';
+            break;
+        case "Wood":
+            landX = 'woodX';
+            break;
+        case "Stone":
+            landX = 'stoneX';
+            break;
+        case "Iron":
+            landX = 'ironX';
+            break;
+        default:
+            break;
+    }
+
  for (let y = -mapSize * 4; y < mapSize * 8; y++) {
                 for (let x = -mapSize * 4; x < mapSize * 8; x++) {
                     const { worldX, worldY } = tileToWorldPosition(x, y);
-            this.add.image(worldX, worldY, 'foodX').setDepth(worldY - 1000);
+            this.add.image(worldX, worldY, landX).setDepth(worldY - 1000);
                 }}
 
 
