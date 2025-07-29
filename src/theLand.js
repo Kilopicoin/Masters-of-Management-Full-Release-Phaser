@@ -1023,7 +1023,7 @@ setBuildingCounts(updatedCounts);
         } catch (error) {
             console.error('Error placing building:', error);
             onTransactionEnd(false); // Remove the transparent image
-            toast.error('Failed to place building. Please try again.');
+            toast.error('Wrong Location or Not Enough Resources !!!');
             return false; // Indicate failure
         } finally {
             setLoading(false);
