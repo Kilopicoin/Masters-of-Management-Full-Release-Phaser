@@ -863,7 +863,7 @@ const fetchTileTurns = async (x, y) => {
         const updatedTurnsX = await contract.getTurn(x - 1, y - 1); // Fetch real-time turns
         const updatedTurns = updatedTurnsX.toString();
 
-        console.log(updatedTurns)
+
 
         setTileData((prev) => ({
             ...prev,
@@ -885,9 +885,42 @@ const fetchMarketplaceItemsByType = async () => {
         const contract = await getMarketplaceSignerContract();
         const items = await contract.getListingsByResourceType(selectedResourceType); // Fetch only selected category
 
+        let restype = '';
+
+
+            switch (selectedResourceType) {
+        case "1":
+            restype = 'Food';
+            break;
+        case "2":
+            restype = 'Wood';
+            break;
+        case "3":
+            restype = 'Stone';
+            break;
+        case "4":
+            restype = 'Iron';
+            break;
+            case "5":
+            restype = 'Offensive Armor';
+            break;
+            case "6":
+            restype = 'Defensive Armor';
+            break;
+            case "7":
+            restype = 'Offensive Weapon';
+            break;
+            case "8":
+            restype = 'Defensive Weapon';
+            break;
+        default:
+            break;
+    }
+
         const formattedItems = items.map((item, index) => ({
             id: index, // Since we don't store an ID in the contract, use index
             seller: item.seller,
+            resourceTypeX: restype,
             resourceType: item.resourceType.toString(),
             amount: item.amount.toString(),
             price: item.price.toString(),
@@ -914,14 +947,14 @@ const listItemForSale = async () => {
 
         const resourceType = parseInt(selectedResource);
         const amount = parseInt(sellAmount);
-        const price = parseInt(sellPrice);
+        const price = parseInt(sellPrice) * 10 ** 6;
 
         if (amount <= 0 || price <= 0) {
             toast.error("Amount and price must be greater than 0");
             setLoading(false);
             return;
         }
-
+        console.log(x, y, resourceType, amount, price)
         const tx = await contract.listItemForSale(x, y, resourceType, amount, price);
         await tx.wait();
 
@@ -951,16 +984,20 @@ const buyItem = async (item, index) => {
 
 
         const TokencontractSigner = await getTokenSignerContract();
+
+        const value = parseInt(item.price);
+
         
                 const Allowancetx = await TokencontractSigner.increaseAllowance(
                   MarketplacecontractAddress,
-                  item.price
+                  value
                 );
                 await Allowancetx.wait();
 
 
 
         const contract = await getMarketplaceSignerContract();
+
         const tx = await contract.buyItem(
             tileCoords.x - 1,
             tileCoords.y - 1,
@@ -2899,9 +2936,10 @@ style={{
                             padding: '5px 10px', 
                             borderBottom: '1px solid #ddd'
                         }}>
-                        <span><strong>{item.seller.slice(0, 6)}...</strong></span>
-                        <span>Amount: {item.amount}</span>
-                        <span>Price: {item.price} LOP</span>
+                        <span style={{ paddingLeft: '10px', paddingRight: '10px' }}><strong>{item.seller.slice(0, 4)}...{item.seller.slice(-4)}</strong></span>
+                        <span style={{ paddingLeft: '10px', paddingRight: '10px' }}>Item: {item.resourceTypeX}</span>
+                        <span style={{ paddingLeft: '10px', paddingRight: '10px' }}>Amount: {item.amount}</span>
+                        <span style={{ paddingLeft: '10px', paddingRight: '10px' }}>Price: {item.price / (10 ** 6)} LOP</span>
                         <button 
                             style={{
                                 padding: '5px 10px', 
@@ -2965,8 +3003,42 @@ style={{
                     </div>
                 </div>
 
+<div
+            style={{
+                marginBottom: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '15px',
+                justifyContent: 'center',
+            }}
+          >
+
+          
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={offensiveArmorImage} alt="Offensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.offensiveArmor}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={defensiveArmorImage} alt="Defensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.defensiveArmor}</span>
+</div>
+
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={offensiveWeaponImage} alt="Offensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.offensiveWeapon}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={defensiveWeaponImage} alt="Defensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.defensiveWeapon}</span>
+</div>
+
+
+</div>
+
                 <div className="card-content">
-                    <h4>List an Item for Sale</h4>
+                    <div style={{ fontWeight: '900' }}>List an Item for Sale</div>
+                    <div>min:10.000 for resources - min:100 for equipments</div>
+                    <div>min price: 10 LOP</div>
                     <select className="medieval-select" value={selectedResource} onChange={(e) => setSelectedResource(e.target.value)}>
     <option value="1">Food</option>
     <option value="2">Wood</option>

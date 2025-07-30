@@ -150,7 +150,7 @@ useEffect(() => {
   const twitterHandle = params.get('handle');
 
   if (twitterHandle) {
-    console.log("Redirected back with Twitter handle:", twitterHandle);
+    
     
     
     // Optionally send the handle to the smart contract
@@ -175,7 +175,7 @@ async function sendToSmartContract(twitterHandle) {
   
 
     toast.success(`Twitter handle @${twitterHandle} saved on-chain!`);
-    console.log('Twitter handle saved on-chain!');
+    
   } catch (error) {
     console.error("Error sending to smart contract:", error);
     toast.error("Failed to save Twitter handle.");
@@ -347,7 +347,7 @@ const calculateAttackCost = useCallback(async (targetX, targetY) => {
   const tileData = await landContract.getTileData(ax, ay);
   const offensiveSoldier = Number(tileData.offensiveSoldier);
   const defensiveSoldier = Number(tileData.defensiveSoldier);
-console.log(ax, ay, dx, dy)
+
   const totalCost = ATTACK_COST_FACTOR * distance * (offensiveSoldier + defensiveSoldier);
 
   setAttackCost({
@@ -490,7 +490,6 @@ useEffect(() => {
     fetchAttackerMilitary().then(data => {
       setAttackerTroops(data);
       // Calculate attacker power using the same formula as in the contract
-      console.log((data.offensiveSoldier * 2), (data.defensiveSoldier * 1), (data.offensiveTech + 1))
       const calculatedPower = (data.offensiveSoldier * 2) + (data.defensiveSoldier * 1) + (data.offensiveTech + 1);
       setAttackerPower(calculatedPower);
     });
@@ -878,11 +877,11 @@ const twitterHandle = await landContract.getTwitterHandle(occupant);
 
     const defTurnsUsedRaw = await landContract.getTotalTurnsUsedByTile(x, y);
     const defTurnsUsed = parseInt(defTurnsUsedRaw.toString());
-    console.log(defTurnsUsed);
+
 
     const lastDefRaw = await marketContract.lastDefenseTurn(x, y);
     const lastDef = parseInt(lastDefRaw.toString());
-    console.log(lastDef);
+
 
     const cooldown = 300;
 
