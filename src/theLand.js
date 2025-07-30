@@ -275,15 +275,24 @@ useEffect(() => {
 
 const handleSetClanFlag = async (tokenId) => {
   try {
+    setLoading(true);
+
+    const TokenContract = await getTokenSignerContract();
+        const approvalTx = await TokenContract.increaseAllowance(clancontractAddress, 10000 * 10 ** 6);
+        await approvalTx.wait();
+
+        
     const clanContract = await getclanSignerContract();
     const tx = await clanContract.setClanFlag(userClan, tokenId);
 
     await tx.wait();
     toast.success("Clan flag set!");
     setShowFlagSelector(false);
+    setLoading(false);
   } catch (err) {
     console.error("Failed to set clan flag", err);
     toast.error("Failed to set flag");
+    setLoading(false);
   }
 };
 
@@ -331,7 +340,7 @@ const fetchFlagNFTs = async () => {
     setShowFlagSelector(true);
   } catch (err) {
     console.error("Failed to fetch flag NFTs", err);
-    toast.error("Failed to load your NFTs from collection 1");
+    toast.error("Error getting NFTs from Kilopi NFT Market Collection id 1");
   }
 };
 
@@ -455,6 +464,9 @@ const checkUserClan = useCallback(async () => {
         toast.error("Failed to fetch clan information.");
     }
 }, []);
+
+
+
 
 const createClan = async () => {
     if (!newClanName || newClanName.trim() === "") {
@@ -656,7 +668,7 @@ const calculateWeaponCost = useCallback((weaponType, quantity) => {
         : { food: 150, wood: 200, stone: 100, iron: 250 }; // Base costs for defensive armor
 
     // Adjust the cost if armories exist
-    const blacksmithCount = 1; // You may want to dynamically calculate this based on your interior map data
+    const blacksmithCount = buildingCounts[2] || 1;
     const multiplier = quantity / blacksmithCount;
 
     return {
@@ -665,7 +677,7 @@ const calculateWeaponCost = useCallback((weaponType, quantity) => {
         stone: Math.ceil(baseCost.stone * multiplier),
         iron: Math.ceil(baseCost.iron * multiplier),
     };
-}, [tileData]);
+}, [tileData, buildingCounts]);
 
 
 const calculateSoldierCost = useCallback((soldierType, quantity) => {
@@ -676,7 +688,7 @@ const calculateSoldierCost = useCallback((soldierType, quantity) => {
         : { food: 400, wood: 200, stone: 150, iron: 100 }; // Base costs for defensive soldier
 
     // Adjust cost if a Fighting Pit exists
-    const fightingPitCount = 1; // Replace this with dynamic logic if needed
+    const fightingPitCount = buildingCounts[4] || 1;
     const multiplier = quantity / fightingPitCount;
 
     return {
@@ -685,7 +697,7 @@ const calculateSoldierCost = useCallback((soldierType, quantity) => {
         stone: Math.ceil(baseCost.stone * multiplier),
         iron: Math.ceil(baseCost.iron * multiplier),
     };
-}, [tileData]);
+}, [tileData, buildingCounts]);
 
 
 
@@ -1899,18 +1911,31 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
             <button
                 onClick={async () => {
-                    try {
-                        const contract = await getclanSignerContract();
-                        const tx = await contract.acceptInvite();
-                        await tx.wait();
-                        toast.success("Joined the clan!");
-                        await checkUserClan();
-                        await fetchPendingInvite();
-                    } catch (err) {
-                        console.error("Accept failed:", err);
-                        toast.error("Failed to accept invite.");
-                    }
-                }}
+    try {
+        setLoading(true);
+        const contract = await getclanSignerContract();
+        const memberCount = await contract.getClanMemberCount(pendingInviteClanId);
+
+        let toastcontent = '';
+        if (memberCount >= 30) {
+            toastcontent = 'Clan Full, Invitation Removed';
+        } else {
+            toastcontent = 'Joined the Clan';
+        }
+
+        const tx = await contract.acceptInvite();
+        await tx.wait();
+        await checkUserClan();
+        await fetchPendingInvite();
+        toast.info(toastcontent);
+        setLoading(false);
+    } catch (err) {
+        console.error("Accept failed:", err);
+        await fetchPendingInvite();
+        setLoading(false);
+    }
+}}
+
                 style={{ padding: '6px 10px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px' }}
             >
                 Accept
@@ -1918,15 +1943,18 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
             <button
                 onClick={async () => {
                     try {
+                        setLoading(true);
                         const contract = await getclanSignerContract();
                         const tx = await contract.refuseInvite();
                         await tx.wait();
                         toast.info("Invite refused.");
                         setPendingInviteClanId(null);
                         setPendingInviteClanName("");
+                        setLoading(false);
                     } catch (err) {
                         console.error("Refuse failed:", err);
                         toast.error("Failed to refuse invite.");
+                        setLoading(false);
                     }
                 }}
                 style={{ padding: '6px 10px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '5px' }}
@@ -2104,7 +2132,20 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                         backgroundColor: selectedBuilding === building.image ? '#575757ff' : '#3e3e3e',
                         minWidth: '120px',
                     }}
-                    onClick={() => setSelectedBuilding(building.image)}
+                    onClick={() => {
+    // Check limits before selecting
+    if (building.key === "clanhall" && (buildingCounts[3] || 0) >= 1) {
+        toast.error("Clanhall Limit ( Max:1 )");
+        return;
+    }
+    if (building.key === "market" && (buildingCounts[6] || 0) >= 1) {
+        toast.error("Market Limit ( Max:1 )");
+        return;
+    }
+
+    setSelectedBuilding(building.image);
+}}
+
                 >
                     <img
                         src={require(`./assets/buildings/${building.image}.png`)}
@@ -2986,9 +3027,49 @@ className='fancy-input'
 
             {showFlagSelector && (
   <div className="interaction-menuA" style={{ minWidth: '900px', maxHeight: '500px', overflowY: 'auto' }}>
-    <h3>Select an NFT as your Clan Flag</h3>
+    <div>Select an NFT as your Clan Flag</div>
+    <div style={{ marginBottom: '10px'}}>Setting a new flag requires 10.000 LOP tokens</div>
     <button className="card-button" onClick={() => setShowFlagSelector(false)}>Cancel</button>
     <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+
+
+        {ownedFlagNFTs.length === 0 && (
+            <>
+            <div style={{
+      marginTop: '20px',
+      display: 'flex',
+      justifyContent: 'center', // horizontally center
+      alignItems: 'center',     // vertically center (optional)
+      width: '100%',
+      textAlign: 'center',
+    }}>No NFTS found from Kilopi NFT Marketplace Collection ID:1
+    
+
+   
+
+    
+    </div>
+
+
+     <a
+  href={'https://kilopi.net/nftmarket/'}
+  target="_blank"
+  rel="noopener noreferrer"
+  style={{
+    marginBottom: '20px',
+      display: 'flex',
+      justifyContent: 'center', // horizontally center
+      alignItems: 'center',     // vertically center (optional)
+      width: '100%',
+      textAlign: 'center',
+      color: 'cyan'
+  }}
+>
+  Go to Kilopi NFT Marketplace
+</a>
+</>
+        )}
+
       {ownedFlagNFTs.map(nft => (
         <div key={nft.tokenId} style={{ border: '1px solid #ccc', padding: '5px' }}>
           <img src={nft.imageUrl} alt="nft" width={300} height={300} />
@@ -3051,8 +3132,9 @@ className='fancy-input'
                         marginBottom: '10px'
                     }}
                 >
-                    {loading ? "Creating Clan..." : "Create Clan"}
+                    {loading ? "Creating Clan..." : "Create Clan ( 100.000 LOP )"}
                 </button>
+
             </div>
         )}
 
@@ -3093,43 +3175,42 @@ className='fancy-input'
         <h4 style={{ textAlign: 'center' }}>All Clans</h4>
 
         {allClans.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {/* Header Row */}
-                <div
-                    style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        fontWeight: 'bold',
-                        borderBottom: '1px solid #ccc',
-                        paddingBottom: '6px',
-                    }}
-                >
-                    <span>Name</span>
-                    <span>Leader</span>
-                    <span>Members</span>
-                </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {/* Header Row */}
+        <div
+            style={{
+                display: 'flex',
+                fontWeight: 'bold',
+                borderBottom: '1px solid #ccc',
+                paddingBottom: '6px',
+            }}
+        >
+            <div style={{ flex: 1, textAlign: 'center' }}>Name</div>
+            <div style={{ flex: 1, textAlign: 'center' }}>Leader</div>
+            <div style={{ flex: 1, textAlign: 'center' }}>Members</div>
+        </div>
 
-                {/* Clan Rows */}
-                {allClans.map((clan, index) => (
-                    <div
-                        key={index}
-                        style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            borderBottom: '1px solid #eee',
-                            padding: '4px 0',
-                            fontSize: '14px',
-                        }}
-                    >
-                        <span>{clan.name}</span>
-                        <span>{clan.leader.slice(0, 6)}...{clan.leader.slice(-3)}</span>
-                        <span>{parseInt(clan.memberCount)}/30</span>
-                    </div>
-                ))}
+        {/* Clan Rows */}
+        {allClans.map((clan, index) => (
+            <div
+                key={index}
+                style={{
+                    display: 'flex',
+                    borderBottom: '1px solid #eee',
+                    padding: '4px 0',
+                    fontSize: '14px',
+                }}
+            >
+                <div style={{ flex: 1, textAlign: 'center'}}>{clan.name}</div>
+                <div style={{ flex: 1, textAlign: 'center' }}>{clan.leader.slice(0, 6)}...{clan.leader.slice(-3)}</div>
+                <div style={{ flex: 1, textAlign: 'center' }}>{parseInt(clan.memberCount)}/30</div>
             </div>
-        ) : (
-            <p>No clans found.</p>
-        )}
+        ))}
+    </div>
+) : (
+    <p>No clans found.</p>
+)}
+
 
         <button
             onClick={() => setShowAllClansModal(false)}

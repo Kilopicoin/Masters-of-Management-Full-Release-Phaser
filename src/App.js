@@ -1978,6 +1978,7 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
     <button
       onClick={async () => {
         try {
+          setLoading(true);
           const clanContract = await getclanSignerContract();
           const tx = await clanContract.leaveClan();
           await tx.wait();
@@ -1989,9 +1990,16 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
             clan: null,
             hasPendingInviteToClan: false,
           }));
+          const coords = await getContract().then(c => c.getOccupiedTileByAddress(metaMaskAccount));
+const [x, y] = coords.map(n => Number(n));
+tilesRef.current[x][y].flagUrl = null; // Clear the flag URL
+updateTileMap(); // Refresh map visuals
+
+          setLoading(false);
         } catch (err) {
           console.error("Error leaving clan:", err);
           toast.error("Failed to leave the clan.");
+          setLoading(false);
         }
       }}
     >
@@ -2009,8 +2017,10 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
     {tileCoords.clan.leader.toLowerCase() === metaMaskAccount.toLowerCase() &&
   tileCoords.occupant.toLowerCase() !== metaMaskAccount.toLowerCase() && (
     <button
+    style={{ marginBottom: '9px'}}
       onClick={async () => {
         try {
+          setLoading(true);
           const clanContract = await getclanSignerContract();
           const tx = await clanContract.removeMember(userClan.id, tileCoords.occupant);
           await tx.wait();
@@ -2020,9 +2030,18 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
             clan: null,
             hasPendingInviteToClan: false
           }));
+
+          const coords = await getContract().then(c => c.getOccupiedTileByAddress(tileCoords.occupant));
+const [x, y] = coords.map(n => Number(n));
+tilesRef.current[x][y].flagUrl = null; // Clear the flag URL
+updateTileMap(); // Refresh map visuals
+
+
+          setLoading(false);
         } catch (err) {
           console.error("Failed to remove member from clan:", err);
           toast.error("Failed to remove member");
+          setLoading(false);
         }
       }}
     >
@@ -2052,6 +2071,7 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
       ) : (
         <button
           onClick={async () => {
+            setLoading(true);
             try {
               const clanContract = await getclanSignerContract();
               const tx = await clanContract.inviteToClan(userClan.id, tileCoords.occupant);
@@ -2062,10 +2082,13 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
                 ...prev,
                 hasPendingInviteToClan: true,
               }));
+              setLoading(false);
             } catch (err) {
               console.error(err);
               toast.error("Failed to send invite");
+              setLoading(false);
             }
+            
           }}
         >
           Invite to Clan
@@ -2081,19 +2104,22 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
       )}
 
 
-      {tileCoords.occupied && metaMaskAccount && getAddress(metaMaskAccount) !== tileCoords.occupant && (
+      {tileCoords.occupied &&
+metaMaskAccount &&
+getAddress(metaMaskAccount) !== tileCoords.occupant &&
+(!tileCoords.clan || !userClan || tileCoords.clan.name !== allclansX[Number(userClan.id) - 1]?.[0]) && (
   <div>
     {attackCooldownMessage ? (
       <p style={{ fontWeight: 'bold', color: 'orange' }}>{attackCooldownMessage}</p>
     ) : (
-      <button className='card-button'
-      onClick={() => setinteractionMenuTypeA("attackMenu")}
-      >
+      <button className='card-button' onClick={() => setinteractionMenuTypeA("attackMenu")}>
         Attack here
       </button>
     )}
   </div>
-)}
+)
+}
+
 
   
 
