@@ -18,7 +18,7 @@ import stopIcon from './assets/stop-icon.png';
 import { getAddress } from 'ethers';
 import TheLand from './theLand';
 import getclanContract, { getclanSignerContract } from './clancontract';
-import { getTheLandSignerContract } from './TheLandContract';
+import getTheLandContract, { getTheLandSignerContract } from './TheLandContract';
 import getNFTContract, { getNFTSignerContract } from './nftContract';
 import getMarketplaceContract, { getMarketplaceSignerContract } from './MarketplaceContract';
 import defensiveSoldierImage from './assets/soldiers/defensive.png';
@@ -2021,6 +2021,17 @@ updateTileMap(); // Refresh map visuals
       onClick={async () => {
         try {
           setLoading(true);
+
+          const landContract = await getTheLandContract(); // call theLand.hasClanHall(userAddress)
+      const hasClan = await landContract.hasClanHall(metaMaskAccount); // replace `account` with connected wallet address
+
+      if (!hasClan) {
+        toast.error("Can not remove members without Clan Hall");
+        setLoading(false);
+        return;
+      }
+
+
           const clanContract = await getclanSignerContract();
           const tx = await clanContract.removeMember(userClan.id, tileCoords.occupant);
           await tx.wait();
@@ -2071,8 +2082,22 @@ updateTileMap(); // Refresh map visuals
       ) : (
         <button
           onClick={async () => {
+
+
+
             setLoading(true);
             try {
+
+               const landContract = await getTheLandContract(); // call theLand.hasClanHall(userAddress)
+      const hasClan = await landContract.hasClanHall(metaMaskAccount); // replace `account` with connected wallet address
+
+      if (!hasClan) {
+        toast.error("Can not send invites without Clan Hall");
+        setLoading(false);
+        return;
+      }
+
+
               const clanContract = await getclanSignerContract();
               const tx = await clanContract.inviteToClan(userClan.id, tileCoords.occupant);
               await tx.wait();
@@ -2105,9 +2130,14 @@ updateTileMap(); // Refresh map visuals
 
 
       {tileCoords.occupied &&
-metaMaskAccount &&
-getAddress(metaMaskAccount) !== tileCoords.occupant &&
-(!tileCoords.clan || !userClan || tileCoords.clan.name !== allclansX[Number(userClan.id) - 1]?.[0]) && (
+ metaMaskAccount &&
+ getAddress(metaMaskAccount) !== tileCoords.occupant &&
+ (!tileCoords.clan || !userClan || (
+   (() => {
+     const index = Number(userClan.id) - 1;
+     return index >= 0 && index < allclansX.length && tileCoords.clan.name !== allclansX[index]?.[0];
+   })()
+ )) && (
   <div>
     {attackCooldownMessage ? (
       <p style={{ fontWeight: 'bold', color: 'orange' }}>{attackCooldownMessage}</p>
@@ -2117,8 +2147,8 @@ getAddress(metaMaskAccount) !== tileCoords.occupant &&
       </button>
     )}
   </div>
-)
-}
+)}
+
 
 
   
