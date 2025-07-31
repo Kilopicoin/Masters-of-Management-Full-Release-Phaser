@@ -291,12 +291,13 @@ box-shadow: 0 0 6px rgba(196, 170, 112, 0.3);
 
 .fancy-table th {
   background-color: #6c757d;
-  padding: 8px;
+  padding: 6px;
   border-bottom: 1px solid #ccc;
+  
 }
 
 .fancy-table td {
-  padding: 6px;
+  padding: 4px;
   border-bottom: 1px solid #eee;
 }
 

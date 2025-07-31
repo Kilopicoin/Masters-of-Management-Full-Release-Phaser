@@ -2752,7 +2752,7 @@ updateTileMap(); // Refresh map visuals
 
     {warLogsData.length > 0 ? (
       <>
-      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+      <table className="fancy-table" style={{ width: '100%', fontSize: '16px', borderCollapse: 'collapse' }}>
         <thead>
   <tr style={{ backgroundColor: '#6c757d' }}>
     <th>Attacker</th>
