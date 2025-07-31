@@ -166,9 +166,9 @@ async function sendToSmartContract(twitterHandle) {
   try {
     
 
-    const landContract = await getTheLandSignerContract();
+    const clanContract = await getclanSignerContract();
     
-    const tx = await landContract.setTwitterHandle(twitterHandle);
+    const tx = await clanContract.setTwitterHandle(twitterHandle);
     setLoading(true); // show loader
     await tx.wait();
 
@@ -275,7 +275,7 @@ const handleConfirmAttack = async () => {
     const latest = updatedLogs[updatedLogs.length - 1];
 
     const defenderAddress = await getContract().then(c => c.getTileOccupant(dx, dy));
-const defenderHandleX = await getTheLandSignerContract().then(c => c.getTwitterHandle(defenderAddress));
+const defenderHandleX = await getclanSignerContract().then(c => c.getTwitterHandle(defenderAddress));
 
 setdefenderHandle([defenderHandleX]);
 
@@ -855,7 +855,7 @@ if (occupantPendingClanId > 0) {
           bonusTypeX = 'None';
       }
 
-const twitterHandle = await landContract.getTwitterHandle(occupant);
+const twitterHandle = await clanContract.getTwitterHandle(occupant);
 
                 setTileCoords({
                   x: x + 1,

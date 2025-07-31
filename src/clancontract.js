@@ -2,7 +2,7 @@
 import { BrowserProvider, Contract, JsonRpcProvider } from 'ethers';
 import contractABI from './clancontractABI.json'; // Import the ABI JSON file
 
-export const clancontractAddress = '0x749e130bd23eCcCD702568435f0625A01156a88F';
+export const clancontractAddress = '0xE61E037Cf57f3Ace9082f98b455A925Bf82dEB9B';
 const RPC = 'https://api.s0.b.hmny.io';
 
 const getclanContract = async () => {

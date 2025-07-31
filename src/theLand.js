@@ -941,20 +941,77 @@ const fetchMarketplaceItemsByType = async () => {
 const listItemForSale = async () => {
     try {
         setLoading(true);
-        const contract = await getMarketplaceSignerContract();
-        const x = tileCoords.x - 1;
-        const y = tileCoords.y - 1;
+        
 
         const resourceType = parseInt(selectedResource);
         const amount = parseInt(sellAmount);
         const price = parseInt(sellPrice) * 10 ** 6;
 
-        if (amount <= 0 || price <= 0) {
-            toast.error("Amount and price must be greater than 0");
+
+        if (resourceType === 1 && tileData.food < amount ) {
+            toast.error("Not Enough Food");
+            setLoading(false);
+            return;
+        } else if (resourceType === 2 && tileData.wood < amount ) {
+            toast.error("Not Enough Wood");
+            setLoading(false);
+            return;
+        } else if (resourceType === 3 && tileData.stone < amount ) {
+            toast.error("Not Enough Stone");
+            setLoading(false);
+            return;
+        } else if (resourceType === 4 && tileData.iron < amount ) {
+            toast.error("Not Enough Iron");
+            setLoading(false);
+            return;
+        } else if (resourceType === 5 && tileData.offensiveArmor < amount ) {
+            toast.error("Not Enough Offensive Armor");
+            setLoading(false);
+            return;
+        } else if (resourceType === 6 && tileData.defensiveArmor < amount ) {
+            toast.error("Not Enough Defensive Armor");
+            setLoading(false);
+            return;
+        } else if (resourceType === 7 && tileData.offensiveWeapon < amount ) {
+            toast.error("Not Enough Offensive Weapon");
+            setLoading(false);
+            return;
+        } else if (resourceType === 8 && tileData.defensiveWeapon < amount ) {
+            toast.error("Not Enough Defensive Weapon");
             setLoading(false);
             return;
         }
-        console.log(x, y, resourceType, amount, price)
+
+
+
+
+        if (resourceType <= 4) {
+
+        if (amount < 10000) {
+            toast.error("Amount must be greater than 10000");
+            setLoading(false);
+            return;
+        } 
+
+        } else {
+
+            if (amount < 100) {
+            toast.error("Amount must be greater than 100");
+            setLoading(false);
+            return;
+        } 
+        }
+
+        if (price < 10000000) {
+            toast.error("Price must be greater than 10");
+            setLoading(false);
+            return;
+        }
+
+const contract = await getMarketplaceSignerContract();
+        const x = tileCoords.x - 1;
+        const y = tileCoords.y - 1;
+
         const tx = await contract.listItemForSale(x, y, resourceType, amount, price);
         await tx.wait();
 
@@ -3064,7 +3121,7 @@ className='fancy-input'
     value={sellPrice} 
     onChange={(e) => setSellPrice(e.target.value)} 
 />
-
+<div>%10 will be added on top your price for burn mechanism</div>
                     <button className='card-button' onClick={() => listItemForSale()}>
                         List Item for Sale
                     </button>
