@@ -370,6 +370,7 @@ const fetchAttackerMilitary = useCallback(async () => {
       offensiveSoldier: Number(data.offensiveSoldier),
       defensiveSoldier: Number(data.defensiveSoldier),
       offensiveTech: Number(data.offensiveTech),
+      level: Number(data.level)
     };
   } catch (err) {
     console.error("Error fetching attacker's soldier data", err);
@@ -490,7 +491,7 @@ useEffect(() => {
     fetchAttackerMilitary().then(data => {
       setAttackerTroops(data);
       // Calculate attacker power using the same formula as in the contract
-      const calculatedPower = (data.offensiveSoldier * 2) + (data.defensiveSoldier * 1) + (data.offensiveTech + 1);
+      const calculatedPower = (data.offensiveSoldier * 2) + (data.defensiveSoldier) + (data.offensiveTech) + (data.level);
       setAttackerPower(calculatedPower);
     });
     fetchAttackerResources();

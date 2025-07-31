@@ -1899,12 +1899,12 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
     Attack: 
-    <span>{tileData ? (parseInt(tileData.offensiveSoldier) + parseInt(tileData.level) + parseInt(tileData.techLevels.offensiveTech)) : 0}</span>
+    <span>{tileData ? ((parseInt(tileData.offensiveSoldier) * 2) + parseInt(tileData.defensiveSoldier) + parseInt(tileData.level) + parseInt(tileData.techLevels.offensiveTech)) : 0}</span>
 </div>
 
 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
     Defense: 
-    <span>{tileData ? (parseInt(tileData.defensiveSoldier) + parseInt(tileData.level) + (parseInt(buildingCounts[7] || 0) * 100)  + parseInt(tileData.techLevels.defensiveTech)) : 0}</span>
+    <span>{tileData ? ((parseInt(tileData.defensiveSoldier) * 2) + parseInt(tileData.offensiveSoldier) + parseInt(tileData.level) + (parseInt(buildingCounts[7] || 0) * 100)  + parseInt(tileData.techLevels.defensiveTech)) : 0}</span>
 </div>
 
             
@@ -2910,7 +2910,7 @@ style={{
                     ].map((tech) => {
                         // Calculate upgrade costs dynamically
                         const workshopCount = buildingCounts[8] || 1; // Ensure at least 1 workshop exists
-                        const costMultiplier = parseInt(tech.level) + 1;
+                        const costMultiplier = (parseInt(tech.level) + 1) * 2;
                         const foodCost = Math.ceil((140 * costMultiplier) / workshopCount);
                         const woodCost = Math.ceil((120 * costMultiplier) / workshopCount);
                         const stoneCost = Math.ceil((180 * costMultiplier) / workshopCount);
@@ -2918,7 +2918,7 @@ style={{
 
                         return (
                             <div className="tech-item" key={tech.id}>
-                                <strong>{tech.name}:</strong> {tech.level} &nbsp;
+                                <strong>{tech.name}:</strong> {tech.level} / 10000 &nbsp;
                                 <button className='card-button' style={{ marginleft: '15px', marginTop: '15px' }} onClick={() => upgradeTech(tech.id)}>Upgrade</button>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     <img src={foodImage} alt="Food" style={{ width: '20px' }} />
