@@ -25,6 +25,17 @@ import defensiveSoldierImage from './assets/soldiers/defensive.png';
 import offensiveSoldierImage from './assets/soldiers/offensive.png';
 import { BrowserProvider } from 'ethers';
 
+import foodImage from './assets/res/food.png';
+import woodImage from './assets/res/wood.png';
+import stoneImage from './assets/res/stone.png';
+import ironImage from './assets/res/iron.png';
+
+import defensiveArmorImage from './assets/armors/defensive.png';
+import offensiveArmorImage from './assets/armors/offensive.png';
+
+import defensiveWeaponImage from './assets/weapons/defensive.png';
+import offensiveWeaponImage from './assets/weapons/offensive.png';
+
 function App() {
   const gameRef = useRef(null);
   const [tileCoords, setTileCoords] = useState({ x: null, y: null, occupied: null, occupant: null });
@@ -64,6 +75,13 @@ const [warLogsData, setWarLogsData] = useState([]);
 const [defenderHandle, setdefenderHandle] = useState("");
 const [showJournal, setShowJournal] = useState(true);
 
+const [sendResourceAmount, setSendResourceAmount] = useState("");
+const [sendResourceType, setSendResourceType] = useState("1"); // 1 = Food, default
+const [sendResourceLOPCost, setSendResourceLOPCost] = useState(null);
+
+const [sendResourceCost, setSendResourceCost] = useState(null);
+
+const [hasMarketplace, setHasMarketplace] = useState(false);
 
 
 const urlToKeyMap = useMemo(() => ({
@@ -98,6 +116,60 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/29.png": "nftflag_29",
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
+
+
+
+const checkMarketplacePresence = useCallback(async () => {
+  try {
+    if (!attackerTileCoords.x || !attackerTileCoords.y) return;
+
+    const landContract = await getTheLandContract(); 
+      const hasMarket = await landContract.hasMarket(metaMaskAccount);
+    setHasMarketplace(hasMarket);
+  } catch (err) {
+    console.error("Error checking marketplace presence:", err);
+    setHasMarketplace(false);
+  }
+}, [attackerTileCoords, metaMaskAccount]);
+
+
+
+
+const getResourceName = (type) => {
+  switch (type) {
+    case "1": return "Food";
+    case "2": return "Wood";
+    case "3": return "Stone";
+    case "4": return "Iron";
+    case "5": return "Offensive Armor";
+    case "6": return "Defensive Armor";
+    case "7": return "Offensive Weapon";
+    case "8": return "Defensive Weapon";
+    default: return "Unknown";
+  }
+};
+
+const getRemainingAmount = (type) => {
+  if (!attackerResources) return 0;
+
+  const keyMap = {
+    "1": "food",
+    "2": "wood",
+    "3": "stone",
+    "4": "iron",
+    "5": "offensiveArmor",
+    "6": "defensiveArmor",
+    "7": "offensiveWeapon",
+    "8": "defensiveWeapon"
+  };
+
+  const key = keyMap[type];
+  const currentAmount = attackerResources[key] || 0;
+  const cost = sendResourceCost || 0;
+  return currentAmount - cost - sendResourceAmount;
+};
+
+
 
 
 const handleTwitterConnect = async () => {
@@ -313,37 +385,36 @@ const fetchAttackerResources = useCallback(async () => {
     const landContract = await getTheLandSignerContract();
     const { x, y } = attackerTileCoords;
     const data = await landContract.getTileData(x, y);
+
     setAttackerResources({
       food: Number(data.food),
       wood: Number(data.wood),
       stone: Number(data.stone),
       iron: Number(data.iron),
+      offensiveArmor: Number(data.offensiveArmor),
+      defensiveArmor: Number(data.defensiveArmor),
+      offensiveWeapon: Number(data.offensiveWeapon),
+      defensiveWeapon: Number(data.defensiveWeapon),
     });
 
+    // Optional: cooldown logic
     const marketContract = await getMarketplaceSignerContract();
-
-    const attTurnsUsedRaw = await landContract.getTotalTurnsUsedByTile(attackerTileCoords.x, attackerTileCoords.y);
-const attTurnsUsed = parseInt(attTurnsUsedRaw.toString());
-
-const lastAttRaw = await marketContract.lastAttackTurn(attackerTileCoords.x, attackerTileCoords.y);
-const lastAtt = parseInt(lastAttRaw.toString());
-
-const cooldown = 300;
-
-if (attTurnsUsed < lastAtt + cooldown) {
-  const turnsLeft = (lastAtt + cooldown) - attTurnsUsed;
-  setAttackCooldownMessageX(`Attacker Cooldown (${turnsLeft} turns left)`);
-  return;
-}
-
-
-
-
+    const attTurnsUsedRaw = await landContract.getTotalTurnsUsedByTile(x, y);
+    const lastAttRaw = await marketContract.lastAttackTurn(x, y);
+    const attTurnsUsed = parseInt(attTurnsUsedRaw.toString());
+    const lastAtt = parseInt(lastAttRaw.toString());
+    const cooldown = 300;
+    if (attTurnsUsed < lastAtt + cooldown) {
+      setAttackCooldownMessageX(`Attacker Cooldown (${(lastAtt + cooldown) - attTurnsUsed} turns left)`);
+    }
   } catch (err) {
     console.error("Error fetching attacker's resources", err);
     setAttackerResources(null);
   }
 }, [attackerTileCoords]);
+
+
+
 
 const calculateAttackCost = useCallback(async (targetX, targetY) => {
   if (attackerTileCoords.x === null || attackerTileCoords.y === null) return;
@@ -501,7 +572,7 @@ useEffect(() => {
   }, [metaMaskAccount]);
   
 useEffect(() => {
-  if (interactionMenuTypeA === "attackMenu") {
+  if (interactionMenuTypeA === "attackMenu" || interactionMenuTypeA === "sendResources") {
     fetchAttackerMilitary().then(data => {
       setAttackerTroops(data);
       // Calculate attacker power using the same formula as in the contract
@@ -512,8 +583,14 @@ useEffect(() => {
     if (tileCoords.x !== null && tileCoords.y !== null) {
       calculateAttackCost(tileCoords.x, tileCoords.y);
     }
+
+if (interactionMenuTypeA === "sendResources") {
+      checkMarketplacePresence(); // ✅ safe to call now
+    }
+
+    
   }
-}, [interactionMenuTypeA, fetchAttackerMilitary, calculateAttackCost, fetchAttackerResources, tileCoords]);
+}, [interactionMenuTypeA, fetchAttackerMilitary, calculateAttackCost, fetchAttackerResources, tileCoords, checkMarketplacePresence]);
 
 
 
@@ -1340,6 +1417,17 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
       this.load.image('defensivesoldier', defensiveSoldierImage);
       this.load.image('offensivesoldier', offensiveSoldierImage);
 
+      this.load.image('food', foodImage);
+                  this.load.image('wood', woodImage);
+                  this.load.image('stone', stoneImage);
+                  this.load.image('iron', ironImage);
+      
+                  this.load.image('defensivearmor', defensiveArmorImage);
+                  this.load.image('offensivearmor', offensiveArmorImage);
+      
+                  this.load.image('defensiveweapon', defensiveWeaponImage);
+                  this.load.image('offensiveweapon', offensiveWeaponImage);
+
     }
 
     const getTileBonus = async (x, y) => {
@@ -2145,6 +2233,18 @@ updateTileMap(); // Refresh map visuals
 
       {tileCoords.occupied &&
  metaMaskAccount &&
+ getAddress(metaMaskAccount) !== tileCoords.occupant && (
+  <div>
+    <button className='card-button' onClick={() => setinteractionMenuTypeA("sendResources")}>
+      Send Resources Here
+    </button>
+  </div>
+)}
+
+
+
+      {tileCoords.occupied &&
+ metaMaskAccount &&
  getAddress(metaMaskAccount) !== tileCoords.occupant &&
  (!tileCoords.clan || !userClan || (
    (() => {
@@ -2302,6 +2402,196 @@ updateTileMap(); // Refresh map visuals
   )}
 </div>
 
+
+
+{interactionMenuTypeA === "sendResources" && (
+  <div className="interaction-menuA">
+    <h4>Send Resources</h4>
+
+    {attackerResources && (
+<>
+
+<div className="card-resource-bar">
+        <div className="resource-item">
+          <img src={foodImage} alt="Food" style={{ width: "20px" }} />
+          <span>{attackerResources.food}</span>
+        </div>
+        <div className="resource-item">
+          <img src={woodImage} alt="Wood" style={{ width: "20px" }} />
+          <span>{attackerResources.wood}</span>
+        </div>
+        <div className="resource-item">
+          <img src={stoneImage} alt="Stone" style={{ width: "20px" }} />
+          <span>{attackerResources.stone}</span>
+        </div>
+        <div className="resource-item">
+          <img src={ironImage} alt="Iron" style={{ width: "20px" }} />
+          <span>{attackerResources.iron}</span>
+        </div>
+
+        
+      </div>
+
+<div
+style={{
+    marginBottom: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px',
+    justifyContent: 'center',
+}}
+>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={offensiveArmorImage} alt="Offensive Armor" style={{ width: '20px' }} />
+    <span>{attackerResources.offensiveArmor}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={defensiveArmorImage} alt="Defensive Armor" style={{ width: '20px' }} />
+    <span>{attackerResources.defensiveArmor}</span>
+</div>
+
+
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={offensiveWeaponImage} alt="Offensive Weapon" style={{ width: '20px' }} />
+    <span>{attackerResources.offensiveWeapon}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={defensiveWeaponImage} alt="Defensive Weapon" style={{ width: '20px' }} />
+    <span>{attackerResources.defensiveWeapon}</span>
+</div>
+
+
+
+</div>
+
+</>
+)}
+
+
+
+
+
+
+
+
+    <div style={{ textAlign: 'center', marginBottom: '10px', fontWeight: '400' }}>
+  Target Land: ({tileCoords.x}, {tileCoords.y})
+</div>
+
+{attackDistance !== null && (
+  <div style={{ textAlign: 'center', marginBottom: '10px', fontWeight: '400' }}>
+    Distance: {attackDistance} units
+  </div>
+)}
+
+
+    <div>
+      <label>Resource Type: </label>
+      <select className="medieval-select" value={sendResourceType} onChange={(e) => setSendResourceType(e.target.value)}>
+        <option value="1">Food</option>
+        <option value="2">Wood</option>
+        <option value="3">Stone</option>
+        <option value="4">Iron</option>
+        <option value="5">Offensive Armor</option>
+        <option value="6">Defensive Armor</option>
+        <option value="7">Offensive Weapon</option>
+        <option value="8">Defensive Weapon</option>
+      </select>
+    </div>
+    <div style={{ marginTop: '10px', marginBottom: '20px' }}>
+      <label>Amount: </label>
+      <input
+  type="number"
+  className='fancy-input'
+  value={sendResourceAmount}
+  onChange={(e) => {
+    const amount = e.target.value;
+    setSendResourceAmount(amount);
+
+    if (!isNaN(amount) && attackDistance !== null) {
+      const distance = attackDistance;
+      const lopCost = 100 * 10 ** 6 * distance;
+      const resourceCost = Math.floor((distance * parseInt(amount)) / 30);
+
+      setSendResourceLOPCost(lopCost);
+      setSendResourceCost(resourceCost);
+    } else {
+      setSendResourceLOPCost(null);
+      setSendResourceCost(null);
+    }
+  }}
+  min={30}
+  placeholder="Min: 30"
+/>
+
+
+    </div>
+    {hasMarketplace ? (
+  <button
+    className="card-button"
+    onClick={async () => {
+      try {
+        setLoading(true);
+        const signerMarket = await getMarketplaceSignerContract();
+        const tokenContract = await getTokenSignerContract();
+        const fromX = attackerTileCoords.x;
+        const fromY = attackerTileCoords.y;
+        const toX = tileCoords.x - 1;
+        const toY = tileCoords.y - 1;
+        const amount = parseInt(sendResourceAmount);
+        const distance = Math.abs(fromX - toX) + Math.abs(fromY - toY);
+        const lopFee = 100 * 10 ** 6 * distance;
+
+        const approveTx = await tokenContract.increaseAllowance(signerMarket.target, lopFee);
+        await approveTx.wait();
+
+        const tx = await signerMarket.sendResources(fromX, fromY, toX, toY, parseInt(sendResourceType), amount);
+        await tx.wait();
+
+        toast.success("Resources sent!");
+        setinteractionMenuTypeA("");
+      } catch (err) {
+        console.error("Send failed:", err);
+        toast.error("Sending failed: " + (err.reason || err.message));
+      } finally {
+        setLoading(false);
+      }
+    }}
+    disabled={!sendResourceAmount || parseInt(sendResourceAmount) < 30}
+  >
+    Confirm Send
+  </button>
+) : (
+  <button className="card-button" disabled>
+    Need Marketplace to send resources
+  </button>
+)}
+
+    &nbsp;
+    <button
+      className="card-button"
+      onClick={() => setinteractionMenuTypeA("")}
+    >
+      Cancel
+    </button>
+
+    {sendResourceLOPCost !== null && (
+  <div style={{ textAlign: 'center', marginTop: '10px', fontWeight: '400' }}>
+    Required LOP Tokens: {sendResourceLOPCost / 10 ** 6}
+  </div>
+)}
+
+{sendResourceLOPCost !== null && sendResourceCost !== null && (
+  <div style={{ textAlign: 'center', marginTop: '10px', fontWeight: '400' }}>
+    Required {getResourceName(sendResourceType)}: {sendResourceAmount} + {sendResourceCost} (Sending Cost) = {parseInt(sendResourceAmount) + parseInt(sendResourceCost)} <br />
+    Remaining {getResourceName(sendResourceType)}: {getRemainingAmount(sendResourceType)} 
+  </div>
+)}
+
+
+
+  </div>
+)}
 
 
 
