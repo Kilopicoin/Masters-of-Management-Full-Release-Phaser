@@ -498,7 +498,6 @@ useEffect(() => {
   const fetchLeaderboardData = async () => {
       try {
           setLoading(true);
-          const TileMap = await getSignerContract(); // This holds ownership info
           const Land = await getTheLandSignerContract();
           const Clan = await getclanSignerContract();
   
@@ -506,10 +505,9 @@ useEffect(() => {
   
           for (let x = 0; x < 20; x++) {
               for (let y = 0; y < 20; y++) {
-                  const tileStats = await Land.getTileData(x, y);
-                  const points = parseInt(tileStats.points.toString());
+                  const tilePoints = await Land.pointsByCoords(x, y);
+                  const points = parseInt(tilePoints.toString());
                   if (points > 0) {
-                      const occupant = await TileMap.getTileOccupant(x, y);
                       const name = await Clan.getTileName(x, y);
                       const clan = await Clan.getTileClan(x, y);
                       const clanNo = parseInt(clan) - 1;
@@ -524,10 +522,8 @@ useEffect(() => {
                       tiles.push({
                           x: x + 1,
                           y: y + 1,
-                          occupant,
                           name,
                           clanName,
-                          level: tileStats.level.toString(),
                           points,
                       });
                   }
@@ -904,6 +900,7 @@ const landContract = await getTheLandSignerContract();
 const tileData = await landContract.getTileData(x, y);
 
 const totalPoints = Number(tileData.points);
+const tileLevel = Number(tileData.level);
 
 
 let clanInfo = null;
@@ -962,6 +959,7 @@ const twitterHandle = await clanContract.getTwitterHandle(occupant);
                   tileName: tileName && tileName.trim().length > 0 ? tileName : null,
                   points: totalPoints,
                   twitterHandle: twitterHandle || null,
+                  level: tileLevel
                 });
 
 
@@ -2066,7 +2064,9 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
   <p><strong>Points</strong>: {tileCoords.points}</p>
 )}
 
-
+{tileCoords.level !== undefined && (
+  <p><strong>Level</strong>: {tileCoords.level}</p>
+)}
 
   {tileCoords.clan ? (
     <>
@@ -3190,9 +3190,7 @@ style={{
                         <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Realm</th>
                         <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Clan</th>
                         <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Coords</th>
-                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Level</th>
                         <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Points</th>
-                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Occupant</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -3202,11 +3200,7 @@ style={{
                             <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.name || "Unnamed"}</td>
                             <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.clanName || "None"}</td>
                             <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.x},{item.y}</td>
-                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.level}</td>
                             <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.points}</td>
-                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>
-                                {item.occupant.slice(0, 6)}...{item.occupant.slice(-4)}
-                            </td>
                         </tr>
                     ))}
                 </tbody>
