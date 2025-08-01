@@ -124,18 +124,24 @@ const createTwitterStoryShareLink = (log, defenderHandle = null) => {
   const attackerCoords = `(${Number(log.attackerX) + 1},${Number(log.attackerY) + 1})`;
   const defenderCoords = `(${Number(log.defenderX) + 1},${Number(log.defenderY) + 1})`;
 
-  const attackerArmy = `${log.atkOffSoldier} OffensiveSoldier and ${log.atkDefSoldier} DefensiveSoldier`;
-  const defenderArmy = `${log.defOffSoldier} OffensiveSoldier and ${log.defDefSoldier} DefensiveSoldier`;
+  const attackerArmy = `${log.attackerSoldiers} Soldiers`;
+  const defenderArmy = `${log.defenderSoldiers} Soldiers`;
 
   const result = log.attackerWon ? "🔥 I claimed victory!" : "🛡️ The defender held strong!";
 
-  const defenderMention = defenderHandle ? `@${defenderHandle}` : `an unknown warrior`;
+  const resources = `${log.resourcesStolen}`;
+
+  const defenderMention = (typeof defenderHandle === 'string' && defenderHandle.trim() !== '')
+  ? `@${defenderHandle}`
+  : 'an unknown warrior';
+
   const gameUrl = "https://kilopi.net/mom/full/"; // Replace with your real URL
   const tutorialUrl = "https://youtu.be/rSffsKpfmDQ?si=_8EsxA-MNu3a-EEK"; // Replace with your real URL
 
-  const tweet = `I ${attackerCoords} attacked ${defenderMention} at ${defenderCoords} \nwith ${attackerArmy}\n` +
-                `\nDefender had \n${defenderArmy}\n` +
-                `\nResult: ${result}\n\n` +
+  const tweet = `I ${attackerCoords} attacked ${defenderMention} at ${defenderCoords} with ${attackerArmy}\n` +
+                `\nDefender had ${defenderArmy}\n` +
+                `\nResult: ${result}\n` +
+                `\nI stole ${resources} resources\n\n` +
                 `🌍 Join the competition: ${gameUrl}\n📺 Tutorial: ${tutorialUrl}`;
 
   return `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`;
@@ -284,7 +290,8 @@ const handleConfirmAttack = async () => {
     const defenderAddress = await getContract().then(c => c.getTileOccupant(dx, dy));
 const defenderHandleX = await getclanSignerContract().then(c => c.getTwitterHandle(defenderAddress));
 
-setdefenderHandle([defenderHandleX]);
+setdefenderHandle(defenderHandleX);
+
 
     // Update state and show result
     setWarLogsData([latest]); // show only this result
@@ -2625,15 +2632,14 @@ updateTileMap(); // Refresh map visuals
         <thead>
   <tr style={{ backgroundColor: '#6c757d' }}>
     <th>Attacker</th>
-    <th>Offensive Soldiers</th>
-    <th>Defensive Soldiers</th>
-    <th>Attack Tech</th>
+    <th>Attacker Power</th>
+    <th>Attacker Soldiers</th>
     <th>Defender</th>
-    <th>Offensive Soldiers</th>
-    <th>Defensive Soldiers</th>
-    <th>Defensive Tech</th>
+    <th>Defender Power</th>
+    <th>Defender Soldiers</th>
     <th>Date</th>
     <th>Result</th>
+    <th>Resources Stolen</th>
     
     
   </tr>
@@ -2642,15 +2648,14 @@ updateTileMap(); // Refresh map visuals
   {warLogsData.map((item, index) => (
     <tr key={index}>
       <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-      <td>{item.atkOffSoldier?.toString()}</td>
-      <td>{item.atkDefSoldier?.toString()}</td>
-      <td>{item.atkTech?.toString()}</td>
+      <td>{item.attackerPower?.toString()}</td>
+      <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()} </td>
       <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-      <td>{item.defOffSoldier?.toString()}</td>
-      <td>{item.defDefSoldier?.toString()}</td>
-      <td>{item.defTech?.toString()}</td>
+      <td>{item.defenderPower?.toString()}</td>
+      <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()} </td>
       <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
       <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      <td>{item.resourcesStolen?.toString()}</td>
       
       
     </tr>
@@ -2691,30 +2696,30 @@ updateTileMap(); // Refresh map visuals
         <thead>
   <tr style={{ backgroundColor: '#6c757d' }}>
     <th>Attacker</th>
-    <th>Offensive Soldiers</th>
-    <th>Defensive Soldiers</th>
-    <th>Offensive Tech</th>
+    <th>Attacker Power</th>
+    <th>Attacker Soldiers</th>
     <th>Defender</th>
-    <th>Offensive Soldiers</th>
-    <th>Defensive Soldiers</th>
-    <th>Defensive Tech</th>
+    <th>Defender Power</th>
+    <th>Defender Soldiers</th>
     <th>Date</th>
     <th>Result</th>
+    <th>Resources Stolen</th>
+    
+    
   </tr>
 </thead>
 <tbody>
   {warLogsData.map((item, index) => (
     <tr key={index}>
       <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-      <td>{item.atkOffSoldier?.toString()}</td>
-      <td>{item.atkDefSoldier?.toString()}</td>
-      <td>{item.atkTech?.toString()}</td>
+      <td>{item.attackerPower?.toString()}</td>
+      <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()} </td>
       <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-      <td>{item.defOffSoldier?.toString()}</td>
-      <td>{item.defDefSoldier?.toString()}</td>
-      <td>{item.defTech?.toString()}</td>
+      <td>{item.defenderPower?.toString()}</td>
+      <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()} </td>
       <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
       <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      <td>{item.resourcesStolen?.toString()}</td>
       
       
     </tr>
@@ -2756,30 +2761,30 @@ updateTileMap(); // Refresh map visuals
         <thead>
   <tr style={{ backgroundColor: '#6c757d' }}>
     <th>Attacker</th>
-    <th>Offensive Soldiers</th>
-    <th>Defensive Soldiers</th>
-    <th>Offensive Tech</th>
+    <th>Attacker Power</th>
+    <th>Attacker Soldiers</th>
     <th>Defender</th>
-    <th>Offensive Soldiers</th>
-    <th>Defensive Soldiers</th>
-    <th>Defensive Tech</th>
+    <th>Defender Power</th>
+    <th>Defender Soldiers</th>
     <th>Date</th>
     <th>Result</th>
+    <th>Resources Stolen</th>
+    
+    
   </tr>
 </thead>
 <tbody>
   {warLogsData.map((item, index) => (
     <tr key={index}>
       <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-      <td>{item.atkOffSoldier?.toString()}</td>
-      <td>{item.atkDefSoldier?.toString()}</td>
-      <td>{item.atkTech?.toString()}</td>
+      <td>{item.attackerPower?.toString()}</td>
+      <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()} </td>
       <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-      <td>{item.defOffSoldier?.toString()}</td>
-      <td>{item.defDefSoldier?.toString()}</td>
-      <td>{item.defTech?.toString()}</td>
+      <td>{item.defenderPower?.toString()}</td>
+      <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()} </td>
       <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
       <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      <td>{item.resourcesStolen?.toString()}</td>
       
       
     </tr>
