@@ -96,6 +96,9 @@ const [isMusicPlaying, setIsMusicPlaying] = useState(false);
 const [defenderCooldownTurnsLeft, setDefenderCooldownTurnsLeft] = useState(null);
 const [selectedInteriorCoords, setSelectedInteriorCoords] = useState(null);
 
+const [ResourceReceivedMessage, setResourceReceivedMessage] = useState('');
+const [ResourceReceived, setResourceReceived] = useState(false);
+
 
 const [musicOnce, setmusicOnce] = useState(false);
     const [armorCosts, setArmorCosts] = useState({
@@ -413,6 +416,8 @@ const fetchAllClans = async () => {
     }
 };
 
+
+
 const fetchPendingInvite = async () => {
     try {
         const contract = await getclanSignerContract();
@@ -433,12 +438,70 @@ const fetchPendingInvite = async () => {
     }
 };
 
+const fetchResourceMessage = useCallback(async () => {
+    try {
+        const landContract = await getTheLandSignerContract();
+        const messageX = await landContract.resourceMessage(tileCoords.x - 1, tileCoords.y - 1);
+
+        if (messageX) {
+            const marketContract = await getMarketplaceSignerContract();
+            const messageC = await marketContract.resourceMessages(tileCoords.x - 1, tileCoords.y - 1);
+            const fromx = (parseInt(messageC.fromX) + 1).toString();
+            const fromy = (parseInt(messageC.fromY) + 1).toString();
+            const resourcetype = (messageC.resourceType).toString();
+            const amount = (messageC.amount).toString();
+
+            let resourceT = "";
+
+            switch (resourcetype) {
+        case "1":
+            resourceT = "Food";
+            break;
+        case "2":
+            resourceT = "Wood";
+            break;
+        case "3":
+            resourceT = "Stone";
+            break;
+        case "4":
+            resourceT = "Iron";
+            break;
+            case "5":
+            resourceT = "Offensive Armor";
+            break;
+        case "6":
+            resourceT = "Defensive Armor";
+            break;
+        case "7":
+            resourceT = "Offensive Weapon";
+            break;
+        case "8":
+            resourceT = "Defensive Weapon";
+            break;
+        default:
+            break;
+    }
+
+
+            const message = `Received ${amount} ${resourceT} from ${fromx},${fromy}`;
+            setResourceReceivedMessage(message);
+            setResourceReceived(true);
+
+        }
+
+   
+    } catch (error) {
+        console.error("Error fetching resource receive:", error);
+    }
+}, [tileCoords.x, tileCoords.y]);
+
 
 useEffect(() => {
     if (metaMaskAccount) {
         fetchPendingInvite();
+        fetchResourceMessage();
     }
-}, [metaMaskAccount]);
+}, [metaMaskAccount, fetchResourceMessage]);
 
 const checkUserClan = useCallback(async () => {
     try {
@@ -1734,6 +1797,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
         console.error("Error using turns:", error);
         toast.error("Failed to use turns. Please try again.");
     } finally {
+        setResourceReceived(false);
         setLoading(false);
     }
 };
@@ -1996,7 +2060,13 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 )}
 
 
-
+{ResourceReceived && (
+<>
+<div style={{ marginTop: '15px', textAlign: 'center' }}>
+        <p style={{ color: '#52bd2fff' }}><strong>{ResourceReceivedMessage}</strong></p>
+</div>
+</>
+)}
 
 
         {pendingInviteClanId && (
