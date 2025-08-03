@@ -24,6 +24,8 @@ import turnsImage from './assets/res/turns.png';
 import playIcon from './assets/play-icon.png';
 import stopIcon from './assets/stop-icon.png';
 
+import clockLoadingImage from './assets/clock-loading.gif';
+
 import defensiveArmorImage from './assets/armors/defensive.png';
 import offensiveArmorImage from './assets/armors/offensive.png';
 
@@ -51,6 +53,7 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     const [interactionMenuType, setinteractionMenuType] = useState("home");
     const buildingPreviewRef = useRef(null);
     const [loading, setLoading] = useState(true); // New state for loading
+    const [loadingTurns, setLoadingTurns] = useState(false);
     const [tileData, setTileData] = useState(null); // For storing tile data (food, wood, stone, iron, level)
     const mapSize = 9;
     const turnsPerLevel = 1000;
@@ -95,6 +98,9 @@ const musicRef2 = useRef(null);
 const [isMusicPlaying, setIsMusicPlaying] = useState(false);
 const [defenderCooldownTurnsLeft, setDefenderCooldownTurnsLeft] = useState(null);
 const [selectedInteriorCoords, setSelectedInteriorCoords] = useState(null);
+
+const [ResourceReceivedMessage, setResourceReceivedMessage] = useState('');
+const [ResourceReceived, setResourceReceived] = useState(false);
 
 
 const [musicOnce, setmusicOnce] = useState(false);
@@ -275,15 +281,24 @@ useEffect(() => {
 
 const handleSetClanFlag = async (tokenId) => {
   try {
+    setLoading(true);
+
+    const TokenContract = await getTokenSignerContract();
+        const approvalTx = await TokenContract.increaseAllowance(clancontractAddress, 10000 * 10 ** 6);
+        await approvalTx.wait();
+
+        
     const clanContract = await getclanSignerContract();
     const tx = await clanContract.setClanFlag(userClan, tokenId);
 
     await tx.wait();
     toast.success("Clan flag set!");
     setShowFlagSelector(false);
+    setLoading(false);
   } catch (err) {
     console.error("Failed to set clan flag", err);
     toast.error("Failed to set flag");
+    setLoading(false);
   }
 };
 
@@ -331,7 +346,7 @@ const fetchFlagNFTs = async () => {
     setShowFlagSelector(true);
   } catch (err) {
     console.error("Failed to fetch flag NFTs", err);
-    toast.error("Failed to load your NFTs from collection 1");
+    toast.error("Error getting NFTs from Kilopi NFT Market Collection id 1");
   }
 };
 
@@ -404,6 +419,8 @@ const fetchAllClans = async () => {
     }
 };
 
+
+
 const fetchPendingInvite = async () => {
     try {
         const contract = await getclanSignerContract();
@@ -424,12 +441,70 @@ const fetchPendingInvite = async () => {
     }
 };
 
+const fetchResourceMessage = useCallback(async () => {
+    try {
+        const landContract = await getTheLandSignerContract();
+        const messageX = await landContract.resourceMessage(tileCoords.x - 1, tileCoords.y - 1);
+
+        if (messageX) {
+            const marketContract = await getMarketplaceSignerContract();
+            const messageC = await marketContract.resourceMessages(tileCoords.x - 1, tileCoords.y - 1);
+            const fromx = (parseInt(messageC.fromX) + 1).toString();
+            const fromy = (parseInt(messageC.fromY) + 1).toString();
+            const resourcetype = (messageC.resourceType).toString();
+            const amount = (messageC.amount).toString();
+
+            let resourceT = "";
+
+            switch (resourcetype) {
+        case "1":
+            resourceT = "Food";
+            break;
+        case "2":
+            resourceT = "Wood";
+            break;
+        case "3":
+            resourceT = "Stone";
+            break;
+        case "4":
+            resourceT = "Iron";
+            break;
+            case "5":
+            resourceT = "Offensive Armor";
+            break;
+        case "6":
+            resourceT = "Defensive Armor";
+            break;
+        case "7":
+            resourceT = "Offensive Weapon";
+            break;
+        case "8":
+            resourceT = "Defensive Weapon";
+            break;
+        default:
+            break;
+    }
+
+
+            const message = `Received ${amount} ${resourceT} from ${fromx},${fromy}`;
+            setResourceReceivedMessage(message);
+            setResourceReceived(true);
+
+        }
+
+   
+    } catch (error) {
+        console.error("Error fetching resource receive:", error);
+    }
+}, [tileCoords.x, tileCoords.y]);
+
 
 useEffect(() => {
     if (metaMaskAccount) {
         fetchPendingInvite();
+        fetchResourceMessage();
     }
-}, [metaMaskAccount]);
+}, [metaMaskAccount, fetchResourceMessage]);
 
 const checkUserClan = useCallback(async () => {
     try {
@@ -455,6 +530,9 @@ const checkUserClan = useCallback(async () => {
         toast.error("Failed to fetch clan information.");
     }
 }, []);
+
+
+
 
 const createClan = async () => {
     if (!newClanName || newClanName.trim() === "") {
@@ -656,7 +734,7 @@ const calculateWeaponCost = useCallback((weaponType, quantity) => {
         : { food: 150, wood: 200, stone: 100, iron: 250 }; // Base costs for defensive armor
 
     // Adjust the cost if armories exist
-    const blacksmithCount = 1; // You may want to dynamically calculate this based on your interior map data
+    const blacksmithCount = buildingCounts[2] || 1;
     const multiplier = quantity / blacksmithCount;
 
     return {
@@ -665,7 +743,7 @@ const calculateWeaponCost = useCallback((weaponType, quantity) => {
         stone: Math.ceil(baseCost.stone * multiplier),
         iron: Math.ceil(baseCost.iron * multiplier),
     };
-}, [tileData]);
+}, [tileData, buildingCounts]);
 
 
 const calculateSoldierCost = useCallback((soldierType, quantity) => {
@@ -676,7 +754,7 @@ const calculateSoldierCost = useCallback((soldierType, quantity) => {
         : { food: 400, wood: 200, stone: 150, iron: 100 }; // Base costs for defensive soldier
 
     // Adjust cost if a Fighting Pit exists
-    const fightingPitCount = 1; // Replace this with dynamic logic if needed
+    const fightingPitCount = buildingCounts[4] || 1;
     const multiplier = quantity / fightingPitCount;
 
     return {
@@ -685,7 +763,7 @@ const calculateSoldierCost = useCallback((soldierType, quantity) => {
         stone: Math.ceil(baseCost.stone * multiplier),
         iron: Math.ceil(baseCost.iron * multiplier),
     };
-}, [tileData]);
+}, [tileData, buildingCounts]);
 
 
 
@@ -851,7 +929,7 @@ const fetchTileTurns = async (x, y) => {
         const updatedTurnsX = await contract.getTurn(x - 1, y - 1); // Fetch real-time turns
         const updatedTurns = updatedTurnsX.toString();
 
-        console.log(updatedTurns)
+
 
         setTileData((prev) => ({
             ...prev,
@@ -873,9 +951,42 @@ const fetchMarketplaceItemsByType = async () => {
         const contract = await getMarketplaceSignerContract();
         const items = await contract.getListingsByResourceType(selectedResourceType); // Fetch only selected category
 
+        let restype = '';
+
+
+            switch (selectedResourceType) {
+        case "1":
+            restype = 'Food';
+            break;
+        case "2":
+            restype = 'Wood';
+            break;
+        case "3":
+            restype = 'Stone';
+            break;
+        case "4":
+            restype = 'Iron';
+            break;
+            case "5":
+            restype = 'Offensive Armor';
+            break;
+            case "6":
+            restype = 'Defensive Armor';
+            break;
+            case "7":
+            restype = 'Offensive Weapon';
+            break;
+            case "8":
+            restype = 'Defensive Weapon';
+            break;
+        default:
+            break;
+    }
+
         const formattedItems = items.map((item, index) => ({
             id: index, // Since we don't store an ID in the contract, use index
             seller: item.seller,
+            resourceTypeX: restype,
             resourceType: item.resourceType.toString(),
             amount: item.amount.toString(),
             price: item.price.toString(),
@@ -896,19 +1007,76 @@ const fetchMarketplaceItemsByType = async () => {
 const listItemForSale = async () => {
     try {
         setLoading(true);
-        const contract = await getMarketplaceSignerContract();
-        const x = tileCoords.x - 1;
-        const y = tileCoords.y - 1;
+        
 
         const resourceType = parseInt(selectedResource);
         const amount = parseInt(sellAmount);
-        const price = parseInt(sellPrice);
+        const price = parseInt(sellPrice) * 10 ** 6;
 
-        if (amount <= 0 || price <= 0) {
-            toast.error("Amount and price must be greater than 0");
+
+        if (resourceType === 1 && tileData.food < amount ) {
+            toast.error("Not Enough Food");
+            setLoading(false);
+            return;
+        } else if (resourceType === 2 && tileData.wood < amount ) {
+            toast.error("Not Enough Wood");
+            setLoading(false);
+            return;
+        } else if (resourceType === 3 && tileData.stone < amount ) {
+            toast.error("Not Enough Stone");
+            setLoading(false);
+            return;
+        } else if (resourceType === 4 && tileData.iron < amount ) {
+            toast.error("Not Enough Iron");
+            setLoading(false);
+            return;
+        } else if (resourceType === 5 && tileData.offensiveArmor < amount ) {
+            toast.error("Not Enough Offensive Armor");
+            setLoading(false);
+            return;
+        } else if (resourceType === 6 && tileData.defensiveArmor < amount ) {
+            toast.error("Not Enough Defensive Armor");
+            setLoading(false);
+            return;
+        } else if (resourceType === 7 && tileData.offensiveWeapon < amount ) {
+            toast.error("Not Enough Offensive Weapon");
+            setLoading(false);
+            return;
+        } else if (resourceType === 8 && tileData.defensiveWeapon < amount ) {
+            toast.error("Not Enough Defensive Weapon");
             setLoading(false);
             return;
         }
+
+
+
+
+        if (resourceType <= 4) {
+
+        if (amount < 10000) {
+            toast.error("Amount must be greater than 10000");
+            setLoading(false);
+            return;
+        } 
+
+        } else {
+
+            if (amount < 100) {
+            toast.error("Amount must be greater than 100");
+            setLoading(false);
+            return;
+        } 
+        }
+
+        if (price < 10000000) {
+            toast.error("Price must be greater than 10");
+            setLoading(false);
+            return;
+        }
+
+const contract = await getMarketplaceSignerContract();
+        const x = tileCoords.x - 1;
+        const y = tileCoords.y - 1;
 
         const tx = await contract.listItemForSale(x, y, resourceType, amount, price);
         await tx.wait();
@@ -939,16 +1107,20 @@ const buyItem = async (item, index) => {
 
 
         const TokencontractSigner = await getTokenSignerContract();
+
+        const value = parseInt(item.price);
+
         
                 const Allowancetx = await TokencontractSigner.increaseAllowance(
                   MarketplacecontractAddress,
-                  item.price
+                  value
                 );
                 await Allowancetx.wait();
 
 
 
         const contract = await getMarketplaceSignerContract();
+
         const tx = await contract.buyItem(
             tileCoords.x - 1,
             tileCoords.y - 1,
@@ -1023,7 +1195,7 @@ setBuildingCounts(updatedCounts);
         } catch (error) {
             console.error('Error placing building:', error);
             onTransactionEnd(false); // Remove the transparent image
-            toast.error('Failed to place building. Please try again.');
+            toast.error('Wrong Location or Not Enough Resources !!!');
             return false; // Indicate failure
         } finally {
             setLoading(false);
@@ -1161,6 +1333,8 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
             this.load.image('defensivesoldier', defensiveSoldierImage);
             this.load.image('offensivesoldier', offensiveSoldierImage);
+
+            this.load.image('clockLoading', clockLoadingImage);
 
         }
 
@@ -1333,6 +1507,8 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                               setinteractionMenuType("buildings");
                           }
                       });
+
+                      
                   }
                 }
             }
@@ -1612,7 +1788,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
         return;
     }
 
-    setLoading(true);
+    setLoadingTurns(true);
 
     try {
         const contract = await getTheLandSignerContract(); // Replace with your function to get a signer instance
@@ -1628,7 +1804,8 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
         console.error("Error using turns:", error);
         toast.error("Failed to use turns. Please try again.");
     } finally {
-        setLoading(false);
+        setResourceReceived(false);
+        setLoadingTurns(false);
     }
 };
 
@@ -1682,6 +1859,47 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 )}
 
             
+
+            {loadingTurns && (
+  <>
+    {/* Dark overlay background */}
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        zIndex: 9999,
+        pointerEvents: 'all',
+      }}
+    />
+
+    {/* Centered animated clock GIF */}
+    <div
+      style={{
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: 10000,
+        textAlign: 'center',
+      }}
+    >
+
+
+      <img
+        src={clockLoadingImage}
+        alt="Using Turns..."
+        style={{ width: 160, height: 160 }}
+      />
+    </div>
+  </>
+)}
+
+
+
 
 <div
     id="interaction-menu"
@@ -1793,12 +2011,12 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
             
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
     Attack: 
-    <span>{tileData ? (parseInt(tileData.offensiveSoldier) + parseInt(tileData.level) + parseInt(tileData.techLevels.offensiveTech)) : 0}</span>
+    <span>{tileData ? ((parseInt(tileData.offensiveSoldier) * 2) + parseInt(tileData.defensiveSoldier) + parseInt(tileData.level) + parseInt(tileData.techLevels.offensiveTech)) : 0}</span>
 </div>
 
 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
     Defense: 
-    <span>{tileData ? (parseInt(tileData.defensiveSoldier) + parseInt(tileData.level) + (parseInt(buildingCounts[7] || 0) * 100)  + parseInt(tileData.techLevels.defensiveTech)) : 0}</span>
+    <span>{tileData ? ((parseInt(tileData.defensiveSoldier) * 2) + parseInt(tileData.offensiveSoldier) + parseInt(tileData.level) + (parseInt(buildingCounts[7] || 0) * 100)  + parseInt(tileData.techLevels.defensiveTech)) : 0}</span>
 </div>
 
             
@@ -1890,7 +2108,13 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 )}
 
 
-
+{ResourceReceived && (
+<>
+<div style={{ marginTop: '15px', textAlign: 'center' }}>
+        <p style={{ color: '#52bd2fff' }}><strong>{ResourceReceivedMessage}</strong></p>
+</div>
+</>
+)}
 
 
         {pendingInviteClanId && (
@@ -1899,18 +2123,31 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
             <button
                 onClick={async () => {
-                    try {
-                        const contract = await getclanSignerContract();
-                        const tx = await contract.acceptInvite();
-                        await tx.wait();
-                        toast.success("Joined the clan!");
-                        await checkUserClan();
-                        await fetchPendingInvite();
-                    } catch (err) {
-                        console.error("Accept failed:", err);
-                        toast.error("Failed to accept invite.");
-                    }
-                }}
+    try {
+        setLoading(true);
+        const contract = await getclanSignerContract();
+        const memberCount = await contract.getClanMemberCount(pendingInviteClanId);
+
+        let toastcontent = '';
+        if (memberCount >= 30) {
+            toastcontent = 'Clan Full, Invitation Removed';
+        } else {
+            toastcontent = 'Joined the Clan';
+        }
+
+        const tx = await contract.acceptInvite();
+        await tx.wait();
+        await checkUserClan();
+        await fetchPendingInvite();
+        toast.info(toastcontent);
+        setLoading(false);
+    } catch (err) {
+        console.error("Accept failed:", err);
+        await fetchPendingInvite();
+        setLoading(false);
+    }
+}}
+
                 style={{ padding: '6px 10px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px' }}
             >
                 Accept
@@ -1918,15 +2155,18 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
             <button
                 onClick={async () => {
                     try {
+                        setLoading(true);
                         const contract = await getclanSignerContract();
                         const tx = await contract.refuseInvite();
                         await tx.wait();
                         toast.info("Invite refused.");
                         setPendingInviteClanId(null);
                         setPendingInviteClanName("");
+                        setLoading(false);
                     } catch (err) {
                         console.error("Refuse failed:", err);
                         toast.error("Failed to refuse invite.");
+                        setLoading(false);
                     }
                 }}
                 style={{ padding: '6px 10px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '5px' }}
@@ -2104,7 +2344,20 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                         backgroundColor: selectedBuilding === building.image ? '#575757ff' : '#3e3e3e',
                         minWidth: '120px',
                     }}
-                    onClick={() => setSelectedBuilding(building.image)}
+                    onClick={() => {
+    // Check limits before selecting
+    if (building.key === "clanhall" && (buildingCounts[3] || 0) >= 1) {
+        toast.error("Clanhall Limit ( Max:1 )");
+        return;
+    }
+    if (building.key === "market" && (buildingCounts[6] || 0) >= 1) {
+        toast.error("Market Limit ( Max:1 )");
+        return;
+    }
+
+    setSelectedBuilding(building.image);
+}}
+
                 >
                     <img
                         src={require(`./assets/buildings/${building.image}.png`)}
@@ -2775,7 +3028,7 @@ style={{
                     ].map((tech) => {
                         // Calculate upgrade costs dynamically
                         const workshopCount = buildingCounts[8] || 1; // Ensure at least 1 workshop exists
-                        const costMultiplier = parseInt(tech.level) + 1;
+                        const costMultiplier = (parseInt(tech.level) + 1) * 2;
                         const foodCost = Math.ceil((140 * costMultiplier) / workshopCount);
                         const woodCost = Math.ceil((120 * costMultiplier) / workshopCount);
                         const stoneCost = Math.ceil((180 * costMultiplier) / workshopCount);
@@ -2783,7 +3036,7 @@ style={{
 
                         return (
                             <div className="tech-item" key={tech.id}>
-                                <strong>{tech.name}:</strong> {tech.level} &nbsp;
+                                <strong>{tech.name}:</strong> {tech.level} / 10000 &nbsp;
                                 <button className='card-button' style={{ marginleft: '15px', marginTop: '15px' }} onClick={() => upgradeTech(tech.id)}>Upgrade</button>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     <img src={foodImage} alt="Food" style={{ width: '20px' }} />
@@ -2858,9 +3111,10 @@ style={{
                             padding: '5px 10px', 
                             borderBottom: '1px solid #ddd'
                         }}>
-                        <span><strong>{item.seller.slice(0, 6)}...</strong></span>
-                        <span>Amount: {item.amount}</span>
-                        <span>Price: {item.price} LOP</span>
+                        <span style={{ paddingLeft: '10px', paddingRight: '10px' }}><strong>{item.seller.slice(0, 4)}...{item.seller.slice(-4)}</strong></span>
+                        <span style={{ paddingLeft: '10px', paddingRight: '10px' }}>Item: {item.resourceTypeX}</span>
+                        <span style={{ paddingLeft: '10px', paddingRight: '10px' }}>Amount: {item.amount}</span>
+                        <span style={{ paddingLeft: '10px', paddingRight: '10px' }}>Price: {item.price / (10 ** 6)} LOP</span>
                         <button 
                             style={{
                                 padding: '5px 10px', 
@@ -2924,8 +3178,42 @@ style={{
                     </div>
                 </div>
 
+<div
+            style={{
+                marginBottom: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '15px',
+                justifyContent: 'center',
+            }}
+          >
+
+          
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={offensiveArmorImage} alt="Offensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.offensiveArmor}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={defensiveArmorImage} alt="Defensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.defensiveArmor}</span>
+</div>
+
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={offensiveWeaponImage} alt="Offensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.offensiveWeapon}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={defensiveWeaponImage} alt="Defensive Armor" style={{ width: '20px' }} />
+    <span>{tileData.defensiveWeapon}</span>
+</div>
+
+
+</div>
+
                 <div className="card-content">
-                    <h4>List an Item for Sale</h4>
+                    <div style={{ fontWeight: '900' }}>List an Item for Sale</div>
+                    <div>min:10.000 for resources - min:100 for equipments</div>
+                    <div>min price: 10 LOP</div>
                     <select className="medieval-select" value={selectedResource} onChange={(e) => setSelectedResource(e.target.value)}>
     <option value="1">Food</option>
     <option value="2">Wood</option>
@@ -2951,7 +3239,7 @@ className='fancy-input'
     value={sellPrice} 
     onChange={(e) => setSellPrice(e.target.value)} 
 />
-
+<div>%10 will be added on top your price for burn mechanism</div>
                     <button className='card-button' onClick={() => listItemForSale()}>
                         List Item for Sale
                     </button>
@@ -2986,9 +3274,49 @@ className='fancy-input'
 
             {showFlagSelector && (
   <div className="interaction-menuA" style={{ minWidth: '900px', maxHeight: '500px', overflowY: 'auto' }}>
-    <h3>Select an NFT as your Clan Flag</h3>
+    <div>Select an NFT as your Clan Flag</div>
+    <div style={{ marginBottom: '10px'}}>Setting a new flag requires 10.000 LOP tokens</div>
     <button className="card-button" onClick={() => setShowFlagSelector(false)}>Cancel</button>
     <div style={{ marginTop: '10px', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+
+
+        {ownedFlagNFTs.length === 0 && (
+            <>
+            <div style={{
+      marginTop: '20px',
+      display: 'flex',
+      justifyContent: 'center', // horizontally center
+      alignItems: 'center',     // vertically center (optional)
+      width: '100%',
+      textAlign: 'center',
+    }}>No NFTS found from Kilopi NFT Marketplace Collection ID:1
+    
+
+   
+
+    
+    </div>
+
+
+     <a
+  href={'https://kilopi.net/nftmarket/'}
+  target="_blank"
+  rel="noopener noreferrer"
+  style={{
+    marginBottom: '20px',
+      display: 'flex',
+      justifyContent: 'center', // horizontally center
+      alignItems: 'center',     // vertically center (optional)
+      width: '100%',
+      textAlign: 'center',
+      color: 'cyan'
+  }}
+>
+  Go to Kilopi NFT Marketplace
+</a>
+</>
+        )}
+
       {ownedFlagNFTs.map(nft => (
         <div key={nft.tokenId} style={{ border: '1px solid #ccc', padding: '5px' }}>
           <img src={nft.imageUrl} alt="nft" width={300} height={300} />
@@ -3051,8 +3379,9 @@ className='fancy-input'
                         marginBottom: '10px'
                     }}
                 >
-                    {loading ? "Creating Clan..." : "Create Clan"}
+                    {loading ? "Creating Clan..." : "Create Clan ( 100.000 LOP )"}
                 </button>
+
             </div>
         )}
 
@@ -3093,43 +3422,42 @@ className='fancy-input'
         <h4 style={{ textAlign: 'center' }}>All Clans</h4>
 
         {allClans.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {/* Header Row */}
-                <div
-                    style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        fontWeight: 'bold',
-                        borderBottom: '1px solid #ccc',
-                        paddingBottom: '6px',
-                    }}
-                >
-                    <span>Name</span>
-                    <span>Leader</span>
-                    <span>Members</span>
-                </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {/* Header Row */}
+        <div
+            style={{
+                display: 'flex',
+                fontWeight: 'bold',
+                borderBottom: '1px solid #ccc',
+                paddingBottom: '6px',
+            }}
+        >
+            <div style={{ flex: 1, textAlign: 'center' }}>Name</div>
+            <div style={{ flex: 1, textAlign: 'center' }}>Leader</div>
+            <div style={{ flex: 1, textAlign: 'center' }}>Members</div>
+        </div>
 
-                {/* Clan Rows */}
-                {allClans.map((clan, index) => (
-                    <div
-                        key={index}
-                        style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            borderBottom: '1px solid #eee',
-                            padding: '4px 0',
-                            fontSize: '14px',
-                        }}
-                    >
-                        <span>{clan.name}</span>
-                        <span>{clan.leader.slice(0, 6)}...{clan.leader.slice(-3)}</span>
-                        <span>{parseInt(clan.memberCount)}/30</span>
-                    </div>
-                ))}
+        {/* Clan Rows */}
+        {allClans.map((clan, index) => (
+            <div
+                key={index}
+                style={{
+                    display: 'flex',
+                    borderBottom: '1px solid #eee',
+                    padding: '4px 0',
+                    fontSize: '14px',
+                }}
+            >
+                <div style={{ flex: 1, textAlign: 'center'}}>{clan.name}</div>
+                <div style={{ flex: 1, textAlign: 'center' }}>{clan.leader.slice(0, 6)}...{clan.leader.slice(-3)}</div>
+                <div style={{ flex: 1, textAlign: 'center' }}>{parseInt(clan.memberCount)}/30</div>
             </div>
-        ) : (
-            <p>No clans found.</p>
-        )}
+        ))}
+    </div>
+) : (
+    <p>No clans found.</p>
+)}
+
 
         <button
             onClick={() => setShowAllClansModal(false)}

@@ -24,6 +24,8 @@ import turnsImage from './assets/res/turns.png';
 import playIcon from './assets/play-icon.png';
 import stopIcon from './assets/stop-icon.png';
 
+import clockLoadingImage from './assets/clock-loading.gif';
+
 import defensiveArmorImage from './assets/armors/defensive.png';
 import offensiveArmorImage from './assets/armors/offensive.png';
 
@@ -51,6 +53,7 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     const [interactionMenuType, setinteractionMenuType] = useState("home");
     const buildingPreviewRef = useRef(null);
     const [loading, setLoading] = useState(true); // New state for loading
+    const [loadingTurns, setLoadingTurns] = useState(false);
     const [tileData, setTileData] = useState(null); // For storing tile data (food, wood, stone, iron, level)
     const mapSize = 9;
     const turnsPerLevel = 1000;
@@ -1293,6 +1296,9 @@ const fetchAllBuildings = async (mainX, mainY) => {
             },
             transparent: true,
             banner: false,
+            dom: {
+    createContainer: true,
+  },
         };
 
         gameRef.current = new Phaser.Game(config);
@@ -1330,6 +1336,8 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
             this.load.image('defensivesoldier', defensiveSoldierImage);
             this.load.image('offensivesoldier', offensiveSoldierImage);
+
+            this.load.image('clockLoading', clockLoadingImage);
 
         }
 
@@ -1502,6 +1510,20 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                               setinteractionMenuType("buildings");
                           }
                       });
+
+                      // Add the DOM element for loading spinner
+  const clockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+    src="${clockLoadingImage}" 
+    style="width:64px; height:64px; display:none; filter: brightness(2.1);" 
+  />
+  `);
+  clockOverlay.setDepth(worldY + 2); // Make sure it's above the elders
+
+  // Save to a ref so we can toggle visibility later
+  gameRef.current.clockOverlay = clockOverlay;
+
+
                   }
                 }
             }
@@ -1770,6 +1792,16 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
     }, [buildingImageMap, tileCoords, placeBuildingOnTile]);
 
     useEffect(() => {
+  if (gameRef.current && gameRef.current.clockOverlay) {
+    const imgEl = gameRef.current.clockOverlay.getChildByName('');
+    if (imgEl) {
+      imgEl.style.display = loadingTurns ? 'block' : 'none';
+    }
+  }
+}, [loadingTurns]);
+
+
+    useEffect(() => {
       // Update the ref whenever `selectedBuilding` changes
       selectedBuildingRef.current = selectedBuilding;
   }, [selectedBuilding]);
@@ -1781,7 +1813,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
         return;
     }
 
-    setLoading(true);
+    setLoadingTurns(true);
 
     try {
         const contract = await getTheLandSignerContract(); // Replace with your function to get a signer instance
@@ -1798,7 +1830,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
         toast.error("Failed to use turns. Please try again.");
     } finally {
         setResourceReceived(false);
-        setLoading(false);
+        setLoadingTurns(false);
     }
 };
 
@@ -1852,6 +1884,11 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 )}
 
             
+
+           
+
+
+
 
 <div
     id="interaction-menu"
