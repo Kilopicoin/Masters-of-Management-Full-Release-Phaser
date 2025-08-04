@@ -25,6 +25,7 @@ import playIcon from './assets/play-icon.png';
 import stopIcon from './assets/stop-icon.png';
 
 import clockLoadingImage from './assets/clock-loading.gif';
+import forgekLoadingImage from './assets/forge-loading.gif';
 
 import defensiveArmorImage from './assets/armors/defensive.png';
 import offensiveArmorImage from './assets/armors/offensive.png';
@@ -54,6 +55,9 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     const buildingPreviewRef = useRef(null);
     const [loading, setLoading] = useState(true); // New state for loading
     const [loadingTurns, setLoadingTurns] = useState(false);
+    const [loadingArmoryForge, setloadingArmoryForge] = useState(false);
+
+
     const [tileData, setTileData] = useState(null); // For storing tile data (food, wood, stone, iron, level)
     const mapSize = 9;
     const turnsPerLevel = 1000;
@@ -603,7 +607,7 @@ const produceArmor = async (armorType, quantity) => {
     }
 
     try {
-        setLoading(true);
+        setloadingArmoryForge(true);
         const contract = await getTheLandSignerContract();
         const tx = await contract.produceArmor(
             tileCoords.x - 1,
@@ -618,7 +622,7 @@ const produceArmor = async (armorType, quantity) => {
         console.error("Error producing armor:", error);
         toast.error("Failed to produce armor. Please try again.");
     } finally {
-        setLoading(false);
+        setloadingArmoryForge(false);
     }
 };
 
@@ -1338,6 +1342,8 @@ const fetchAllBuildings = async (mainX, mainY) => {
             this.load.image('offensivesoldier', offensiveSoldierImage);
 
             this.load.image('clockLoading', clockLoadingImage);
+            this.load.image('forgekLoading', forgekLoadingImage);
+            
 
         }
 
@@ -1436,6 +1442,24 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                                     setinteractionMenuType('armory'); // Set the menu type to armory
                                 }
                             });
+
+
+                            const forgeOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${forgekLoadingImage}" 
+      style="width: 150px; height: 150px; display: none; filter: brightness(1.9); transform: translate(-120px, -80px);" 
+    />
+  `);
+  forgeOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.armoryForgeOverlays) {
+    gameRef.current.armoryForgeOverlays = [];
+  }
+  gameRef.current.armoryForgeOverlays.push(forgeOverlay);
+
+
+
                         } else if (buildingImage === 'blacksmith') {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
@@ -1460,6 +1484,24 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                                     setinteractionMenuType('house-info'); // Set the menu type to train soldiers
                                 }
                             });
+
+
+                            const clockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${clockLoadingImage}" 
+      style="width: 96px; height: 96px; display: none; filter: brightness(2.1); transform: translate(-40px, -10px);" 
+    />
+  `);
+  clockOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.houseClockOverlays) {
+    gameRef.current.houseClockOverlays = [];
+  }
+  gameRef.current.houseClockOverlays.push(clockOverlay);
+
+
+
                         } else if (buildingImage === 'tower') {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
@@ -1515,7 +1557,7 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
   const clockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
     <img 
     src="${clockLoadingImage}" 
-    style="width:64px; height:64px; display:none; filter: brightness(2.1);" 
+    style="width:96px; height:96px; display:none; filter: brightness(2.1); transform: translate(-40px, -10px);" 
   />
   `);
   clockOverlay.setDepth(worldY + 2); // Make sure it's above the elders
@@ -1801,6 +1843,32 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 }, [loadingTurns]);
 
 
+useEffect(() => {
+  if (gameRef.current?.houseClockOverlays) {
+    for (const overlay of gameRef.current.houseClockOverlays) {
+      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+      if (imgEl) {
+        imgEl.style.display = loadingTurns ? 'block' : 'none';
+      }
+    }
+  }
+}, [loadingTurns]);
+
+
+
+useEffect(() => {
+  if (gameRef.current?.armoryForgeOverlays) {
+    for (const overlay of gameRef.current.armoryForgeOverlays) {
+      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+      if (imgEl) {
+        imgEl.style.display = loadingArmoryForge ? 'block' : 'none';
+      }
+    }
+  }
+}, [loadingArmoryForge]);
+
+
+
     useEffect(() => {
       // Update the ref whenever `selectedBuilding` changes
       selectedBuildingRef.current = selectedBuilding;
@@ -1853,6 +1921,12 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                 style={{ width: '100%', height: '100%', position: 'relative', zIndex: 0 }}
             />
 
+            <div
+  style={{
+    pointerEvents: loadingTurns || loadingArmoryForge ? 'none' : 'auto',
+  }}
+>
+
 
 {loading && (
   <>
@@ -1885,7 +1959,9 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 
             
 
-           
+         
+
+
 
 
 
@@ -3644,6 +3720,7 @@ className='fancy-input'
             
         </>
     )}
+            </div>
             </div>
         </div>
     );

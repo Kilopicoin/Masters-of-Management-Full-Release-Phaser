@@ -1296,6 +1296,9 @@ const fetchAllBuildings = async (mainX, mainY) => {
             },
             transparent: true,
             banner: false,
+            dom: {
+    createContainer: true,
+  },
         };
 
         gameRef.current = new Phaser.Game(config);
@@ -1457,6 +1460,24 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                                     setinteractionMenuType('house-info'); // Set the menu type to train soldiers
                                 }
                             });
+
+
+                            const clockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${clockLoadingImage}" 
+      style="width: 96px; height: 96px; display: none; filter: brightness(2.1); transform: translate(-40px, -10px);" 
+    />
+  `);
+  clockOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.houseClockOverlays) {
+    gameRef.current.houseClockOverlays = [];
+  }
+  gameRef.current.houseClockOverlays.push(clockOverlay);
+
+
+
                         } else if (buildingImage === 'tower') {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
@@ -1508,7 +1529,19 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                           }
                       });
 
-                      
+                      // Add the DOM element for loading spinner
+  const clockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+    src="${clockLoadingImage}" 
+    style="width:96px; height:96px; display:none; filter: brightness(2.1); transform: translate(-40px, -10px);" 
+  />
+  `);
+  clockOverlay.setDepth(worldY + 2); // Make sure it's above the elders
+
+  // Save to a ref so we can toggle visibility later
+  gameRef.current.clockOverlay = clockOverlay;
+
+
                   }
                 }
             }
@@ -1777,6 +1810,29 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
     }, [buildingImageMap, tileCoords, placeBuildingOnTile]);
 
     useEffect(() => {
+  if (gameRef.current && gameRef.current.clockOverlay) {
+    const imgEl = gameRef.current.clockOverlay.getChildByName('');
+    if (imgEl) {
+      imgEl.style.display = loadingTurns ? 'block' : 'none';
+    }
+  }
+}, [loadingTurns]);
+
+
+useEffect(() => {
+  if (gameRef.current?.houseClockOverlays) {
+    for (const overlay of gameRef.current.houseClockOverlays) {
+      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+      if (imgEl) {
+        imgEl.style.display = loadingTurns ? 'block' : 'none';
+      }
+    }
+  }
+}, [loadingTurns]);
+
+
+
+    useEffect(() => {
       // Update the ref whenever `selectedBuilding` changes
       selectedBuildingRef.current = selectedBuilding;
   }, [selectedBuilding]);
@@ -1828,6 +1884,12 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                 style={{ width: '100%', height: '100%', position: 'relative', zIndex: 0 }}
             />
 
+            <div
+  style={{
+    pointerEvents: loadingTurns ? 'none' : 'auto',
+  }}
+>
+
 
 {loading && (
   <>
@@ -1860,43 +1922,9 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
 
             
 
-            {loadingTurns && (
-  <>
-    {/* Dark overlay background */}
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        width: '100vw',
-        height: '100vh',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        zIndex: 9999,
-        pointerEvents: 'all',
-      }}
-    />
-
-    {/* Centered animated clock GIF */}
-    <div
-      style={{
-        position: 'fixed',
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        zIndex: 10000,
-        textAlign: 'center',
-      }}
-    >
+         
 
 
-      <img
-        src={clockLoadingImage}
-        alt="Using Turns..."
-        style={{ width: 160, height: 160 }}
-      />
-    </div>
-  </>
-)}
 
 
 
@@ -3655,6 +3683,7 @@ className='fancy-input'
             
         </>
     )}
+            </div>
             </div>
         </div>
     );
