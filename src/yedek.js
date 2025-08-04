@@ -18,12 +18,27 @@ import stopIcon from './assets/stop-icon.png';
 import { getAddress } from 'ethers';
 import TheLand from './theLand';
 import getclanContract, { getclanSignerContract } from './clancontract';
-import { getTheLandSignerContract } from './TheLandContract';
+import getTheLandContract, { getTheLandSignerContract } from './TheLandContract';
 import getNFTContract, { getNFTSignerContract } from './nftContract';
 import getMarketplaceContract, { getMarketplaceSignerContract } from './MarketplaceContract';
 import defensiveSoldierImage from './assets/soldiers/defensive.png';
 import offensiveSoldierImage from './assets/soldiers/offensive.png';
 import { BrowserProvider } from 'ethers';
+
+import foodImage from './assets/res/food.png';
+import woodImage from './assets/res/wood.png';
+import stoneImage from './assets/res/stone.png';
+import ironImage from './assets/res/iron.png';
+
+import defensiveArmorImage from './assets/armors/defensive.png';
+import offensiveArmorImage from './assets/armors/offensive.png';
+
+import defensiveWeaponImage from './assets/weapons/defensive.png';
+import offensiveWeaponImage from './assets/weapons/offensive.png';
+
+import arrowIconImage from './assets/arrowRight.png';
+
+
 
 function App() {
   const gameRef = useRef(null);
@@ -64,6 +79,16 @@ const [warLogsData, setWarLogsData] = useState([]);
 const [defenderHandle, setdefenderHandle] = useState("");
 const [showJournal, setShowJournal] = useState(true);
 
+const [sendResourceAmount, setSendResourceAmount] = useState("");
+const [sendResourceType, setSendResourceType] = useState("1"); // 1 = Food, default
+const [sendResourceLOPCost, setSendResourceLOPCost] = useState(null);
+
+const [sendResourceCost, setSendResourceCost] = useState(null);
+
+const [hasMarketplace, setHasMarketplace] = useState(false);
+
+const arrowRef = useRef(null);
+
 
 
 const urlToKeyMap = useMemo(() => ({
@@ -100,6 +125,102 @@ const urlToKeyMap = useMemo(() => ({
 }), []);
 
 
+
+
+const drawArrowBetweenTiles = (from, to) => {
+  const scene = gameRef.current?.scene.keys.default;
+  if (!scene) return;
+
+  const tileWidth = 386;
+  const visibleTileHeight = 193;
+  const overlap = visibleTileHeight / 2;
+  const halfTileWidth = tileWidth / 2;
+  const offsetX = window.innerWidth / 2;
+
+  const tileToWorldPosition = (x, y) => {
+    const worldX = (x - y) * halfTileWidth + offsetX;
+    const worldY = (x + y) * overlap;
+    return { worldX, worldY };
+  };
+
+  const { worldX: x1, worldY: y1 } = tileToWorldPosition(from.x, from.y);
+  const { worldX: x2, worldY: y2 } = tileToWorldPosition(to.x - 1, to.y - 1); // subtract 1 to match contract coords
+
+  // Remove existing arrow
+  if (arrowRef.current) {
+    arrowRef.current.destroy();
+    arrowRef.current = null;
+  }
+
+  // Create arrow
+  const angle = Phaser.Math.Angle.Between(x1, y1, x2, y2);
+  const distance = Phaser.Math.Distance.Between(x1, y1, x2, y2);
+
+  const arrow = scene.add.image(x1, y1, 'arrowIcon')
+    .setOrigin(0, 0.5)
+    .setRotation(angle)
+    .setDisplaySize(distance, 1000)
+    .setDepth(1000); // on top
+
+  arrowRef.current = arrow;
+};
+
+
+
+
+const checkMarketplacePresence = useCallback(async () => {
+  try {
+    if (!attackerTileCoords.x || !attackerTileCoords.y) return;
+
+    const landContract = await getTheLandContract(); 
+      const hasMarket = await landContract.hasMarket(metaMaskAccount);
+    setHasMarketplace(hasMarket);
+  } catch (err) {
+    console.error("Error checking marketplace presence:", err);
+    setHasMarketplace(false);
+  }
+}, [attackerTileCoords, metaMaskAccount]);
+
+
+
+
+const getResourceName = (type) => {
+  switch (type) {
+    case "1": return "Food";
+    case "2": return "Wood";
+    case "3": return "Stone";
+    case "4": return "Iron";
+    case "5": return "Offensive Armor";
+    case "6": return "Defensive Armor";
+    case "7": return "Offensive Weapon";
+    case "8": return "Defensive Weapon";
+    default: return "Unknown";
+  }
+};
+
+const getRemainingAmount = (type) => {
+  if (!attackerResources) return 0;
+
+  const keyMap = {
+    "1": "food",
+    "2": "wood",
+    "3": "stone",
+    "4": "iron",
+    "5": "offensiveArmor",
+    "6": "defensiveArmor",
+    "7": "offensiveWeapon",
+    "8": "defensiveWeapon"
+  };
+
+  const key = keyMap[type];
+  const currentAmount = attackerResources[key] || 0;
+  const cost = sendResourceCost || 0;
+  return currentAmount - cost - sendResourceAmount;
+};
+
+
+
+
 const handleTwitterConnect = async () => {
   try {
     setLoading(true);
@@ -124,18 +245,24 @@ const createTwitterStoryShareLink = (log, defenderHandle = null) => {
   const attackerCoords = `(${Number(log.attackerX) + 1},${Number(log.attackerY) + 1})`;
   const defenderCoords = `(${Number(log.defenderX) + 1},${Number(log.defenderY) + 1})`;
 
-  const attackerArmy = `${log.atkOffSoldier} OffensiveSoldier and ${log.atkDefSoldier} DefensiveSoldier`;
-  const defenderArmy = `${log.defOffSoldier} OffensiveSoldier and ${log.defDefSoldier} DefensiveSoldier`;
+  const attackerArmy = `${log.attackerSoldiers} Soldiers`;
+  const defenderArmy = `${log.defenderSoldiers} Soldiers`;
 
   const result = log.attackerWon ? "🔥 I claimed victory!" : "🛡️ The defender held strong!";
 
-  const defenderMention = defenderHandle ? `@${defenderHandle}` : `an unknown warrior`;
+  const resources = `${log.resourcesStolen}`;
+
+  const defenderMention = (typeof defenderHandle === 'string' && defenderHandle.trim() !== '')
+  ? `@${defenderHandle}`
+  : 'an unknown warrior';
+
   const gameUrl = "https://kilopi.net/mom/full/"; // Replace with your real URL
   const tutorialUrl = "https://youtu.be/rSffsKpfmDQ?si=_8EsxA-MNu3a-EEK"; // Replace with your real URL
 
-  const tweet = `I ${attackerCoords} attacked ${defenderMention} at ${defenderCoords} \nwith ${attackerArmy}\n` +
-                `\nDefender had \n${defenderArmy}\n` +
-                `\nResult: ${result}\n\n` +
+  const tweet = `I ${attackerCoords} attacked ${defenderMention} at ${defenderCoords} with ${attackerArmy}\n` +
+                `\nDefender had ${defenderArmy}\n` +
+                `\nResult: ${result}\n` +
+                `\nI stole ${resources} resources\n\n` +
                 `🌍 Join the competition: ${gameUrl}\n📺 Tutorial: ${tutorialUrl}`;
 
   return `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`;
@@ -150,7 +277,7 @@ useEffect(() => {
   const twitterHandle = params.get('handle');
 
   if (twitterHandle) {
-    console.log("Redirected back with Twitter handle:", twitterHandle);
+    
     
     
     // Optionally send the handle to the smart contract
@@ -166,16 +293,16 @@ async function sendToSmartContract(twitterHandle) {
   try {
     
 
-    const landContract = await getTheLandSignerContract();
+    const clanContract = await getclanSignerContract();
     
-    const tx = await landContract.setTwitterHandle(twitterHandle);
+    const tx = await clanContract.setTwitterHandle(twitterHandle);
     setLoading(true); // show loader
     await tx.wait();
 
   
 
     toast.success(`Twitter handle @${twitterHandle} saved on-chain!`);
-    console.log('Twitter handle saved on-chain!');
+    
   } catch (error) {
     console.error("Error sending to smart contract:", error);
     toast.error("Failed to save Twitter handle.");
@@ -253,6 +380,13 @@ const handleConfirmAttack = async () => {
     setLoading(true);
     if (!attackerTileCoords || !tileCoords) return;
 
+
+    if (!attackerTroops || attackerTroops.offensiveSoldier < 10) {
+      toast.warn("You need at least 10 Offensive Soldiers to launch an attack.");
+      setLoading(false);
+      return;
+    }
+
     const marketContract = await getMarketplaceSignerContract();
 
     const ax = attackerTileCoords.x;
@@ -275,9 +409,10 @@ const handleConfirmAttack = async () => {
     const latest = updatedLogs[updatedLogs.length - 1];
 
     const defenderAddress = await getContract().then(c => c.getTileOccupant(dx, dy));
-const defenderHandleX = await getTheLandSignerContract().then(c => c.getTwitterHandle(defenderAddress));
+const defenderHandleX = await getclanSignerContract().then(c => c.getTwitterHandle(defenderAddress));
 
-setdefenderHandle([defenderHandleX]);
+setdefenderHandle(defenderHandleX);
+
 
     // Update state and show result
     setWarLogsData([latest]); // show only this result
@@ -299,37 +434,36 @@ const fetchAttackerResources = useCallback(async () => {
     const landContract = await getTheLandSignerContract();
     const { x, y } = attackerTileCoords;
     const data = await landContract.getTileData(x, y);
+
     setAttackerResources({
       food: Number(data.food),
       wood: Number(data.wood),
       stone: Number(data.stone),
       iron: Number(data.iron),
+      offensiveArmor: Number(data.offensiveArmor),
+      defensiveArmor: Number(data.defensiveArmor),
+      offensiveWeapon: Number(data.offensiveWeapon),
+      defensiveWeapon: Number(data.defensiveWeapon),
     });
 
+    // Optional: cooldown logic
     const marketContract = await getMarketplaceSignerContract();
-
-    const attTurnsUsedRaw = await landContract.getTotalTurnsUsedByTile(attackerTileCoords.x, attackerTileCoords.y);
-const attTurnsUsed = parseInt(attTurnsUsedRaw.toString());
-
-const lastAttRaw = await marketContract.lastAttackTurn(attackerTileCoords.x, attackerTileCoords.y);
-const lastAtt = parseInt(lastAttRaw.toString());
-
-const cooldown = 300;
-
-if (attTurnsUsed < lastAtt + cooldown) {
-  const turnsLeft = (lastAtt + cooldown) - attTurnsUsed;
-  setAttackCooldownMessageX(`Attacker Cooldown (${turnsLeft} turns left)`);
-  return;
-}
-
-
-
-
+    const attTurnsUsedRaw = await landContract.getTotalTurnsUsedByTile(x, y);
+    const lastAttRaw = await marketContract.lastAttackTurn(x, y);
+    const attTurnsUsed = parseInt(attTurnsUsedRaw.toString());
+    const lastAtt = parseInt(lastAttRaw.toString());
+    const cooldown = 300;
+    if (attTurnsUsed < lastAtt + cooldown) {
+      setAttackCooldownMessageX(`Attacker Cooldown (${(lastAtt + cooldown) - attTurnsUsed} turns left)`);
+    }
   } catch (err) {
     console.error("Error fetching attacker's resources", err);
     setAttackerResources(null);
   }
 }, [attackerTileCoords]);
+
+
+
 
 const calculateAttackCost = useCallback(async (targetX, targetY) => {
   if (attackerTileCoords.x === null || attackerTileCoords.y === null) return;
@@ -341,13 +475,13 @@ const calculateAttackCost = useCallback(async (targetX, targetY) => {
 
   const distance = Math.abs(ax - dx) + Math.abs(ay - dy);
    setAttackDistance(distance);
-  const ATTACK_COST_FACTOR = 10;
+  const ATTACK_COST_FACTOR = 100;
 
   const landContract = await getTheLandSignerContract();
   const tileData = await landContract.getTileData(ax, ay);
   const offensiveSoldier = Number(tileData.offensiveSoldier);
   const defensiveSoldier = Number(tileData.defensiveSoldier);
-console.log(ax, ay, dx, dy)
+
   const totalCost = ATTACK_COST_FACTOR * distance * (offensiveSoldier + defensiveSoldier);
 
   setAttackCost({
@@ -370,6 +504,7 @@ const fetchAttackerMilitary = useCallback(async () => {
       offensiveSoldier: Number(data.offensiveSoldier),
       defensiveSoldier: Number(data.defensiveSoldier),
       offensiveTech: Number(data.offensiveTech),
+      level: Number(data.level)
     };
   } catch (err) {
     console.error("Error fetching attacker's soldier data", err);
@@ -412,7 +547,6 @@ useEffect(() => {
   const fetchLeaderboardData = async () => {
       try {
           setLoading(true);
-          const TileMap = await getSignerContract(); // This holds ownership info
           const Land = await getTheLandSignerContract();
           const Clan = await getclanSignerContract();
   
@@ -420,10 +554,9 @@ useEffect(() => {
   
           for (let x = 0; x < 20; x++) {
               for (let y = 0; y < 20; y++) {
-                  const tileStats = await Land.getTileData(x, y);
-                  const points = parseInt(tileStats.points.toString());
+                  const tilePoints = await Land.pointsByCoords(x, y);
+                  const points = parseInt(tilePoints.toString());
                   if (points > 0) {
-                      const occupant = await TileMap.getTileOccupant(x, y);
                       const name = await Clan.getTileName(x, y);
                       const clan = await Clan.getTileClan(x, y);
                       const clanNo = parseInt(clan) - 1;
@@ -438,10 +571,8 @@ useEffect(() => {
                       tiles.push({
                           x: x + 1,
                           y: y + 1,
-                          occupant,
                           name,
                           clanName,
-                          level: tileStats.level.toString(),
                           points,
                       });
                   }
@@ -486,22 +617,37 @@ useEffect(() => {
   }, [metaMaskAccount]);
   
 useEffect(() => {
-  if (interactionMenuTypeA === "attackMenu") {
+  if (interactionMenuTypeA === "attackMenu" || interactionMenuTypeA === "sendResources") {
     fetchAttackerMilitary().then(data => {
       setAttackerTroops(data);
       // Calculate attacker power using the same formula as in the contract
-      console.log((data.offensiveSoldier * 2), (data.defensiveSoldier * 1), (data.offensiveTech + 1))
-      const calculatedPower = (data.offensiveSoldier * 2) + (data.defensiveSoldier * 1) + (data.offensiveTech + 1);
+      const calculatedPower = (data.offensiveSoldier * 2) + (data.defensiveSoldier) + (data.offensiveTech) + (data.level);
       setAttackerPower(calculatedPower);
     });
     fetchAttackerResources();
     if (tileCoords.x !== null && tileCoords.y !== null) {
       calculateAttackCost(tileCoords.x, tileCoords.y);
     }
+
+if (interactionMenuTypeA === "sendResources") {
+      checkMarketplacePresence(); // ✅ safe to call now
+      drawArrowBetweenTiles(attackerTileCoords, tileCoords);
+    }
+
+    
   }
-}, [interactionMenuTypeA, fetchAttackerMilitary, calculateAttackCost, fetchAttackerResources, tileCoords]);
+}, [interactionMenuTypeA, fetchAttackerMilitary, calculateAttackCost, fetchAttackerResources, tileCoords, checkMarketplacePresence, attackerTileCoords]);
 
 
+useEffect(() => {
+  if (interactionMenuTypeA !== "sendResources") {
+    // Cleanup arrow when leaving "sendResources"
+    if (arrowRef.current) {
+      arrowRef.current.destroy();
+      arrowRef.current = null;
+    }
+  }
+}, [interactionMenuTypeA]);
 
 
 
@@ -813,6 +959,7 @@ const landContract = await getTheLandSignerContract();
 const tileData = await landContract.getTileData(x, y);
 
 const totalPoints = Number(tileData.points);
+const tileLevel = Number(tileData.level);
 
 
 let clanInfo = null;
@@ -856,7 +1003,7 @@ if (occupantPendingClanId > 0) {
           bonusTypeX = 'None';
       }
 
-const twitterHandle = await landContract.getTwitterHandle(occupant);
+const twitterHandle = await clanContract.getTwitterHandle(occupant);
 
                 setTileCoords({
                   x: x + 1,
@@ -871,6 +1018,7 @@ const twitterHandle = await landContract.getTwitterHandle(occupant);
                   tileName: tileName && tileName.trim().length > 0 ? tileName : null,
                   points: totalPoints,
                   twitterHandle: twitterHandle || null,
+                  level: tileLevel
                 });
 
 
@@ -878,11 +1026,11 @@ const twitterHandle = await landContract.getTwitterHandle(occupant);
 
     const defTurnsUsedRaw = await landContract.getTotalTurnsUsedByTile(x, y);
     const defTurnsUsed = parseInt(defTurnsUsedRaw.toString());
-    console.log(defTurnsUsed);
+
 
     const lastDefRaw = await marketContract.lastDefenseTurn(x, y);
     const lastDef = parseInt(lastDefRaw.toString());
-    console.log(lastDef);
+
 
     const cooldown = 300;
 
@@ -1326,6 +1474,19 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
       this.load.image('defensivesoldier', defensiveSoldierImage);
       this.load.image('offensivesoldier', offensiveSoldierImage);
 
+      this.load.image('food', foodImage);
+                  this.load.image('wood', woodImage);
+                  this.load.image('stone', stoneImage);
+                  this.load.image('iron', ironImage);
+      
+                  this.load.image('defensivearmor', defensiveArmorImage);
+                  this.load.image('offensivearmor', offensiveArmorImage);
+      
+                  this.load.image('defensiveweapon', defensiveWeaponImage);
+                  this.load.image('offensiveweapon', offensiveWeaponImage);
+
+                  this.load.image('arrowIcon', arrowIconImage);
+
     }
 
     const getTileBonus = async (x, y) => {
@@ -1385,8 +1546,7 @@ const tileWidth = 386;
         const worldY = (x + y) * overlap;
         return { worldX, worldY };
       }
-       // const oceanImage = this.add.image((window.innerWidth / 2) - 80, (window.innerHeight * 2) + 190, 'ocean');
-        //  oceanImage.setDisplaySize(19200, 10800); // Set the map image size
+       
 
        const centerTileX = Math.floor(mapSize / 2);
 const centerTileY = Math.floor(mapSize / 2);
@@ -1395,7 +1555,6 @@ const { worldX: centerX, worldY: centerY } = tileToWorldPosition(centerTileX, ce
 // Center the large map image there
 const mapImage = this.add.image(centerX, centerY, 'largemap');
 mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .setScale() instead
-
 
 
       
@@ -1437,7 +1596,7 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
         for (let x = 0; x < mapSize; x++) {
           const { worldX, worldY } = tileToWorldPosition(x, y);
 
-          this.add.image(worldX, worldY, 'grass').setDepth(worldY);
+          this.add.image(worldX, worldY, 'grass').setDepth(worldY - 1000);
           
           // const tile = this.add.image(worldX, worldY, 'grass').setDepth(worldY);
           // tile.setPipeline('Light2D');
@@ -1500,14 +1659,34 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
       
 
       this.input.on('pointermove', function (pointer) {
-        if (isDragging) {
-          const zoom = this.cameras.main.zoom;
-          const dragX = (dragStartX - pointer.x) / zoom;
-          const dragY = (dragStartY - pointer.y) / zoom;
-          this.cameras.main.scrollX = cameraStartX + dragX;
-          this.cameras.main.scrollY = cameraStartY + dragY;
-        }
-      }, this);
+  if (isDragging) {
+    const zoom = this.cameras.main.zoom;
+    const dragX = (dragStartX - pointer.x) / zoom;
+    const dragY = (dragStartY - pointer.y) / zoom;
+
+    let newScrollX = cameraStartX + dragX;
+    let newScrollY = cameraStartY + dragY;
+
+    // Get dimensions of the full map (after scaling)
+    const mapWidth = 8000; // your large map image width
+    const mapHeight = 4600; // your large map image height
+
+    const viewWidth = this.scale.width / zoom;
+    const viewHeight = this.scale.height / zoom;
+
+    // Calculate scroll limits
+    const minScrollX = (- mapWidth - viewWidth) / 2;
+    const maxScrollX = (mapWidth + viewWidth) / 2;
+
+    const minScrollY = (- mapHeight - viewHeight) / 2;
+    const maxScrollY = (mapHeight + viewHeight);
+
+    // Clamp camera position
+    this.cameras.main.scrollX = Phaser.Math.Clamp(newScrollX, minScrollX, maxScrollX);
+    this.cameras.main.scrollY = Phaser.Math.Clamp(newScrollY, minScrollY, maxScrollY);
+  }
+}, this);
+
 
       this.input.on('pointerup', function (pointer) {
         if (pointer.button === 0) {
@@ -1946,7 +2125,9 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
   <p><strong>Points</strong>: {tileCoords.points}</p>
 )}
 
-
+{tileCoords.level !== undefined && (
+  <p><strong>Level</strong>: {tileCoords.level}</p>
+)}
 
   {tileCoords.clan ? (
     <>
@@ -1960,6 +2141,7 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
     <button
       onClick={async () => {
         try {
+          setLoading(true);
           const clanContract = await getclanSignerContract();
           const tx = await clanContract.leaveClan();
           await tx.wait();
@@ -1971,9 +2153,16 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
             clan: null,
             hasPendingInviteToClan: false,
           }));
+          const coords = await getContract().then(c => c.getOccupiedTileByAddress(metaMaskAccount));
+const [x, y] = coords.map(n => Number(n));
+tilesRef.current[x][y].flagUrl = null; // Clear the flag URL
+updateTileMap(); // Refresh map visuals
+
+          setLoading(false);
         } catch (err) {
           console.error("Error leaving clan:", err);
           toast.error("Failed to leave the clan.");
+          setLoading(false);
         }
       }}
     >
@@ -1991,8 +2180,21 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
     {tileCoords.clan.leader.toLowerCase() === metaMaskAccount.toLowerCase() &&
   tileCoords.occupant.toLowerCase() !== metaMaskAccount.toLowerCase() && (
     <button
+    style={{ marginBottom: '9px'}}
       onClick={async () => {
         try {
+          setLoading(true);
+
+          const landContract = await getTheLandContract(); // call theLand.hasClanHall(userAddress)
+      const hasClan = await landContract.hasClanHall(metaMaskAccount); // replace `account` with connected wallet address
+
+      if (!hasClan) {
+        toast.error("Can not remove members without Clan Hall");
+        setLoading(false);
+        return;
+      }
+
+
           const clanContract = await getclanSignerContract();
           const tx = await clanContract.removeMember(userClan.id, tileCoords.occupant);
           await tx.wait();
@@ -2002,9 +2204,18 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
             clan: null,
             hasPendingInviteToClan: false
           }));
+
+          const coords = await getContract().then(c => c.getOccupiedTileByAddress(tileCoords.occupant));
+const [x, y] = coords.map(n => Number(n));
+tilesRef.current[x][y].flagUrl = null; // Clear the flag URL
+updateTileMap(); // Refresh map visuals
+
+
+          setLoading(false);
         } catch (err) {
           console.error("Failed to remove member from clan:", err);
           toast.error("Failed to remove member");
+          setLoading(false);
         }
       }}
     >
@@ -2034,7 +2245,22 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
       ) : (
         <button
           onClick={async () => {
+
+
+
+            setLoading(true);
             try {
+
+               const landContract = await getTheLandContract(); // call theLand.hasClanHall(userAddress)
+      const hasClan = await landContract.hasClanHall(metaMaskAccount); // replace `account` with connected wallet address
+
+      if (!hasClan) {
+        toast.error("Can not send invites without Clan Hall");
+        setLoading(false);
+        return;
+      }
+
+
               const clanContract = await getclanSignerContract();
               const tx = await clanContract.inviteToClan(userClan.id, tileCoords.occupant);
               await tx.wait();
@@ -2044,10 +2270,13 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
                 ...prev,
                 hasPendingInviteToClan: true,
               }));
+              setLoading(false);
             } catch (err) {
               console.error(err);
               toast.error("Failed to send invite");
+              setLoading(false);
             }
+            
           }}
         >
           Invite to Clan
@@ -2063,19 +2292,39 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
       )}
 
 
-      {tileCoords.occupied && metaMaskAccount && getAddress(metaMaskAccount) !== tileCoords.occupant && (
+      {tileCoords.occupied &&
+ metaMaskAccount &&
+ getAddress(metaMaskAccount) !== tileCoords.occupant && (
+  <div>
+    <button className='card-button' onClick={() => setinteractionMenuTypeA("sendResources")}>
+      Send Resources Here
+    </button>
+  </div>
+)}
+
+
+
+      {tileCoords.occupied &&
+ metaMaskAccount &&
+ getAddress(metaMaskAccount) !== tileCoords.occupant &&
+ (!tileCoords.clan || !userClan || (
+   (() => {
+     const index = Number(userClan.id) - 1;
+     return index >= 0 && index < allclansX.length && tileCoords.clan.name !== allclansX[index]?.[0];
+   })()
+ )) && (
   <div>
     {attackCooldownMessage ? (
       <p style={{ fontWeight: 'bold', color: 'orange' }}>{attackCooldownMessage}</p>
     ) : (
-      <button className='card-button'
-      onClick={() => setinteractionMenuTypeA("attackMenu")}
-      >
+      <button className='card-button' onClick={() => setinteractionMenuTypeA("attackMenu")}>
         Attack here
       </button>
     )}
   </div>
 )}
+
+
 
   
 
@@ -2214,6 +2463,196 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
   )}
 </div>
 
+
+
+{interactionMenuTypeA === "sendResources" && (
+  <div className="interaction-menuA">
+    <h4>Send Resources</h4>
+
+    {attackerResources && (
+<>
+
+<div className="card-resource-bar">
+        <div className="resource-item">
+          <img src={foodImage} alt="Food" style={{ width: "20px" }} />
+          <span>{attackerResources.food}</span>
+        </div>
+        <div className="resource-item">
+          <img src={woodImage} alt="Wood" style={{ width: "20px" }} />
+          <span>{attackerResources.wood}</span>
+        </div>
+        <div className="resource-item">
+          <img src={stoneImage} alt="Stone" style={{ width: "20px" }} />
+          <span>{attackerResources.stone}</span>
+        </div>
+        <div className="resource-item">
+          <img src={ironImage} alt="Iron" style={{ width: "20px" }} />
+          <span>{attackerResources.iron}</span>
+        </div>
+
+        
+      </div>
+
+<div
+style={{
+    marginBottom: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px',
+    justifyContent: 'center',
+}}
+>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={offensiveArmorImage} alt="Offensive Armor" style={{ width: '20px' }} />
+    <span>{attackerResources.offensiveArmor}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={defensiveArmorImage} alt="Defensive Armor" style={{ width: '20px' }} />
+    <span>{attackerResources.defensiveArmor}</span>
+</div>
+
+
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={offensiveWeaponImage} alt="Offensive Weapon" style={{ width: '20px' }} />
+    <span>{attackerResources.offensiveWeapon}</span>
+</div>
+<div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+    <img src={defensiveWeaponImage} alt="Defensive Weapon" style={{ width: '20px' }} />
+    <span>{attackerResources.defensiveWeapon}</span>
+</div>
+
+
+
+</div>
+
+</>
+)}
+
+
+
+
+
+
+
+
+    <div style={{ textAlign: 'center', marginBottom: '10px', fontWeight: '400' }}>
+  Target Land: ({tileCoords.x}, {tileCoords.y})
+</div>
+
+{attackDistance !== null && (
+  <div style={{ textAlign: 'center', marginBottom: '10px', fontWeight: '400' }}>
+    Distance: {attackDistance} units
+  </div>
+)}
+
+
+    <div>
+      <label>Resource Type: </label>
+      <select className="medieval-select" value={sendResourceType} onChange={(e) => setSendResourceType(e.target.value)}>
+        <option value="1">Food</option>
+        <option value="2">Wood</option>
+        <option value="3">Stone</option>
+        <option value="4">Iron</option>
+        <option value="5">Offensive Armor</option>
+        <option value="6">Defensive Armor</option>
+        <option value="7">Offensive Weapon</option>
+        <option value="8">Defensive Weapon</option>
+      </select>
+    </div>
+    <div style={{ marginTop: '10px', marginBottom: '20px' }}>
+      <label>Amount: </label>
+      <input
+  type="number"
+  className='fancy-input'
+  value={sendResourceAmount}
+  onChange={(e) => {
+    const amount = e.target.value;
+    setSendResourceAmount(amount);
+
+    if (!isNaN(amount) && attackDistance !== null) {
+      const distance = attackDistance;
+      const lopCost = 100 * 10 ** 6 * distance;
+      const resourceCost = Math.floor((distance * parseInt(amount)) / 30);
+
+      setSendResourceLOPCost(lopCost);
+      setSendResourceCost(resourceCost);
+    } else {
+      setSendResourceLOPCost(null);
+      setSendResourceCost(null);
+    }
+  }}
+  min={30}
+  placeholder="Min: 30"
+/>
+
+
+    </div>
+    {hasMarketplace ? (
+  <button
+    className="card-button"
+    onClick={async () => {
+      try {
+        setLoading(true);
+        const signerMarket = await getMarketplaceSignerContract();
+        const tokenContract = await getTokenSignerContract();
+        const fromX = attackerTileCoords.x;
+        const fromY = attackerTileCoords.y;
+        const toX = tileCoords.x - 1;
+        const toY = tileCoords.y - 1;
+        const amount = parseInt(sendResourceAmount);
+        const distance = Math.abs(fromX - toX) + Math.abs(fromY - toY);
+        const lopFee = 100 * 10 ** 6 * distance;
+
+        const approveTx = await tokenContract.increaseAllowance(signerMarket.target, lopFee);
+        await approveTx.wait();
+
+        const tx = await signerMarket.sendResources(fromX, fromY, toX, toY, parseInt(sendResourceType), amount);
+        await tx.wait();
+
+        toast.success("Resources sent!");
+        setinteractionMenuTypeA("");
+      } catch (err) {
+        console.error("Send failed:", err);
+        toast.error("Sending failed: " + (err.reason || err.message));
+      } finally {
+        setLoading(false);
+      }
+    }}
+    disabled={!sendResourceAmount || parseInt(sendResourceAmount) < 30}
+  >
+    Confirm Send
+  </button>
+) : (
+  <button className="card-button" disabled>
+    Need Marketplace to send resources
+  </button>
+)}
+
+    &nbsp;
+    <button
+      className="card-button"
+      onClick={() => setinteractionMenuTypeA("")}
+    >
+      Cancel
+    </button>
+
+    {sendResourceLOPCost !== null && (
+  <div style={{ textAlign: 'center', marginTop: '10px', fontWeight: '400' }}>
+    Required LOP Tokens: {sendResourceLOPCost / 10 ** 6}
+  </div>
+)}
+
+{sendResourceLOPCost !== null && sendResourceCost !== null && (
+  <div style={{ textAlign: 'center', marginTop: '10px', fontWeight: '400' }}>
+    Required {getResourceName(sendResourceType)}: {sendResourceAmount} + {sendResourceCost} (Sending Cost) = {parseInt(sendResourceAmount) + parseInt(sendResourceCost)} <br />
+    Remaining {getResourceName(sendResourceType)}: {getRemainingAmount(sendResourceType)} 
+  </div>
+)}
+
+
+
+  </div>
+)}
 
 
 
@@ -2544,15 +2983,14 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
         <thead>
   <tr style={{ backgroundColor: '#6c757d' }}>
     <th>Attacker</th>
-    <th>Offensive Soldiers</th>
-    <th>Defensive Soldiers</th>
-    <th>Attack Tech</th>
+    <th>Attacker Power</th>
+    <th>Attacker Soldiers</th>
     <th>Defender</th>
-    <th>Offensive Soldiers</th>
-    <th>Defensive Soldiers</th>
-    <th>Defensive Tech</th>
+    <th>Defender Power</th>
+    <th>Defender Soldiers</th>
     <th>Date</th>
     <th>Result</th>
+    <th>Resources Stolen</th>
     
     
   </tr>
@@ -2561,15 +2999,14 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
   {warLogsData.map((item, index) => (
     <tr key={index}>
       <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-      <td>{item.atkOffSoldier?.toString()}</td>
-      <td>{item.atkDefSoldier?.toString()}</td>
-      <td>{item.atkTech?.toString()}</td>
+      <td>{item.attackerPower?.toString()}</td>
+      <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()} </td>
       <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-      <td>{item.defOffSoldier?.toString()}</td>
-      <td>{item.defDefSoldier?.toString()}</td>
-      <td>{item.defTech?.toString()}</td>
+      <td>{item.defenderPower?.toString()}</td>
+      <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()} </td>
       <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
       <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      <td>{item.resourcesStolen?.toString()}</td>
       
       
     </tr>
@@ -2610,30 +3047,30 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
         <thead>
   <tr style={{ backgroundColor: '#6c757d' }}>
     <th>Attacker</th>
-    <th>Offensive Soldiers</th>
-    <th>Defensive Soldiers</th>
-    <th>Offensive Tech</th>
+    <th>Attacker Power</th>
+    <th>Attacker Soldiers</th>
     <th>Defender</th>
-    <th>Offensive Soldiers</th>
-    <th>Defensive Soldiers</th>
-    <th>Defensive Tech</th>
+    <th>Defender Power</th>
+    <th>Defender Soldiers</th>
     <th>Date</th>
     <th>Result</th>
+    <th>Resources Stolen</th>
+    
+    
   </tr>
 </thead>
 <tbody>
   {warLogsData.map((item, index) => (
     <tr key={index}>
       <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-      <td>{item.atkOffSoldier?.toString()}</td>
-      <td>{item.atkDefSoldier?.toString()}</td>
-      <td>{item.atkTech?.toString()}</td>
+      <td>{item.attackerPower?.toString()}</td>
+      <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()} </td>
       <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-      <td>{item.defOffSoldier?.toString()}</td>
-      <td>{item.defDefSoldier?.toString()}</td>
-      <td>{item.defTech?.toString()}</td>
+      <td>{item.defenderPower?.toString()}</td>
+      <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()} </td>
       <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
       <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      <td>{item.resourcesStolen?.toString()}</td>
       
       
     </tr>
@@ -2671,34 +3108,34 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
 
     {warLogsData.length > 0 ? (
       <>
-      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+      <table className="fancy-table" style={{ width: '100%', fontSize: '16px', borderCollapse: 'collapse' }}>
         <thead>
   <tr style={{ backgroundColor: '#6c757d' }}>
     <th>Attacker</th>
-    <th>Offensive Soldiers</th>
-    <th>Defensive Soldiers</th>
-    <th>Offensive Tech</th>
+    <th>Attacker Power</th>
+    <th>Attacker Soldiers</th>
     <th>Defender</th>
-    <th>Offensive Soldiers</th>
-    <th>Defensive Soldiers</th>
-    <th>Defensive Tech</th>
+    <th>Defender Power</th>
+    <th>Defender Soldiers</th>
     <th>Date</th>
     <th>Result</th>
+    <th>Resources Stolen</th>
+    
+    
   </tr>
 </thead>
 <tbody>
   {warLogsData.map((item, index) => (
     <tr key={index}>
       <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-      <td>{item.atkOffSoldier?.toString()}</td>
-      <td>{item.atkDefSoldier?.toString()}</td>
-      <td>{item.atkTech?.toString()}</td>
+      <td>{item.attackerPower?.toString()}</td>
+      <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()} </td>
       <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-      <td>{item.defOffSoldier?.toString()}</td>
-      <td>{item.defDefSoldier?.toString()}</td>
-      <td>{item.defTech?.toString()}</td>
+      <td>{item.defenderPower?.toString()}</td>
+      <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()} </td>
       <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
       <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      <td>{item.resourcesStolen?.toString()}</td>
       
       
     </tr>
@@ -2814,9 +3251,7 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
                         <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Realm</th>
                         <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Clan</th>
                         <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Coords</th>
-                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Level</th>
                         <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Points</th>
-                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Occupant</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -2826,11 +3261,7 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
                             <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.name || "Unnamed"}</td>
                             <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.clanName || "None"}</td>
                             <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.x},{item.y}</td>
-                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.level}</td>
                             <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.points}</td>
-                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>
-                                {item.occupant.slice(0, 6)}...{item.occupant.slice(-4)}
-                            </td>
                         </tr>
                     ))}
                 </tbody>

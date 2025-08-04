@@ -36,6 +36,10 @@ import offensiveArmorImage from './assets/armors/offensive.png';
 import defensiveWeaponImage from './assets/weapons/defensive.png';
 import offensiveWeaponImage from './assets/weapons/offensive.png';
 
+import arrowIconImage from './assets/arrowRight.png';
+
+
+
 function App() {
   const gameRef = useRef(null);
   const [tileCoords, setTileCoords] = useState({ x: null, y: null, occupied: null, occupant: null });
@@ -83,6 +87,10 @@ const [sendResourceCost, setSendResourceCost] = useState(null);
 
 const [hasMarketplace, setHasMarketplace] = useState(false);
 
+const arrowRef = useRef(null);
+const resourceAnimationLoopRef = useRef(null);
+
+
 
 const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/1.png": "nftflag_1",
@@ -116,6 +124,119 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/29.png": "nftflag_29",
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
+
+
+
+
+
+const startResourceTransferLoop = (resourceType, from, to) => {
+  const scene = gameRef.current?.scene.keys.default;
+  if (!scene) return;
+
+  const tileWidth = 386;
+  const visibleTileHeight = 193;
+  const overlap = visibleTileHeight / 2;
+  const halfTileWidth = tileWidth / 2;
+  const offsetX = window.innerWidth / 2;
+
+  const tileToWorldPosition = (x, y) => {
+    const worldX = (x - y) * halfTileWidth + offsetX;
+    const worldY = (x + y) * overlap;
+    return { worldX, worldY };
+  };
+
+  const resourceKeyMap = {
+    "1": "food",
+    "2": "wood",
+    "3": "stone",
+    "4": "iron",
+    "5": "offensivearmor",
+    "6": "defensivearmor",
+    "7": "offensiveweapon",
+    "8": "defensiveweapon",
+  };
+
+  const imageKey = resourceKeyMap[resourceType];
+  if (!imageKey) return;
+
+  const fromPos = tileToWorldPosition(from.x, from.y);
+  const toPos = tileToWorldPosition(to.x - 1, to.y - 1);
+
+  // Clean up old loop if it exists
+  if (resourceAnimationLoopRef.current) {
+    resourceAnimationLoopRef.current.remove(false);
+  }
+
+  resourceAnimationLoopRef.current = scene.time.addEvent({
+    delay: 2000,
+    loop: true,
+    callback: () => {
+      const img = scene.add.image(fromPos.worldX, fromPos.worldY, imageKey)
+        .setDisplaySize(120, 120)
+        .setDepth(9999);
+
+      scene.tweens.add({
+        targets: img,
+        x: toPos.worldX,
+        y: toPos.worldY,
+        duration: 5000,
+        ease: 'Power2',
+        onComplete: () => img.destroy(),
+      });
+    }
+  });
+};
+
+
+const stopResourceTransferLoop = () => {
+  if (resourceAnimationLoopRef.current) {
+    resourceAnimationLoopRef.current.remove(false); // Stop the loop
+    resourceAnimationLoopRef.current = null;
+  }
+};
+
+
+
+
+
+const drawArrowBetweenTiles = (from, to) => {
+  const scene = gameRef.current?.scene.keys.default;
+  if (!scene) return;
+
+  const tileWidth = 386;
+  const visibleTileHeight = 193;
+  const overlap = visibleTileHeight / 2;
+  const halfTileWidth = tileWidth / 2;
+  const offsetX = window.innerWidth / 2;
+
+  const tileToWorldPosition = (x, y) => {
+    const worldX = (x - y) * halfTileWidth + offsetX;
+    const worldY = (x + y) * overlap;
+    return { worldX, worldY };
+  };
+
+  const { worldX: x1, worldY: y1 } = tileToWorldPosition(from.x, from.y);
+  const { worldX: x2, worldY: y2 } = tileToWorldPosition(to.x - 1, to.y - 1); // subtract 1 to match contract coords
+
+  // Remove existing arrow
+  if (arrowRef.current) {
+    arrowRef.current.destroy();
+    arrowRef.current = null;
+  }
+
+  // Create arrow
+  const angle = Phaser.Math.Angle.Between(x1, y1, x2, y2);
+  const distance = Phaser.Math.Distance.Between(x1, y1, x2, y2);
+
+  const arrow = scene.add.image(x1, y1, 'arrowIcon')
+    .setOrigin(0, 0.5)
+    .setRotation(angle)
+    .setDisplaySize(distance, 1000)
+    .setDepth(1000); // on top
+
+  arrowRef.current = arrow;
+};
+
 
 
 
@@ -582,13 +703,23 @@ useEffect(() => {
 
 if (interactionMenuTypeA === "sendResources") {
       checkMarketplacePresence(); // ✅ safe to call now
+      drawArrowBetweenTiles(attackerTileCoords, tileCoords);
     }
 
     
   }
-}, [interactionMenuTypeA, fetchAttackerMilitary, calculateAttackCost, fetchAttackerResources, tileCoords, checkMarketplacePresence]);
+}, [interactionMenuTypeA, fetchAttackerMilitary, calculateAttackCost, fetchAttackerResources, tileCoords, checkMarketplacePresence, attackerTileCoords]);
 
 
+useEffect(() => {
+  if (interactionMenuTypeA !== "sendResources") {
+    // Cleanup arrow when leaving "sendResources"
+    if (arrowRef.current) {
+      arrowRef.current.destroy();
+      arrowRef.current = null;
+    }
+  }
+}, [interactionMenuTypeA]);
 
 
 
@@ -1426,6 +1557,8 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
                   this.load.image('defensiveweapon', defensiveWeaponImage);
                   this.load.image('offensiveweapon', offensiveWeaponImage);
 
+                  this.load.image('arrowIcon', arrowIconImage);
+
     }
 
     const getTileBonus = async (x, y) => {
@@ -1535,7 +1668,7 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
         for (let x = 0; x < mapSize; x++) {
           const { worldX, worldY } = tileToWorldPosition(x, y);
 
-          this.add.image(worldX, worldY, 'grass').setDepth(worldY);
+          this.add.image(worldX, worldY, 'grass').setDepth(worldY - 1000);
           
           // const tile = this.add.image(worldX, worldY, 'grass').setDepth(worldY);
           // tile.setPipeline('Light2D');
@@ -2532,6 +2665,7 @@ style={{
     onClick={async () => {
       try {
         setLoading(true);
+        startResourceTransferLoop(sendResourceType, attackerTileCoords, tileCoords);
         const signerMarket = await getMarketplaceSignerContract();
         const tokenContract = await getTokenSignerContract();
         const fromX = attackerTileCoords.x;
@@ -2542,11 +2676,15 @@ style={{
         const distance = Math.abs(fromX - toX) + Math.abs(fromY - toY);
         const lopFee = 100 * 10 ** 6 * distance;
 
+
         const approveTx = await tokenContract.increaseAllowance(signerMarket.target, lopFee);
         await approveTx.wait();
 
         const tx = await signerMarket.sendResources(fromX, fromY, toX, toY, parseInt(sendResourceType), amount);
+        
         await tx.wait();
+        
+
 
         toast.success("Resources sent!");
         setinteractionMenuTypeA("");
@@ -2554,6 +2692,7 @@ style={{
         console.error("Send failed:", err);
         toast.error("Sending failed: " + (err.reason || err.message));
       } finally {
+        stopResourceTransferLoop();
         setLoading(false);
       }
     }}
