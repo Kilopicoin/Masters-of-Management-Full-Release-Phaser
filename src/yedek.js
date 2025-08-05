@@ -37,8 +37,9 @@ import defensiveWeaponImage from './assets/weapons/defensive.png';
 import offensiveWeaponImage from './assets/weapons/offensive.png';
 
 import arrowIconImage from './assets/arrowRight.png';
+import arrowRedIconImage from './assets/arrowRightRed.png';
 
-
+import battleGifImage from './assets/battle.gif';
 
 function App() {
   const gameRef = useRef(null);
@@ -47,6 +48,8 @@ function App() {
   const tilesRef = useRef([]);
   const mapSize = 20;
   const [loading, setLoading] = useState(true); // New state for loading
+  const [LoadingAttack, setLoadingAttack] = useState(false); // New state for loading
+  const [loadingResources, setloadingResources] = useState(false); // New state for loading
   const [metaMaskAccount, setMetaMaskAccount] = useState(null);
   const [referrer, setReferrer] = useState('');
   const [referralLink, setReferralLink] = useState('');
@@ -88,7 +91,11 @@ const [sendResourceCost, setSendResourceCost] = useState(null);
 const [hasMarketplace, setHasMarketplace] = useState(false);
 
 const arrowRef = useRef(null);
+const arrowRedRef = useRef(null);
+const resourceAnimationLoopRef = useRef(null);
+const attackAnimationLoopRef = useRef(null);
 
+const battleGifRef = useRef(null);
 
 
 const urlToKeyMap = useMemo(() => ({
@@ -126,6 +133,190 @@ const urlToKeyMap = useMemo(() => ({
 
 
 
+const showBattleGifAtTile = (to) => {
+  const scene = gameRef.current?.scene.keys.default;
+  if (!scene) return;
+
+  const tileWidth = 386;
+  const visibleTileHeight = 193;
+  const overlap = visibleTileHeight / 2;
+  const halfTileWidth = tileWidth / 2;
+  const offsetX = window.innerWidth / 2;
+
+  const tileToWorldPosition = (x, y) => {
+    const worldX = (x - y) * halfTileWidth + offsetX;
+    const worldY = (x + y) * overlap;
+    return { worldX, worldY };
+  };
+
+  const { worldX, worldY } = tileToWorldPosition(to.x - 1, to.y - 1);
+
+  // Remove any old battle gif
+  if (battleGifRef.current) {
+    battleGifRef.current.destroy();
+    battleGifRef.current = null;
+  }
+
+  // Create DOM overlay with your gif
+  const gifOverlay = scene.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${battleGifImage}" 
+      style="width: 210px; height: 210px; filter: brightness(2.1); transform: translate(50px, -110px);" 
+    />
+  `);
+
+  gifOverlay.setDepth(10000);
+
+  // Save reference
+  battleGifRef.current = gifOverlay;
+
+
+};
+
+
+
+
+const hideBattleGif = () => {
+  if (battleGifRef.current) {
+    battleGifRef.current.destroy();
+    battleGifRef.current = null;
+  }
+};
+
+
+
+
+const startResourceTransferLoop = (resourceType, from, to) => {
+  const scene = gameRef.current?.scene.keys.default;
+  if (!scene) return;
+
+  const tileWidth = 386;
+  const visibleTileHeight = 193;
+  const overlap = visibleTileHeight / 2;
+  const halfTileWidth = tileWidth / 2;
+  const offsetX = window.innerWidth / 2;
+
+  const tileToWorldPosition = (x, y) => {
+    const worldX = (x - y) * halfTileWidth + offsetX;
+    const worldY = (x + y) * overlap;
+    return { worldX, worldY };
+  };
+
+  const resourceKeyMap = {
+    "1": "food",
+    "2": "wood",
+    "3": "stone",
+    "4": "iron",
+    "5": "offensivearmor",
+    "6": "defensivearmor",
+    "7": "offensiveweapon",
+    "8": "defensiveweapon",
+  };
+
+  const imageKey = resourceKeyMap[resourceType];
+  if (!imageKey) return;
+
+  const fromPos = tileToWorldPosition(from.x, from.y);
+  const toPos = tileToWorldPosition(to.x - 1, to.y - 1);
+
+  // Clean up old loop if it exists
+  if (resourceAnimationLoopRef.current) {
+    resourceAnimationLoopRef.current.remove(false);
+  }
+
+  resourceAnimationLoopRef.current = scene.time.addEvent({
+    delay: 2000,
+    loop: true,
+    callback: () => {
+      const img = scene.add.image(fromPos.worldX, fromPos.worldY, imageKey)
+        .setDisplaySize(120, 120)
+        .setDepth(9999);
+
+      scene.tweens.add({
+        targets: img,
+        x: toPos.worldX,
+        y: toPos.worldY,
+        duration: 5000,
+        ease: 'Power2',
+        onComplete: () => img.destroy(),
+      });
+    }
+  });
+};
+
+
+const stopResourceTransferLoop = () => {
+  if (resourceAnimationLoopRef.current) {
+    resourceAnimationLoopRef.current.remove(false); // Stop the loop
+    resourceAnimationLoopRef.current = null;
+  }
+};
+
+
+
+
+const startAttackTransferLoop = (from, to) => {
+  const scene = gameRef.current?.scene.keys.default;
+  if (!scene) return;
+
+  showBattleGifAtTile(to);
+
+  const tileWidth = 386;
+  const visibleTileHeight = 193;
+  const overlap = visibleTileHeight / 2;
+  const halfTileWidth = tileWidth / 2;
+  const offsetX = window.innerWidth / 2;
+
+  const tileToWorldPosition = (x, y) => {
+    const worldX = (x - y) * halfTileWidth + offsetX;
+    const worldY = (x + y) * overlap;
+    return { worldX, worldY };
+  };
+
+  const resourceKey = "offensivesoldier";
+
+  const imageKey = resourceKey;
+  if (!imageKey) return;
+
+  const fromPos = tileToWorldPosition(from.x, from.y);
+  const toPos = tileToWorldPosition(to.x - 1, to.y - 1);
+
+  // Clean up old loop if it exists
+  if (attackAnimationLoopRef.current) {
+    attackAnimationLoopRef.current.remove(false);
+  }
+
+  attackAnimationLoopRef.current = scene.time.addEvent({
+    delay: 2000,
+    loop: true,
+    callback: () => {
+      const img = scene.add.image(fromPos.worldX, fromPos.worldY, imageKey)
+        .setDisplaySize(120, 120)
+        .setDepth(9999);
+
+      scene.tweens.add({
+        targets: img,
+        x: toPos.worldX,
+        y: toPos.worldY,
+        duration: 5000,
+        ease: 'Power2',
+        onComplete: () => img.destroy(),
+      });
+    }
+  });
+};
+
+
+
+
+const stopAttackTransferLoop = () => {
+  if (attackAnimationLoopRef.current) {
+    attackAnimationLoopRef.current.remove(false); // Stop the loop
+    attackAnimationLoopRef.current = null;
+  }
+  hideBattleGif();
+};
+
 
 const drawArrowBetweenTiles = (from, to) => {
   const scene = gameRef.current?.scene.keys.default;
@@ -159,11 +350,53 @@ const drawArrowBetweenTiles = (from, to) => {
   const arrow = scene.add.image(x1, y1, 'arrowIcon')
     .setOrigin(0, 0.5)
     .setRotation(angle)
-    .setDisplaySize(distance, 1000)
+    .setDisplaySize(distance, 1500)
     .setDepth(1000); // on top
 
   arrowRef.current = arrow;
 };
+
+
+
+
+const drawRedArrowBetweenTiles = (from, to) => {
+  const scene = gameRef.current?.scene.keys.default;
+  if (!scene) return;
+
+  const tileWidth = 386;
+  const visibleTileHeight = 193;
+  const overlap = visibleTileHeight / 2;
+  const halfTileWidth = tileWidth / 2;
+  const offsetX = window.innerWidth / 2;
+
+  const tileToWorldPosition = (x, y) => {
+    const worldX = (x - y) * halfTileWidth + offsetX;
+    const worldY = (x + y) * overlap;
+    return { worldX, worldY };
+  };
+
+  const { worldX: x1, worldY: y1 } = tileToWorldPosition(from.x, from.y);
+  const { worldX: x2, worldY: y2 } = tileToWorldPosition(to.x - 1, to.y - 1); // subtract 1 to match contract coords
+
+  // Remove existing arrow
+  if (arrowRedRef.current) {
+    arrowRedRef.current.destroy();
+    arrowRedRef.current = null;
+  }
+
+  // Create arrow
+  const angle = Phaser.Math.Angle.Between(x1, y1, x2, y2);
+  const distance = Phaser.Math.Distance.Between(x1, y1, x2, y2);
+
+  const arrowRed = scene.add.image(x1, y1, 'arrowRedIcon')
+    .setOrigin(0, 0.5)
+    .setRotation(angle)
+    .setDisplaySize(distance, 1500)
+    .setDepth(1000); // on top
+
+  arrowRedRef.current = arrowRed;
+};
+
 
 
 
@@ -377,15 +610,18 @@ const fetchAllWarLogs = async () => {
 
 const handleConfirmAttack = async () => {
   try {
-    setLoading(true);
+    
     if (!attackerTileCoords || !tileCoords) return;
 
 
     if (!attackerTroops || attackerTroops.offensiveSoldier < 10) {
       toast.warn("You need at least 10 Offensive Soldiers to launch an attack.");
-      setLoading(false);
       return;
     }
+
+
+    setLoadingAttack(true);
+    startAttackTransferLoop(attackerTileCoords, tileCoords);
 
     const marketContract = await getMarketplaceSignerContract();
 
@@ -417,11 +653,12 @@ setdefenderHandle(defenderHandleX);
     // Update state and show result
     setWarLogsData([latest]); // show only this result
     setinteractionMenuTypeA("warlogsAllMineX");
-    setLoading(false);
   } catch (err) {
     console.error("Attack failed:", err);
     toast.error("Attack failed: " + (err.reason || err.message));
-    setLoading(false);
+  } finally {
+    stopAttackTransferLoop();
+    setLoadingAttack(false);
   }
 };
 
@@ -634,6 +871,10 @@ if (interactionMenuTypeA === "sendResources") {
       drawArrowBetweenTiles(attackerTileCoords, tileCoords);
     }
 
+    if (interactionMenuTypeA === "attackMenu") {
+      drawRedArrowBetweenTiles(attackerTileCoords, tileCoords);
+    }
+
     
   }
 }, [interactionMenuTypeA, fetchAttackerMilitary, calculateAttackCost, fetchAttackerResources, tileCoords, checkMarketplacePresence, attackerTileCoords]);
@@ -645,6 +886,13 @@ useEffect(() => {
     if (arrowRef.current) {
       arrowRef.current.destroy();
       arrowRef.current = null;
+    }
+  }
+  if (interactionMenuTypeA !== "attackMenu") {
+    // Cleanup arrow when leaving "sendResources"
+    if (arrowRedRef.current) {
+      arrowRedRef.current.destroy();
+      arrowRedRef.current = null;
     }
   }
 }, [interactionMenuTypeA]);
@@ -1428,6 +1676,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
       },
       transparent: true,
       banner: false,
+      dom: { createContainer: true },
     };
 
     gameRef.current = new Phaser.Game(config);
@@ -1486,6 +1735,10 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
                   this.load.image('offensiveweapon', offensiveWeaponImage);
 
                   this.load.image('arrowIcon', arrowIconImage);
+                  this.load.image('arrowRedIcon', arrowRedIconImage);
+
+
+                  this.load.image('battlegif', battleGifImage);
 
     }
 
@@ -1836,6 +2089,11 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
 
   return (
     <div
+  style={{
+    pointerEvents: LoadingAttack || loadingResources ? 'none' : 'auto',
+  }}
+>
+    <div
       style={{
         width: '100vw',
         height: '100vh',
@@ -1844,6 +2102,9 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
     >
 
 <ToastContainer limit={1} closeButton={false} />
+
+
+
 
 
 
@@ -2592,7 +2853,8 @@ style={{
     className="card-button"
     onClick={async () => {
       try {
-        setLoading(true);
+        setloadingResources(true);
+        startResourceTransferLoop(sendResourceType, attackerTileCoords, tileCoords);
         const signerMarket = await getMarketplaceSignerContract();
         const tokenContract = await getTokenSignerContract();
         const fromX = attackerTileCoords.x;
@@ -2603,11 +2865,15 @@ style={{
         const distance = Math.abs(fromX - toX) + Math.abs(fromY - toY);
         const lopFee = 100 * 10 ** 6 * distance;
 
+
         const approveTx = await tokenContract.increaseAllowance(signerMarket.target, lopFee);
         await approveTx.wait();
 
         const tx = await signerMarket.sendResources(fromX, fromY, toX, toY, parseInt(sendResourceType), amount);
+        
         await tx.wait();
+        
+
 
         toast.success("Resources sent!");
         setinteractionMenuTypeA("");
@@ -2615,7 +2881,8 @@ style={{
         console.error("Send failed:", err);
         toast.error("Sending failed: " + (err.reason || err.message));
       } finally {
-        setLoading(false);
+        stopResourceTransferLoop();
+        setloadingResources(false);
       }
     }}
     disabled={!sendResourceAmount || parseInt(sendResourceAmount) < 30}
@@ -3304,7 +3571,7 @@ style={{
   </div>
 )}
 
-
+</div>
     </div>
   );
 
