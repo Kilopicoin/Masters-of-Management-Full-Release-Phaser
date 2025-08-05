@@ -59,7 +59,6 @@ function App() {
   const [showReferralNetwork, setShowReferralNetwork] = useState(false); // To show/hide the referral network info
   const occupationCost = 100000 * 10**6;
   const [salePrice, setSalePrice] = useState("");
-  const [journalEntries, setJournalEntries] = useState([]);
   const [hasTileG, sethasTileG] = useState(false);
   const [showTheLand, setShowTheLand] = useState(false);
   const [selectedTile, setSelectedTile] = useState(null);
@@ -80,7 +79,6 @@ const [attackerPower, setAttackerPower] = useState(0);
 const [warLogsData, setWarLogsData] = useState([]);
 
 const [defenderHandle, setdefenderHandle] = useState("");
-const [showJournal, setShowJournal] = useState(true);
 
 const [sendResourceAmount, setSendResourceAmount] = useState("");
 const [sendResourceType, setSendResourceType] = useState("1"); // 1 = Food, default
@@ -93,6 +91,8 @@ const [hasMarketplace, setHasMarketplace] = useState(false);
 const arrowRef = useRef(null);
 const arrowRedRef = useRef(null);
 const resourceAnimationLoopRef = useRef(null);
+const elseattackAnimationLoopRef = useRef(null);
+const elseresourceAnimationLoopRef = useRef(null);
 const attackAnimationLoopRef = useRef(null);
 
 const battleGifRef = useRef(null);
@@ -130,6 +130,235 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/29.png": "nftflag_29",
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
+
+
+
+
+// Play ONE soldier travel (no loop) then destroy it.
+const playSingleSoldierTravel = (from, to, duration) => {
+  const scene = gameRef.current?.scene.keys.default;
+  if (!scene) return;
+
+  const tileWidth = 386;
+  const visibleTileHeight = 193;
+  const overlap = visibleTileHeight / 2;
+  const halfTileWidth = tileWidth / 2;
+  const offsetX = window.innerWidth / 2;
+
+  const tileToWorldPosition = (x, y) => {
+    const worldX = (x - y) * halfTileWidth + offsetX;
+    const worldY = (x + y) * overlap;
+    return { worldX, worldY };
+  };
+
+  // NOTE:
+  // - from is expected 0-based
+  // - to is expected 1-based (consistent with your other helpers)
+  const fromPos = tileToWorldPosition(from.x, from.y);
+  const toPos   = tileToWorldPosition(to.x - 1, to.y - 1);
+
+ if (elseattackAnimationLoopRef.current) {
+    elseattackAnimationLoopRef.current.remove(false);
+    elseattackAnimationLoopRef.current = null;
+  }
+
+  elseattackAnimationLoopRef.current = scene.time.addEvent({
+    delay: 2000,
+    loop: true,
+    callback: () => {
+      const img = scene.add.image(fromPos.worldX, fromPos.worldY, 'offensivesoldier')
+        .setDisplaySize(120, 120)
+        .setDepth(9999);
+
+      scene.tweens.add({
+        targets: img,
+        x: toPos.worldX,
+        y: toPos.worldY,
+        duration,
+        ease: 'Power2',
+        onComplete: () => img.destroy(),
+      });
+    }
+  });
+
+
+
+
+};
+
+
+
+
+
+const playSingleResourceTravel = (from, to, type, duration) => {
+  const scene = gameRef.current?.scene.keys.default;
+  if (!scene) return;
+
+  const tileWidth = 386;
+  const visibleTileHeight = 193;
+  const overlap = visibleTileHeight / 2;
+  const halfTileWidth = tileWidth / 2;
+  const offsetX = window.innerWidth / 2;
+
+  const tileToWorldPosition = (x, y) => {
+    const worldX = (x - y) * halfTileWidth + offsetX;
+    const worldY = (x + y) * overlap;
+    return { worldX, worldY };
+  };
+
+  // NOTE:
+  // - from is expected 0-based
+  // - to is expected 1-based (consistent with your other helpers)
+  const fromPos = tileToWorldPosition(from.x, from.y);
+  const toPos   = tileToWorldPosition(to.x - 1, to.y - 1);
+
+ if (elseresourceAnimationLoopRef.current) {
+    elseresourceAnimationLoopRef.current.remove(false);
+    elseresourceAnimationLoopRef.current = null;
+  }
+
+  const typeX = Number(type);
+  let typex = '';
+      switch (typeX) {
+        case 1:
+          typex = 'food';
+          break;
+        case 2:
+          typex = 'wood';
+          break;
+        case 3:
+          typex = 'stone';
+          break;
+        case 4:
+          typex = 'iron';
+          break;
+          case 5:
+          typex = 'offensivearmor';
+          break;
+          case 6:
+          typex = 'defensivearmor';
+          break;
+          case 7:
+          typex = 'offensiveweapon';
+          break;
+          case 8:
+          typex = 'defensiveweapon';
+          break;
+        default:
+          typex = 'food';
+      }
+
+
+
+  elseresourceAnimationLoopRef.current = scene.time.addEvent({
+    delay: 2000,
+    loop: true,
+    callback: () => {
+      const img = scene.add.image(fromPos.worldX, fromPos.worldY, typex)
+        .setDisplaySize(120, 120)
+        .setDepth(9999);
+
+      scene.tweens.add({
+        targets: img,
+        x: toPos.worldX,
+        y: toPos.worldY,
+        duration,
+        ease: 'Power2',
+        onComplete: () => img.destroy(),
+      });
+    }
+  });
+
+
+
+
+};
+
+
+
+
+const stopElseResourceLoop = () => {
+  if (elseresourceAnimationLoopRef.current) {
+    elseresourceAnimationLoopRef.current.remove(false);
+    elseresourceAnimationLoopRef.current = null;
+  }
+};
+
+
+
+
+
+const stopElseAttackLoop = () => {
+  if (elseattackAnimationLoopRef.current) {
+    elseattackAnimationLoopRef.current.remove(false);
+    elseattackAnimationLoopRef.current = null;
+  }
+};
+
+
+// Show all three attack visuals for ~6s, then cleanup.
+const triggerAttackCinematics = useCallback(({ ax, ay, dx, dy }) => {
+  // Convert BigInts to numbers if needed
+  const A = { x: Number(ax), y: Number(ay) };   // 0-based from chain
+  const D = { x: Number(dx) + 1, y: Number(dy) + 1 }; // make target 1-based for helpers
+
+  // Red arrow
+  drawRedArrowBetweenTiles(A, D);
+
+  // Single soldier travel
+  playSingleSoldierTravel(A, D, 8000);
+
+  // Battle GIF on defender tile
+  showBattleGifAtTile(D);
+
+  // Auto cleanup after 6s
+  const scene = gameRef.current?.scene.keys.default;
+  if (!scene) return;
+
+  scene.time.delayedCall(16000, () => {
+    stopElseAttackLoop();
+    // remove red arrow
+    if (arrowRedRef.current) {
+      arrowRedRef.current.destroy();
+      arrowRedRef.current = null;
+    }
+    // remove gif
+    hideBattleGif();
+  });
+}, [gameRef]);
+
+
+
+
+
+const triggerResourcesCinematics = useCallback(({ ax, ay, dx, dy, type }) => {
+  // Convert BigInts to numbers if needed
+  const A = { x: Number(ax), y: Number(ay) };   // 0-based from chain
+  const D = { x: Number(dx) + 1, y: Number(dy) + 1 }; // make target 1-based for helpers
+
+  // Red arrow
+  drawArrowBetweenTiles(A, D);
+
+  // Single soldier travel
+  playSingleResourceTravel(A, D, type, 8000);
+
+  // Auto cleanup after 6s
+  const scene = gameRef.current?.scene.keys.default;
+  if (!scene) return;
+
+  scene.time.delayedCall(16000, () => {
+    stopElseResourceLoop();
+    // remove red arrow
+    if (arrowRef.current) {
+      arrowRef.current.destroy();
+      arrowRef.current = null;
+    }
+
+  });
+}, [gameRef]);
+
+
+
 
 
 
@@ -1993,36 +2222,16 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
   useEffect(() => {
     const setupEventListener = async () => {
       try {
-        const contract = await getContract();
         const marketcontract = await getMarketplaceContract();
   
         // Clear existing listeners for "TileUpdated" to prevent duplicates
-        contract.removeAllListeners("TileUpdated");
+        marketcontract.removeAllListeners("ResourcesSent");
         marketcontract.removeAllListeners("TileAttacked");
   
         // Set up the event listener with a single instance
-        contract.on("TileUpdated", (x, y, isOccupied, occupant) => {
+        marketcontract.on("ResourcesSent", (sender, ax, ay, receiver, dx, dy, type, amount) => {
 
-  
-          // Convert BigInt coordinates to regular numbers
-          const xCoord = Number(x);
-          const yCoord = Number(y);
-  
-          const formattedOccupant = `${occupant.slice(0, 4)}...${occupant.slice(-4)}`;
-          const newEntry = `${formattedOccupant} has occupied the land at coordinates (${xCoord + 1}, ${yCoord + 1})`;
-
-  
-          setJournalEntries((prevEntries) => {
-            if (!prevEntries.includes(newEntry)) {
-              let newEntries = [newEntry, ...prevEntries];
-              if (newEntries.length > 3) {
-                prevEntries.pop(); // Remove the oldest entry if we have more than 3
-                newEntries = [newEntry, ...prevEntries];
-              }
-              return newEntries;
-            }
-            return prevEntries;
-          });
+          triggerResourcesCinematics({ ax, ay, dx, dy, type });
 
         });
 
@@ -2030,15 +2239,10 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
 
         marketcontract.on("TileAttacked", (attacker, ax, ay, defender, dx, dy, attackerWon) => {
 
-      const msg = `(${Number(ax) + 1},${Number(ay) + 1}) attacked (${Number(dx) + 1},${Number(dy) + 1})`;
+
+      triggerAttackCinematics({ ax, ay, dx, dy });
+
       
-      setJournalEntries((prevEntries) => {
-        let newEntries = [msg, ...prevEntries];
-        if (newEntries.length > 3) {
-          newEntries = newEntries.slice(0, 3);
-        }
-        return newEntries;
-      });
     });
 
 
@@ -2048,22 +2252,20 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
     };
   
 
-     if (RPC !== 'https://api.s0.b.hmny.io') {
+     if (RPC === 'https://api.s0.b.hmny.io') {
     setupEventListener();
   }
 
     // Cleanup listener on unmount
     return () => {
-      getContract().then((contract) => {
-        contract.removeAllListeners("TileUpdated");
-      });
 
       getMarketplaceContract().then((marketcontract) => {
     marketcontract.removeAllListeners("TileAttacked");
+    marketcontract.removeAllListeners("ResourcesSent");
   });
 
     };
-  }, [loading, appKey]);
+  }, [triggerAttackCinematics, triggerResourcesCinematics]);
   
   const handleGoBackToApp = () => {
     setShowTheLand(false);
@@ -3541,35 +3743,6 @@ style={{
 
 
 
-
-
-
-
-{showJournal && (
-  <div className="journal-card">
-    <div>
-     Journal
-      <button
-        onClick={() => setShowJournal(false)}
-        style={{
-          backgroundColor: 'transparent',
-          border: 'none',
-          color: '#e8dbc0',
-          fontSize: '16px',
-          cursor: 'pointer',
-        }}
-        aria-label="Close Journal"
-      >
-        ❌
-      </button>
-    </div>
-    <ul>
-      {journalEntries.map((entry, index) => (
-        <li key={index}>{entry}</li>
-      ))}
-    </ul>
-  </div>
-)}
 
 </div>
     </div>
