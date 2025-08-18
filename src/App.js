@@ -2288,7 +2288,7 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
     };
   
 
-     if (RPC === 'https://api.s0.b.hmny.io') {
+     if (RPC !== 'https://api.s0.b.hmny.io') {
     setupEventListener();
   }
 

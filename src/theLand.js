@@ -2113,7 +2113,13 @@ useEffect(() => {
 
     try {
         const contract = await getTheLandSignerContract(); // Replace with your function to get a signer instance
-        const tx = await contract.useTurns(turns, tileCoords.x - 1, tileCoords.y - 1);
+        const feeWei = await contract.turnFeeWei();
+        const tx = await contract.useTurns(
+      turns,
+      tileCoords.x - 1,
+      tileCoords.y - 1,
+      { value: feeWei } // 👈 sends the native coin (e.g., 0.1 ETH) with the tx
+    );
         await tx.wait();
 
         // Fetch updated tile data after the transaction
