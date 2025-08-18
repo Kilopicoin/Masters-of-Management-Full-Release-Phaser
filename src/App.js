@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-
+import ChatBox from './ChatBox';
 import Phaser from 'phaser';
 import grassImage from './assets/grass.png';
 import oceanImage from './assets/ocean.png';
@@ -3777,7 +3777,14 @@ style={{
     </div>
 )}
 
-
+<ChatBox
+  account={metaMaskAccount}
+  twitterHandle={
+    metaMaskAccount && getAddress(metaMaskAccount) === tileCoords.occupant
+      ? tileCoords.twitterHandle
+      : null
+  }
+/>
 
 
 </div>
