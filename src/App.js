@@ -2420,7 +2420,16 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
     width: '250px',
   }}
 ><strong>Info Box</strong>
-
+<div>
+<a
+            href={`https://twitter.com`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '16px' }}
+          >
+            Tutorial Video
+          </a>
+          </div>
 {metaMaskAccount ? (
 <>
           <p>
@@ -2904,7 +2913,7 @@ updateTileMap(); // Refresh map visuals
       top: '100px',
       left: '20px',
       padding: '15px',
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      backgroundColor: 'rgba(44, 37, 37, 1)',
       borderRadius: '10px',
       boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
       color: '#333',
@@ -2912,7 +2921,18 @@ updateTileMap(); // Refresh map visuals
       width: '250px',
     }}
   >
-    <strong>Referral Network</strong>
+    <p><strong>Referral Network</strong></p>
+    <div>
+        <a
+            href={`https://twitter.com`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '16px' }}
+          >
+            Referral System Docs
+          </a>
+
+</div>
     <p><strong>Referrer:</strong> {referralNetwork.referrer ? `${referralNetwork.referrer.slice(0, 6)}...${referralNetwork.referrer.slice(-4)}` : 'None'}</p>
     <p><strong>Referrals:</strong></p>
     <ul>
@@ -3720,6 +3740,18 @@ style={{
         >
             Cancel
         </button>
+
+<div>
+        <a
+            href={`https://twitter.com`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '16px' }}
+          >
+            Leaderboard Docs
+          </a>
+
+</div>
 
     </div>
 )}

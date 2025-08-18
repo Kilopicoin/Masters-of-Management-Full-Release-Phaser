@@ -557,6 +557,13 @@ const createClan = async () => {
 
     try {
         setloadingClanCreate(true);
+        const contract = await getclanSignerContract();
+
+      const available = await contract.isClanNameAvailable(newClanName);
+      if (!available) {
+        toast.error("This clan name is already taken.");
+        return;
+      }
 
         const TokencontractSigner = await getTokenSignerContract();
         const Allowancetx = await TokencontractSigner.increaseAllowance(
@@ -565,7 +572,7 @@ const createClan = async () => {
         );
         await Allowancetx.wait();
 
-        const contract = await getclanSignerContract();
+        
         const tx = await contract.createClan(newClanName);
         await tx.wait();
         toast.success("Clan created successfully!");
@@ -2321,10 +2328,21 @@ useEffect(() => {
 </div>
 
             
+<div>
+        <a
+            href={`https://twitter.com`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '16px' }}
+          >
+            Realm Docs
+          </a>
 
+</div>
 
 
                 </div>
+
 
 
         {/* Loading Bar */}
@@ -2336,6 +2354,11 @@ useEffect(() => {
   <div className="medieval-progress-label">
     Next Level {tileData.accumulatedTurns}/{1000}
   </div>
+
+
+  
+
+
 </div>
 
     </>
@@ -2584,7 +2607,25 @@ useEffect(() => {
                     justifyContent: 'center',
                 }}>
                 Select Building Type
+
+
+                <div>
+        <a
+            href={`https://twitter.com`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '16px' }}
+          >
+            Buildings Docs
+          </a>
+
+</div>
+
+
                 </div>
+
+
+                
 
         {/* Current Tile Resources */}
         {tileData && (
