@@ -25,6 +25,13 @@ import playIcon from './assets/play-icon.png';
 import stopIcon from './assets/stop-icon.png';
 
 import clockLoadingImage from './assets/clock-loading.gif';
+import forgekLoadingImage from './assets/forge-loading.gif';
+import offensiveLoadingImage from './assets/training-offsenvie.gif';
+import defensiveLoadingImage from './assets/training-defensive.gif';
+import clancreateLoadingImage from './assets/clan-creating.gif';
+
+import offensiveTechLoadingImage from './assets/offensiveTech-loading.gif';
+import defensiveTechLoadingImage from './assets/defensiveTech-loading.gif';
 
 import defensiveArmorImage from './assets/armors/defensive.png';
 import offensiveArmorImage from './assets/armors/offensive.png';
@@ -54,6 +61,14 @@ const TheLand = ({ tileCoords, goBackToApp }) => {
     const buildingPreviewRef = useRef(null);
     const [loading, setLoading] = useState(true); // New state for loading
     const [loadingTurns, setLoadingTurns] = useState(false);
+    const [loadingArmoryForge, setloadingArmoryForge] = useState(false);
+    const [loadingBlacksmithForge, setloadingBlacksmithForge] = useState(false);
+    const [loadingOffensiveTraining, setloadingOffensiveTraining] = useState(false);
+    const [loadingDefensiveTraining, setloadingDefensiveTraining] = useState(false);
+    const [loadingClanCreate, setloadingClanCreate] = useState(false);
+    const [laodingOffensiveTech, setlaodingOffensiveTech] = useState(false);
+    const [loadingDefensiveTech, setloadingDefensiveTech] = useState(false);
+    
     const [tileData, setTileData] = useState(null); // For storing tile data (food, wood, stone, iron, level)
     const mapSize = 9;
     const turnsPerLevel = 1000;
@@ -541,7 +556,16 @@ const createClan = async () => {
     }
 
     try {
-        setLoading(true);
+        
+        const contract = await getclanSignerContract();
+
+      const available = await contract.isClanNameAvailable(newClanName);
+      if (!available) {
+        toast.error("This clan name is already taken.");
+        return;
+      }
+
+      setloadingClanCreate(true);
 
         const TokencontractSigner = await getTokenSignerContract();
         const Allowancetx = await TokencontractSigner.increaseAllowance(
@@ -550,7 +574,7 @@ const createClan = async () => {
         );
         await Allowancetx.wait();
 
-        const contract = await getclanSignerContract();
+        
         const tx = await contract.createClan(newClanName);
         await tx.wait();
         toast.success("Clan created successfully!");
@@ -560,7 +584,7 @@ const createClan = async () => {
         console.error("Error creating clan:", error);
         toast.error("Failed to create clan.");
     } finally {
-        setLoading(false);
+        setloadingClanCreate(false);
     }
 };
 
@@ -603,7 +627,7 @@ const produceArmor = async (armorType, quantity) => {
     }
 
     try {
-        setLoading(true);
+        setloadingArmoryForge(true);
         const contract = await getTheLandSignerContract();
         const tx = await contract.produceArmor(
             tileCoords.x - 1,
@@ -618,7 +642,7 @@ const produceArmor = async (armorType, quantity) => {
         console.error("Error producing armor:", error);
         toast.error("Failed to produce armor. Please try again.");
     } finally {
-        setLoading(false);
+        setloadingArmoryForge(false);
     }
 };
 
@@ -632,7 +656,7 @@ const produceWeapon = async (weaponType, quantity) => {
     }
 
     try {
-        setLoading(true);
+        setloadingBlacksmithForge(true);
         const contract = await getTheLandSignerContract();
         const tx = await contract.produceWeapon(
             tileCoords.x - 1,
@@ -647,7 +671,7 @@ const produceWeapon = async (weaponType, quantity) => {
         console.error("Error producing weapon:", error);
         toast.error("Failed to produce weapon. Please try again.");
     } finally {
-        setLoading(false);
+        setloadingBlacksmithForge(false);
     }
 };
 
@@ -660,7 +684,13 @@ const trainSoldier = async (soldierType, quantity) => {
     }
 
     try {
-        setLoading(true);
+
+        if (soldierType === 1) {
+        setloadingOffensiveTraining(true);
+        } else  if (soldierType === 2) {
+        setloadingDefensiveTraining(true);
+        }
+
         const contract = await getTheLandSignerContract();
         const tx = await contract.createSoldier(
             tileCoords.x - 1,
@@ -676,14 +706,22 @@ const trainSoldier = async (soldierType, quantity) => {
         console.error("Error training soldier:", error);
         toast.error("Failed to train soldier. Please try again.");
     } finally {
-        setLoading(false);
+        setloadingOffensiveTraining(false);
+        setloadingDefensiveTraining(false);
     }
 };
 
 
 const upgradeTech = async (techType) => {
     try {
-        setLoading(true);
+
+         if (techType === 1) {
+        setlaodingOffensiveTech(true);
+        } else  if (techType === 2) {
+        setloadingDefensiveTech(true);
+        }
+
+
         const contract = await getTheLandSignerContract();
         const tx = await contract.upgradeTech(tileCoords.x - 1, tileCoords.y - 1, techType);
         await tx.wait();
@@ -694,7 +732,8 @@ const upgradeTech = async (techType) => {
         console.error("Error upgrading tech:", error);
         toast.error("Failed to upgrade technology. Please try again.");
     } finally {
-        setLoading(false);
+        setlaodingOffensiveTech(false);
+        setloadingDefensiveTech(false);
     }
 };
 
@@ -1338,6 +1377,14 @@ const fetchAllBuildings = async (mainX, mainY) => {
             this.load.image('offensivesoldier', offensiveSoldierImage);
 
             this.load.image('clockLoading', clockLoadingImage);
+            this.load.image('forgekLoading', forgekLoadingImage);
+            this.load.image('offensiveLoading', offensiveLoadingImage);
+            this.load.image('defensiveLoading', defensiveLoadingImage);
+            this.load.image('clancreateLoading', clancreateLoadingImage);
+
+            this.load.image('offensiveTechLoading', offensiveTechLoadingImage);
+            this.load.image('defensiveTechLoading', defensiveTechLoadingImage);
+            
 
         }
 
@@ -1436,6 +1483,24 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                                     setinteractionMenuType('armory'); // Set the menu type to armory
                                 }
                             });
+
+
+                            const forgeOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${forgekLoadingImage}" 
+      style="width: 150px; height: 150px; display: none; filter: brightness(1.9); transform: translate(-120px, -80px);" 
+    />
+  `);
+  forgeOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.armoryForgeOverlays) {
+    gameRef.current.armoryForgeOverlays = [];
+  }
+  gameRef.current.armoryForgeOverlays.push(forgeOverlay);
+
+
+
                         } else if (buildingImage === 'blacksmith') {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
@@ -1444,6 +1509,25 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                                     setinteractionMenuType('blacksmith'); // Set the menu type to blacksmith
                                 }
                             });
+
+
+
+                            const forgeOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${forgekLoadingImage}" 
+      style="width: 150px; height: 150px; display: none; filter: brightness(1.9); transform: translate(-120px, -80px);" 
+    />
+  `);
+  forgeOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.blacksmithForgeOverlays) {
+    gameRef.current.blacksmithForgeOverlays = [];
+  }
+  gameRef.current.blacksmithForgeOverlays.push(forgeOverlay);
+
+
+
                         } else if (buildingImage === 'fightingpit') {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
@@ -1452,6 +1536,45 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                                     setinteractionMenuType('train-soldier'); // Set the menu type to train soldiers
                                 }
                             });
+
+
+
+                            const trainingOffensiveOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${offensiveLoadingImage}" 
+      style="width: 120px; height: 120px; display: none; filter: brightness(1.9); transform: translate(-60px, -40px);" 
+    />
+  `);
+  trainingOffensiveOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.trainingOffensiveOverlays) {
+    gameRef.current.trainingOffensiveOverlays = [];
+  }
+  gameRef.current.trainingOffensiveOverlays.push(trainingOffensiveOverlay);
+
+
+
+
+
+
+   const trainingDefensiveOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${defensiveLoadingImage}" 
+      style="width: 120px; height: 120px; display: none; filter: brightness(1.9); transform: translate(-60px, -40px);" 
+    />
+  `);
+  trainingDefensiveOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.trainingDefensiveOverlays) {
+    gameRef.current.trainingDefensiveOverlays = [];
+  }
+  gameRef.current.trainingDefensiveOverlays.push(trainingDefensiveOverlay);
+
+
+
+
                         } else if (buildingImage === 'house') {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
@@ -1494,6 +1617,46 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                                     setinteractionMenuType('workshop'); // Set the menu type to train soldiers
                                 }
                             });
+
+
+
+                            const offensiveTechOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${offensiveTechLoadingImage}" 
+      style="width: 96px; height: 96px; display: none; filter: brightness(1.3); transform: translate(-60px, -20px);" 
+    />
+  `);
+  offensiveTechOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.offensiveTechOverlays) {
+    gameRef.current.offensiveTechOverlays = [];
+  }
+  gameRef.current.offensiveTechOverlays.push(offensiveTechOverlay);
+
+
+
+
+
+
+
+  const defensiveTechOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${defensiveTechLoadingImage}" 
+      style="width: 96px; height: 96px; display: none; filter: brightness(1.3); transform: translate(-60px, -20px);" 
+    />
+  `);
+  defensiveTechOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.defensiveTechOverlays) {
+    gameRef.current.defensiveTechOverlays = [];
+  }
+  gameRef.current.defensiveTechOverlays.push(defensiveTechOverlay);
+
+
+
+
                         } else if (buildingImage === 'market') {
                             building.setInteractive({ pixelPerfect: true });
                             building.on('pointerdown', (pointer) => {
@@ -1510,6 +1673,26 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                                     setinteractionMenuType('clanhall'); // Set the menu type to train soldiers
                                 }
                             });
+
+
+
+                            const flagOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${clancreateLoadingImage}" 
+      style="width: 150px; height: 150px; display: none; filter: brightness(2.1); transform: translate(-120px, -90px);" 
+    />
+  `);
+  flagOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.flagOverlays) {
+    gameRef.current.flagOverlays = [];
+  }
+  gameRef.current.flagOverlays.push(flagOverlay);
+
+
+
+
                         }
                         
                     }
@@ -1832,6 +2015,97 @@ useEffect(() => {
 
 
 
+
+useEffect(() => {
+  if (gameRef.current?.offensiveTechOverlays) {
+    for (const overlay of gameRef.current.offensiveTechOverlays) {
+      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+      if (imgEl) {
+        imgEl.style.display = laodingOffensiveTech ? 'block' : 'none';
+      }
+    }
+  }
+}, [laodingOffensiveTech]);
+
+
+
+
+useEffect(() => {
+  if (gameRef.current?.defensiveTechOverlays) {
+    for (const overlay of gameRef.current.defensiveTechOverlays) {
+      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+      if (imgEl) {
+        imgEl.style.display = loadingDefensiveTech ? 'block' : 'none';
+      }
+    }
+  }
+}, [loadingDefensiveTech]);
+
+
+useEffect(() => {
+  if (gameRef.current?.flagOverlays) {
+    for (const overlay of gameRef.current.flagOverlays) {
+      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+      if (imgEl) {
+        imgEl.style.display = loadingClanCreate ? 'block' : 'none';
+      }
+    }
+  }
+}, [loadingClanCreate]);
+
+
+
+useEffect(() => {
+  if (gameRef.current?.armoryForgeOverlays) {
+    for (const overlay of gameRef.current.armoryForgeOverlays) {
+      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+      if (imgEl) {
+        imgEl.style.display = loadingArmoryForge ? 'block' : 'none';
+      }
+    }
+  }
+}, [loadingArmoryForge]);
+
+
+useEffect(() => {
+  if (gameRef.current?.blacksmithForgeOverlays) {
+    for (const overlay of gameRef.current.blacksmithForgeOverlays) {
+      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+      if (imgEl) {
+        imgEl.style.display = loadingBlacksmithForge ? 'block' : 'none';
+      }
+    }
+  }
+}, [loadingBlacksmithForge]);
+
+
+
+
+useEffect(() => {
+  if (gameRef.current?.trainingOffensiveOverlays) {
+    for (const overlay of gameRef.current.trainingOffensiveOverlays) {
+      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+      if (imgEl) {
+        imgEl.style.display = loadingOffensiveTraining ? 'block' : 'none';
+      }
+    }
+  }
+}, [loadingOffensiveTraining]);
+
+
+useEffect(() => {
+  if (gameRef.current?.trainingDefensiveOverlays) {
+    for (const overlay of gameRef.current.trainingDefensiveOverlays) {
+      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+      if (imgEl) {
+        imgEl.style.display = loadingDefensiveTraining ? 'block' : 'none';
+      }
+    }
+  }
+}, [loadingDefensiveTraining]);
+
+
+
     useEffect(() => {
       // Update the ref whenever `selectedBuilding` changes
       selectedBuildingRef.current = selectedBuilding;
@@ -1848,7 +2122,13 @@ useEffect(() => {
 
     try {
         const contract = await getTheLandSignerContract(); // Replace with your function to get a signer instance
-        const tx = await contract.useTurns(turns, tileCoords.x - 1, tileCoords.y - 1);
+        const feeWei = await contract.turnFeeWei();
+        const tx = await contract.useTurns(
+      turns,
+      tileCoords.x - 1,
+      tileCoords.y - 1,
+      { value: feeWei } // 👈 sends the native coin (e.g., 0.1 ETH) with the tx
+    );
         await tx.wait();
 
         // Fetch updated tile data after the transaction
@@ -1871,6 +2151,8 @@ useEffect(() => {
 
 
     return (
+
+        
         <div
             style={{
                 width: '100vw',
@@ -1886,7 +2168,7 @@ useEffect(() => {
 
             <div
   style={{
-    pointerEvents: loadingTurns ? 'none' : 'auto',
+    pointerEvents: laodingOffensiveTech || loadingDefensiveTech || loadingClanCreate || loadingBlacksmithForge || loadingDefensiveTraining || loadingOffensiveTraining || loadingTurns || loadingArmoryForge ? 'none' : 'auto',
   }}
 >
 
@@ -2048,10 +2330,21 @@ useEffect(() => {
 </div>
 
             
+<div>
+        <a
+            href={`https://twitter.com`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '16px' }}
+          >
+            Realm Docs
+          </a>
 
+</div>
 
 
                 </div>
+
 
 
         {/* Loading Bar */}
@@ -2063,6 +2356,11 @@ useEffect(() => {
   <div className="medieval-progress-label">
     Next Level {tileData.accumulatedTurns}/{1000}
   </div>
+
+
+  
+
+
 </div>
 
     </>
@@ -2311,7 +2609,25 @@ useEffect(() => {
                     justifyContent: 'center',
                 }}>
                 Select Building Type
+
+
+                <div>
+        <a
+            href={`https://twitter.com`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '16px' }}
+          >
+            Buildings Docs
+          </a>
+
+</div>
+
+
                 </div>
+
+
+                
 
         {/* Current Tile Resources */}
         {tileData && (

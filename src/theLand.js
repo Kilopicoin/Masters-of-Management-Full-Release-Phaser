@@ -556,7 +556,7 @@ const createClan = async () => {
     }
 
     try {
-        setloadingClanCreate(true);
+        
         const contract = await getclanSignerContract();
 
       const available = await contract.isClanNameAvailable(newClanName);
@@ -564,6 +564,8 @@ const createClan = async () => {
         toast.error("This clan name is already taken.");
         return;
       }
+
+      setloadingClanCreate(true);
 
         const TokencontractSigner = await getTokenSignerContract();
         const Allowancetx = await TokencontractSigner.increaseAllowance(
@@ -1835,6 +1837,27 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                     setinteractionMenuType('armory');
                 }
             });
+
+
+
+
+             const forgeOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${forgekLoadingImage}" 
+      style="width: 150px; height: 150px; display: none; filter: brightness(1.9); transform: translate(-120px, -80px);" 
+    />
+  `);
+  forgeOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.armoryForgeOverlays) {
+    gameRef.current.armoryForgeOverlays = [];
+  }
+  gameRef.current.armoryForgeOverlays.push(forgeOverlay);
+
+
+
+
         } else if (imageKey === 'blacksmith') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
@@ -1842,6 +1865,26 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                     setinteractionMenuType('blacksmith');
                 }
             });
+
+
+
+            const forgeOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${forgekLoadingImage}" 
+      style="width: 150px; height: 150px; display: none; filter: brightness(1.9); transform: translate(-120px, -80px);" 
+    />
+  `);
+  forgeOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.blacksmithForgeOverlays) {
+    gameRef.current.blacksmithForgeOverlays = [];
+  }
+  gameRef.current.blacksmithForgeOverlays.push(forgeOverlay);
+
+
+
+
         } else if (imageKey === 'fightingpit') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
@@ -1849,6 +1892,44 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                     setinteractionMenuType('train-soldier');
                 }
             });
+
+
+
+            const trainingOffensiveOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${offensiveLoadingImage}" 
+      style="width: 120px; height: 120px; display: none; filter: brightness(1.9); transform: translate(-60px, -40px);" 
+    />
+  `);
+  trainingOffensiveOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.trainingOffensiveOverlays) {
+    gameRef.current.trainingOffensiveOverlays = [];
+  }
+  gameRef.current.trainingOffensiveOverlays.push(trainingOffensiveOverlay);
+
+
+
+
+
+
+   const trainingDefensiveOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${defensiveLoadingImage}" 
+      style="width: 120px; height: 120px; display: none; filter: brightness(1.9); transform: translate(-60px, -40px);" 
+    />
+  `);
+  trainingDefensiveOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.trainingDefensiveOverlays) {
+    gameRef.current.trainingDefensiveOverlays = [];
+  }
+  gameRef.current.trainingDefensiveOverlays.push(trainingDefensiveOverlay);
+
+
+
         } else if (imageKey === 'house') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
@@ -1856,6 +1937,25 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                     setinteractionMenuType('house-info');
                 }
             });
+
+
+const clockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${clockLoadingImage}" 
+      style="width: 96px; height: 96px; display: none; filter: brightness(2.1); transform: translate(-40px, -10px);" 
+    />
+  `);
+  clockOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.houseClockOverlays) {
+    gameRef.current.houseClockOverlays = [];
+  }
+  gameRef.current.houseClockOverlays.push(clockOverlay);
+
+
+
+
         } else if (imageKey === 'tower') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
@@ -1870,6 +1970,45 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                     setinteractionMenuType('workshop');
                 }
             });
+
+
+
+            const offensiveTechOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${offensiveTechLoadingImage}" 
+      style="width: 96px; height: 96px; display: none; filter: brightness(1.3); transform: translate(-60px, -20px);" 
+    />
+  `);
+  offensiveTechOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.offensiveTechOverlays) {
+    gameRef.current.offensiveTechOverlays = [];
+  }
+  gameRef.current.offensiveTechOverlays.push(offensiveTechOverlay);
+
+
+
+
+
+
+
+  const defensiveTechOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${defensiveTechLoadingImage}" 
+      style="width: 96px; height: 96px; display: none; filter: brightness(1.3); transform: translate(-60px, -20px);" 
+    />
+  `);
+  defensiveTechOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.defensiveTechOverlays) {
+    gameRef.current.defensiveTechOverlays = [];
+  }
+  gameRef.current.defensiveTechOverlays.push(defensiveTechOverlay);
+
+
+
         } else if (imageKey === 'market') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
@@ -1884,6 +2023,25 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                     setinteractionMenuType('clanhall');
                 }
             });
+
+
+
+            const flagOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${clancreateLoadingImage}" 
+      style="width: 150px; height: 150px; display: none; filter: brightness(2.1); transform: translate(-120px, -90px);" 
+    />
+  `);
+  flagOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.flagOverlays) {
+    gameRef.current.flagOverlays = [];
+  }
+  gameRef.current.flagOverlays.push(flagOverlay);
+
+
+  
         }
 
     } else {
