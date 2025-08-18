@@ -17,7 +17,7 @@ import playIcon from './assets/play-icon.png';
 import stopIcon from './assets/stop-icon.png';
 import { getAddress } from 'ethers';
 import TheLand from './theLand';
-import getclanContract, { getclanSignerContract } from './clancontract';
+import getclanContract, { getclanSignerContract, clancontractAddress } from './clancontract';
 import getTheLandContract, { getTheLandSignerContract } from './TheLandContract';
 import getNFTContract, { getNFTSignerContract } from './nftContract';
 import getMarketplaceContract, { getMarketplaceSignerContract } from './MarketplaceContract';
@@ -96,7 +96,7 @@ const elseresourceAnimationLoopRef = useRef(null);
 const attackAnimationLoopRef = useRef(null);
 
 const battleGifRef = useRef(null);
-
+const [txCounter, setTxCounter] = useState(0);
 
 const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/1.png": "nftflag_1",
@@ -131,6 +131,21 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
 
+
+
+useEffect(() => {
+    const loadTXCounter = async () => {
+      const contract = await getTheLandContract();
+      const counter = await contract.TXCounter(); // public getter
+      setTxCounter(counter.toString());
+    };
+
+    loadTXCounter();
+
+    // Optional: refresh every 10 seconds
+    const interval = setInterval(loadTXCounter, 100000);
+    return () => clearInterval(interval);
+  }, []);
 
 
 
@@ -918,7 +933,7 @@ const fetchAttackerResources = useCallback(async () => {
     const lastAttRaw = await marketContract.lastAttackTurn(x, y);
     const attTurnsUsed = parseInt(attTurnsUsedRaw.toString());
     const lastAtt = parseInt(lastAttRaw.toString());
-    const cooldown = 300;
+    const cooldown = 150;
     if (attTurnsUsed < lastAtt + cooldown) {
       setAttackCooldownMessageX(`Attacker Cooldown (${(lastAtt + cooldown) - attTurnsUsed} turns left)`);
     }
@@ -2650,6 +2665,11 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
       onClick={async () => {
         try {
           setLoading(true);
+
+          const tokenContractSigner = await getTokenSignerContract();
+    const allowanceTx = await tokenContractSigner.increaseAllowance(clancontractAddress, 1000000000);
+    await allowanceTx.wait();
+
           const clanContract = await getclanSignerContract();
           const tx = await clanContract.leaveClan();
           await tx.wait();
@@ -2674,7 +2694,7 @@ updateTileMap(); // Refresh map visuals
         }
       }}
     >
-      Leave Clan
+      Leave Clan (1000 LOP)
     </button>
 )}
 
@@ -2703,6 +2723,10 @@ updateTileMap(); // Refresh map visuals
       }
 
 
+      const tokenContractSigner = await getTokenSignerContract();
+    const allowanceTx = await tokenContractSigner.increaseAllowance(clancontractAddress, 1000000000);
+    await allowanceTx.wait();
+
           const clanContract = await getclanSignerContract();
           const tx = await clanContract.removeMember(userClan.id, tileCoords.occupant);
           await tx.wait();
@@ -2727,7 +2751,7 @@ updateTileMap(); // Refresh map visuals
         }
       }}
     >
-      Remove from Clan
+      RemoveFromClan (1000 LOP)
     </button>
 )}
 
@@ -3185,6 +3209,17 @@ style={{
 {interactionMenuTypeA === "attackMenu" && attackerTroops && (
   <div className="interaction-menuA">
     <h4>Attack Menu</h4>
+    <div>
+        <a
+            href={`https://twitter.com`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '16px' }}
+          >
+            War System Docs
+          </a>
+
+</div>
     <div>
       Attacker Soldiers<br/>
       <img src={offensiveSoldierImage} alt="Defensive Soldier" style={{ width: '20px' }} /> Offensive Soldiers: {attackerTroops.offensiveSoldier} 
@@ -3817,6 +3852,23 @@ style={{
       : null
   }
 />
+
+
+<div
+      style={{
+        position: "fixed",
+        bottom: "10px",
+        left: "10px",
+        background: "rgba(0,0,0,0.6)",
+        color: "white",
+        padding: "6px 12px",
+        borderRadius: "8px",
+        fontSize: "14px",
+        fontFamily: "monospace"
+      }}
+    >
+      TXCounter: {txCounter}
+    </div>
 
 
 </div>

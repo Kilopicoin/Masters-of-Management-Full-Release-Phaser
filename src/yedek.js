@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-
+import ChatBox from './ChatBox';
 import Phaser from 'phaser';
 import grassImage from './assets/grass.png';
 import oceanImage from './assets/ocean.png';
@@ -17,7 +17,7 @@ import playIcon from './assets/play-icon.png';
 import stopIcon from './assets/stop-icon.png';
 import { getAddress } from 'ethers';
 import TheLand from './theLand';
-import getclanContract, { getclanSignerContract } from './clancontract';
+import getclanContract, { getclanSignerContract, clancontractAddress } from './clancontract';
 import getTheLandContract, { getTheLandSignerContract } from './TheLandContract';
 import getNFTContract, { getNFTSignerContract } from './nftContract';
 import getMarketplaceContract, { getMarketplaceSignerContract } from './MarketplaceContract';
@@ -96,7 +96,7 @@ const elseresourceAnimationLoopRef = useRef(null);
 const attackAnimationLoopRef = useRef(null);
 
 const battleGifRef = useRef(null);
-
+const [txCounter, setTxCounter] = useState(0);
 
 const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/1.png": "nftflag_1",
@@ -131,6 +131,21 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
 
+
+
+useEffect(() => {
+    const loadTXCounter = async () => {
+      const contract = await getTheLandContract();
+      const counter = await contract.TXCounter(); // public getter
+      setTxCounter(counter.toString());
+    };
+
+    loadTXCounter();
+
+    // Optional: refresh every 10 seconds
+    const interval = setInterval(loadTXCounter, 100000);
+    return () => clearInterval(interval);
+  }, []);
 
 
 
@@ -918,7 +933,7 @@ const fetchAttackerResources = useCallback(async () => {
     const lastAttRaw = await marketContract.lastAttackTurn(x, y);
     const attTurnsUsed = parseInt(attTurnsUsedRaw.toString());
     const lastAtt = parseInt(lastAttRaw.toString());
-    const cooldown = 300;
+    const cooldown = 150;
     if (attTurnsUsed < lastAtt + cooldown) {
       setAttackCooldownMessageX(`Attacker Cooldown (${(lastAtt + cooldown) - attTurnsUsed} turns left)`);
     }
@@ -2070,20 +2085,56 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
 
 
 
-      
+      const hoverCells = Array.from({ length: mapSize }, () => Array(mapSize).fill(null));
 
 
 
       for (let y = 0; y < mapSize; y++) {
-        for (let x = 0; x < mapSize; x++) {
-          const { worldX, worldY } = tileToWorldPosition(x, y);
+  for (let x = 0; x < mapSize; x++) {
+    const { worldX, worldY } = tileToWorldPosition(x, y);
 
-          this.add.image(worldX, worldY, 'grass').setDepth(worldY - 1000);
-          
-          // const tile = this.add.image(worldX, worldY, 'grass').setDepth(worldY);
-          // tile.setPipeline('Light2D');
-        }
-      }
+    // 1) Create the GRASS sprite fully hidden.
+    // Depth places it under flags/units but above the big background map.
+    const grass = this.add.image(worldX, worldY, 'grass')
+      .setDepth(worldY - 10)
+      .setAlpha(0);
+    hoverCells[y][x] = grass;
+
+    // 2) Create an invisible interactive zone on top of the cell.
+    // Slightly smaller than tile so you don't catch neighbor edges.
+   const diamond = new Phaser.Geom.Polygon([
+  0, visibleTileHeight / 2,               // top point
+  tileWidth / 2, visibleTileHeight,       // right point
+  tileWidth, visibleTileHeight / 2,       // bottom point
+  tileWidth / 2, 0                        // left point
+]);
+
+const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTileHeight)
+  .setOrigin(0, 0) // match polygon coords
+  .setInteractive(diamond, Phaser.Geom.Polygon.Contains);
+    zone.setDepth(worldY + 50); // ensure it's on top to receive hover
+
+    // 3) Fade in/out on hover (skip while dragging the map).
+    zone.on('pointerover', () => {
+      this.tweens.add({
+        targets: grass,
+        alpha: 1,
+        tint: 0xff0000,
+        duration: 120,
+        ease: 'Linear'
+      });
+    });
+
+    zone.on('pointerout', () => {
+      this.tweens.add({
+        targets: grass,
+        alpha: 0,
+        duration: 120,
+        ease: 'Linear'
+      });
+    });
+  }
+}
 
 
 
@@ -2252,7 +2303,7 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
     };
   
 
-     if (RPC === 'https://api.s0.b.hmny.io') {
+     if (RPC !== 'https://api.s0.b.hmny.io') {
     setupEventListener();
   }
 
@@ -2384,7 +2435,16 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
     width: '250px',
   }}
 ><strong>Info Box</strong>
-
+<div>
+<a
+            href={`https://twitter.com`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '16px' }}
+          >
+            Tutorial Video
+          </a>
+          </div>
 {metaMaskAccount ? (
 <>
           <p>
@@ -2605,6 +2665,11 @@ mapImage.setDisplaySize(8000, 4600); // Optional: you can also scale it with .se
       onClick={async () => {
         try {
           setLoading(true);
+
+          const tokenContractSigner = await getTokenSignerContract();
+    const allowanceTx = await tokenContractSigner.increaseAllowance(clancontractAddress, 1000000000);
+    await allowanceTx.wait();
+
           const clanContract = await getclanSignerContract();
           const tx = await clanContract.leaveClan();
           await tx.wait();
@@ -2629,7 +2694,7 @@ updateTileMap(); // Refresh map visuals
         }
       }}
     >
-      Leave Clan
+      Leave Clan (1000 LOP)
     </button>
 )}
 
@@ -2658,6 +2723,10 @@ updateTileMap(); // Refresh map visuals
       }
 
 
+      const tokenContractSigner = await getTokenSignerContract();
+    const allowanceTx = await tokenContractSigner.increaseAllowance(clancontractAddress, 1000000000);
+    await allowanceTx.wait();
+
           const clanContract = await getclanSignerContract();
           const tx = await clanContract.removeMember(userClan.id, tileCoords.occupant);
           await tx.wait();
@@ -2682,7 +2751,7 @@ updateTileMap(); // Refresh map visuals
         }
       }}
     >
-      Remove from Clan
+      RemoveFromClan (1000 LOP)
     </button>
 )}
 
@@ -2868,7 +2937,7 @@ updateTileMap(); // Refresh map visuals
       top: '100px',
       left: '20px',
       padding: '15px',
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+      backgroundColor: 'rgba(44, 37, 37, 1)',
       borderRadius: '10px',
       boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
       color: '#333',
@@ -2876,7 +2945,18 @@ updateTileMap(); // Refresh map visuals
       width: '250px',
     }}
   >
-    <strong>Referral Network</strong>
+    <p><strong>Referral Network</strong></p>
+    <div>
+        <a
+            href={`https://twitter.com`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '16px' }}
+          >
+            Referral System Docs
+          </a>
+
+</div>
     <p><strong>Referrer:</strong> {referralNetwork.referrer ? `${referralNetwork.referrer.slice(0, 6)}...${referralNetwork.referrer.slice(-4)}` : 'None'}</p>
     <p><strong>Referrals:</strong></p>
     <ul>
@@ -3129,6 +3209,17 @@ style={{
 {interactionMenuTypeA === "attackMenu" && attackerTroops && (
   <div className="interaction-menuA">
     <h4>Attack Menu</h4>
+    <div>
+        <a
+            href={`https://twitter.com`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '16px' }}
+          >
+            War System Docs
+          </a>
+
+</div>
     <div>
       Attacker Soldiers<br/>
       <img src={offensiveSoldierImage} alt="Defensive Soldier" style={{ width: '20px' }} /> Offensive Soldiers: {attackerTroops.offensiveSoldier} 
@@ -3685,6 +3776,18 @@ style={{
             Cancel
         </button>
 
+<div>
+        <a
+            href={`https://twitter.com`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '16px' }}
+          >
+            Leaderboard Docs
+          </a>
+
+</div>
+
     </div>
 )}
 
@@ -3741,7 +3844,31 @@ style={{
     </div>
 )}
 
+<ChatBox
+  account={metaMaskAccount}
+  twitterHandle={
+    metaMaskAccount && getAddress(metaMaskAccount) === tileCoords.occupant
+      ? tileCoords.twitterHandle
+      : null
+  }
+/>
 
+
+<div
+      style={{
+        position: "fixed",
+        bottom: "10px",
+        left: "10px",
+        background: "rgba(0,0,0,0.6)",
+        color: "white",
+        padding: "6px 12px",
+        borderRadius: "8px",
+        fontSize: "14px",
+        fontFamily: "monospace"
+      }}
+    >
+      TXCounter: {txCounter}
+    </div>
 
 
 </div>
