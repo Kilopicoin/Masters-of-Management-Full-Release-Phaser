@@ -16,6 +16,14 @@ import marketImage from './assets/buildings/market.png';
 import towerImage from './assets/buildings/tower.png';
 import workshopImage from './assets/buildings/workshop.png';
 import backgroundMusicFile from './assets/background2.mp3';
+
+import armorySound from './assets/armory.mp3';
+import turnSound from './assets/turnuse.mp3';
+import constructionSound from './assets/construction.mp3';
+import clancreateSound from './assets/clancreate.mp3';
+import trainingSound from './assets/training.mp3';
+import upgradeSound from './assets/upgrade.mp3';
+
 import foodImage from './assets/res/food.png';
 import woodImage from './assets/res/wood.png';
 import stoneImage from './assets/res/stone.png';
@@ -297,6 +305,7 @@ useEffect(() => {
 const handleSetClanFlag = async (tokenId) => {
   try {
     setLoading(true);
+    gameRef.current.sounds.clancreate.play();
 
     const TokenContract = await getTokenSignerContract();
         const approvalTx = await TokenContract.increaseAllowance(clancontractAddress, 10000 * 10 ** 6);
@@ -566,6 +575,7 @@ const createClan = async () => {
       }
 
       setloadingClanCreate(true);
+      gameRef.current.sounds.clancreate.play();
 
         const TokencontractSigner = await getTokenSignerContract();
         const Allowancetx = await TokencontractSigner.increaseAllowance(
@@ -628,6 +638,7 @@ const produceArmor = async (armorType, quantity) => {
 
     try {
         setloadingArmoryForge(true);
+        gameRef.current.sounds.armory.play();
         const contract = await getTheLandSignerContract();
         const tx = await contract.produceArmor(
             tileCoords.x - 1,
@@ -639,6 +650,7 @@ const produceArmor = async (armorType, quantity) => {
         toast.success(`${armorType === 1 ? "Offensive" : "Defensive"} armor produced successfully!`);
         await fetchTileData(tileCoords.x, tileCoords.y); // Refresh tile data
     } catch (error) {
+        
         console.error("Error producing armor:", error);
         toast.error("Failed to produce armor. Please try again.");
     } finally {
@@ -657,6 +669,7 @@ const produceWeapon = async (weaponType, quantity) => {
 
     try {
         setloadingBlacksmithForge(true);
+        gameRef.current.sounds.armory.play();
         const contract = await getTheLandSignerContract();
         const tx = await contract.produceWeapon(
             tileCoords.x - 1,
@@ -687,8 +700,10 @@ const trainSoldier = async (soldierType, quantity) => {
 
         if (soldierType === 1) {
         setloadingOffensiveTraining(true);
+        gameRef.current.sounds.training.play();
         } else  if (soldierType === 2) {
         setloadingDefensiveTraining(true);
+        gameRef.current.sounds.training.play();
         }
 
         const contract = await getTheLandSignerContract();
@@ -717,8 +732,10 @@ const upgradeTech = async (techType) => {
 
          if (techType === 1) {
         setlaodingOffensiveTech(true);
+        gameRef.current.sounds.upgrade.play();
         } else  if (techType === 2) {
         setloadingDefensiveTech(true);
+        gameRef.current.sounds.upgrade.play();
         }
 
 
@@ -1194,6 +1211,7 @@ useEffect(() => {
 const placeBuildingOnTile = useCallback(
     async (mainX, mainY, interiorX, interiorY, buildingType, onTransactionStart, onTransactionEnd) => {
         setLoading(true);
+        gameRef.current.sounds.construction.play();
         try {
             onTransactionStart(); // Temporarily place the transparent image
             const contract = await getTheLandSignerContract();
@@ -1346,6 +1364,14 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
         function preload() {
             this.load.audio('backgroundMusic2', backgroundMusicFile);
+
+            this.load.audio('armorySound', armorySound);
+            this.load.audio('turnSound', turnSound);
+            this.load.audio('constructionSound', constructionSound);
+            this.load.audio('clancreateSound', clancreateSound);
+            this.load.audio('trainingSound', trainingSound);
+            this.load.audio('upgradeSound', upgradeSound);
+
             this.load.image('grassX', grassXImage);
             this.load.image('foodX', foodXImage);
             this.load.image('woodX', woodXImage);
@@ -1389,6 +1415,19 @@ const fetchAllBuildings = async (mainX, mainY) => {
         }
 
         async function create() {
+
+            gameRef.current.sounds = {
+  armory: this.sound.add('armorySound', { volume: 0.6 }),
+  turn: this.sound.add('turnSound', { volume: 0.6 }),
+   construction: this.sound.add('constructionSound', { volume: 0.6 }),
+   clancreate: this.sound.add('clancreateSound', { volume: 0.6 }),
+   training: this.sound.add('trainingSound', { volume: 0.3 }),
+   upgrade: this.sound.add('upgradeSound', { volume: 0.6 }),
+
+};
+
+
+
             this.buildingSprites = Array(mapSize).fill(null).map(() => Array(mapSize).fill(null));
 
             const tileWidth = 386;
@@ -2275,6 +2314,7 @@ useEffect(() => {
     }
 
     setLoadingTurns(true);
+    gameRef.current.sounds.turn.play();
 
     try {
         const contract = await getTheLandSignerContract(); // Replace with your function to get a signer instance

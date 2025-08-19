@@ -13,6 +13,13 @@ import './App.css';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import backgroundMusicFile from './assets/background.mp3';
+
+import leaderboardSound from './assets/leaderboard.mp3';
+import paperSound from './assets/paper.mp3';
+import horsecartSound from './assets/horsecart.mp3';
+import battleSound from './assets/battle.mp3';
+
+
 import playIcon from './assets/play-icon.png';
 import stopIcon from './assets/stop-icon.png';
 import { getAddress } from 'ethers';
@@ -140,10 +147,9 @@ useEffect(() => {
       setTxCounter(counter.toString());
     };
 
-    loadTXCounter();
 
     // Optional: refresh every 10 seconds
-    const interval = setInterval(loadTXCounter, 100000);
+    const interval = setInterval(loadTXCounter, 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -313,6 +319,7 @@ const stopElseAttackLoop = () => {
 
 // Show all three attack visuals for ~6s, then cleanup.
 const triggerAttackCinematics = useCallback(({ ax, ay, dx, dy }) => {
+  gameRef.current.sounds.battle.play();
   // Convert BigInts to numbers if needed
   const A = { x: Number(ax), y: Number(ay) };   // 0-based from chain
   const D = { x: Number(dx) + 1, y: Number(dy) + 1 }; // make target 1-based for helpers
@@ -347,6 +354,7 @@ const triggerAttackCinematics = useCallback(({ ax, ay, dx, dy }) => {
 
 
 const triggerResourcesCinematics = useCallback(({ ax, ay, dx, dy, type }) => {
+  gameRef.current.sounds.horsecart.play();
   // Convert BigInts to numbers if needed
   const A = { x: Number(ax), y: Number(ay) };   // 0-based from chain
   const D = { x: Number(dx) + 1, y: Number(dy) + 1 }; // make target 1-based for helpers
@@ -792,6 +800,7 @@ async function sendToSmartContract(twitterHandle) {
 const fetchMyRecentWarLogs = async () => {
   try {
     setLoading(true);
+    gameRef.current.sounds.paper.play();
     const marketContract = await getMarketplaceSignerContract();
     const data = await marketContract.getRecentPlayerWars(metaMaskAccount);
     setWarLogsData(data);
@@ -806,6 +815,7 @@ const fetchMyRecentWarLogs = async () => {
 const fetchMyAllWarLogs = async () => {
   try {
     setLoading(true);
+    gameRef.current.sounds.paper.play();
     const marketContract = await getMarketplaceSignerContract();
     const data = await marketContract.getAllPlayerWars(metaMaskAccount);
     setWarLogsData(data);
@@ -823,6 +833,7 @@ const fetchMyAllWarLogs = async () => {
 const fetchRecentWarLogs = async () => {
   try {
     setLoading(true);
+    gameRef.current.sounds.paper.play();
     const marketContract = await getMarketplaceSignerContract();
     const data = await marketContract.getRecentWarHistory();
     setWarLogsData(data);
@@ -837,6 +848,7 @@ const fetchRecentWarLogs = async () => {
 const fetchAllWarLogs = async () => {
   try {
     setLoading(true);
+    gameRef.current.sounds.paper.play();
     const marketContract = await getMarketplaceSignerContract();
     const data = await marketContract.getAllWarHistory();
     setWarLogsData(data);
@@ -865,6 +877,7 @@ const handleConfirmAttack = async () => {
 
 
     setLoadingAttack(true);
+    gameRef.current.sounds.battle.play();
     startAttackTransferLoop(attackerTileCoords, tileCoords);
 
     const marketContract = await getMarketplaceSignerContract();
@@ -1028,6 +1041,7 @@ useEffect(() => {
   const fetchLeaderboardData = async () => {
       try {
           setLoading(true);
+          gameRef.current.sounds.leaderboard.play();
           const Land = await getTheLandSignerContract();
           const Clan = await getclanSignerContract();
   
@@ -1934,6 +1948,13 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
       this.load.image('skyflag', skyflagImage);
       this.load.image('largemap', largemapImage);
       this.load.audio('backgroundMusic', backgroundMusicFile);
+
+      this.load.audio('leaderboardSound', leaderboardSound);
+      this.load.audio('paperSound', paperSound);
+      this.load.audio('horsecartSound', horsecartSound);
+      this.load.audio('battleSound', battleSound);
+
+
       this.load.image('nftflag_1', "https://kilopi.net/mom/nfts/1.png");
       this.load.image('nftflag_2', "https://kilopi.net/mom/nfts/2.png");
       this.load.image('nftflag_3', "https://kilopi.net/mom/nfts/3.png");
@@ -2028,6 +2049,16 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     
 
     async function create() {
+
+       gameRef.current.sounds = {
+   leaderboard: this.sound.add('leaderboardSound', { volume: 0.6 }),
+   paper: this.sound.add('paperSound', { volume: 0.6 }),
+   horsecart: this.sound.add('horsecartSound', { volume: 0.6 }),
+   battle: this.sound.add('battleSound', { volume: 0.6 }),
+
+};
+
+
 const tileWidth = 386;
       const visibleTileHeight = 193;
       const overlap = visibleTileHeight / 2;
@@ -3136,6 +3167,7 @@ style={{
     onClick={async () => {
       try {
         setloadingResources(true);
+        gameRef.current.sounds.horsecart.play();
         startResourceTransferLoop(sendResourceType, attackerTileCoords, tileCoords);
         const signerMarket = await getMarketplaceSignerContract();
         const tokenContract = await getTokenSignerContract();
@@ -3867,7 +3899,7 @@ style={{
         fontFamily: "monospace"
       }}
     >
-      Turn Usage TXs: {txCounter}
+      Total UseTurn TXs: {txCounter === 0 ? "Counting on-chain" : txCounter}
     </div>
 
 
