@@ -3867,7 +3867,7 @@ style={{
         fontFamily: "monospace"
       }}
     >
-      TXCounter: {txCounter}
+      Turn Usage TXs: {txCounter}
     </div>
 
 
