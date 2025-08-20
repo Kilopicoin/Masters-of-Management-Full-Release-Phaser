@@ -50,7 +50,7 @@ import offensiveWeaponImage from './assets/weapons/offensive.png';
 import defensiveSoldierImage from './assets/soldiers/defensive.png';
 import offensiveSoldierImage from './assets/soldiers/offensive.png';
 
-import { getTheLandSignerContract } from './TheLandContract';
+import getTheLandContract, { getTheLandSignerContract } from './TheLandContract';
 import { getMarketplaceSignerContract, MarketplacecontractAddress } from './MarketplaceContract';
 import { getclanSignerContract, clancontractAddress } from './clancontract';
 import { getTokenSignerContract } from './Tokencontract';
@@ -58,6 +58,7 @@ import { getNFTSignerContract } from './nftContract';
 
 import { Circles } from 'react-loader-spinner';
 import './App.css';
+import getContract from './contract';
 
 const TheLand = ({ tileCoords, goBackToApp }) => {
     const gameRef = useRef(null);
@@ -303,28 +304,58 @@ useEffect(() => {
 
 
 const handleSetClanFlag = async (tokenId) => {
+
   try {
+    if (!userClan) {
+      toast.error("Join or create a clan first.");
+      return;
+    }
+    if (!clanDetails?.isLeader) {
+      toast.error("Only the clan leader can set the flag.");
+      return;
+    }
+
     setLoading(true);
-    gameRef.current.sounds.clancreate.play();
+    gameRef.current?.sounds?.clancreate?.play?.();
 
-    const TokenContract = await getTokenSignerContract();
-        const approvalTx = await TokenContract.increaseAllowance(clancontractAddress, 10000 * 10 ** 6);
-        await approvalTx.wait();
+    const clan = await getclanSignerContract();
+    const land = await getTheLandContract();
 
-        
-    const clanContract = await getclanSignerContract();
-    const tx = await clanContract.setClanFlag(userClan, tokenId);
+    // Get leader tile coords from on-chain info
+    const info = await clan.getClanInfo(userClan);
+    const leaderX = parseInt(info.leaderX);
+    const leaderY = parseInt(info.leaderY);
 
+    // Must have a Clan Hall at the leader tile
+    const hasHall = await land.hasClanHallAtCoord(leaderX, leaderY);
+    if (!hasHall) {
+      toast.error("You need a Clan Hall at your leader tile to set a flag.");
+      setLoading(false);
+      return;
+    }
+
+    // Approve 10,000 LOP (10,000 * 10^6)
+    const token = await getTokenSignerContract();
+    const approvalTx = await token.increaseAllowance(
+      clancontractAddress,
+      10_000 * 10 ** 6
+    );
+    await approvalTx.wait();
+
+    // Set flag with leader coords
+    const tx = await clan.setClanFlag(userClan, leaderX, leaderY, tokenId);
     await tx.wait();
+
     toast.success("Clan flag set!");
     setShowFlagSelector(false);
-    setLoading(false);
   } catch (err) {
     console.error("Failed to set clan flag", err);
     toast.error("Failed to set flag");
+  } finally {
     setLoading(false);
   }
 };
+
 
 
 useEffect(() => {
@@ -454,26 +485,53 @@ const fetchAllClans = async () => {
 };
 
 
-
-const fetchPendingInvite = async () => {
+const fetchPendingInvite = useCallback(async () => {
     try {
-        const contract = await getclanSignerContract();
-        const userAddress = await window.ethereum.request({ method: 'eth_accounts' });
-        if (!userAddress.length) return;
+    const clan = await getclanSignerContract();
+    const tileMap = await getContract();
 
-        const clanId = await contract.pendingInvites(userAddress[0]);
-        if (clanId > 0) {
-            const info = await contract.getClanInfo(clanId);
-            setPendingInviteClanId(clanId);
-            setPendingInviteClanName(info.name);
-        } else {
-            setPendingInviteClanId(null);
-            setPendingInviteClanName("");
-        }
-    } catch (error) {
-        console.error("Error fetching pending invite:", error);
+    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+    const account = accounts && accounts[0] ? accounts[0] : null;
+    if (!account) {
+      setPendingInviteClanId(null);
+      setPendingInviteClanName("");
+      return;
     }
-};
+
+
+
+    const x = tileCoords.x - 1;
+    const y = tileCoords.y - 1;
+
+    // Verify ownership of that tile
+    const occupant = await tileMap.getTileOccupant(x, y);
+    if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
+      setPendingInviteClanId(null);
+      setPendingInviteClanName("");
+      return;
+    }
+
+    // Compute tile key: (x<<8)|y  ==> use multiply to avoid bitwise sign quirks
+    const tileKey = x * 256 + y;
+
+    // Read pending invite by tile
+    const clanIdRaw = await clan.pendingInvitesByTile(tileKey);
+    const clanId = parseInt(clanIdRaw);
+
+    if (clanId > 0) {
+      setPendingInviteClanId(clanId);
+      const info = await clan.getClanInfo(clanId);
+      setPendingInviteClanName(info.name);
+    } else {
+      setPendingInviteClanId(null);
+      setPendingInviteClanName("");
+    }
+  } catch (error) {
+    console.error("Error fetching pending invite:", error);
+    setPendingInviteClanId(null);
+    setPendingInviteClanName("");
+  }
+}, [tileCoords.x, tileCoords.y]);
 
 const fetchResourceMessage = useCallback(async () => {
     try {
@@ -538,75 +596,127 @@ useEffect(() => {
         fetchPendingInvite();
         fetchResourceMessage();
     }
-}, [metaMaskAccount, fetchResourceMessage]);
+}, [metaMaskAccount, fetchResourceMessage, fetchPendingInvite]);
 
 const checkUserClan = useCallback(async () => {
     try {
-        const contract = await getclanSignerContract();
-        const userAddress = await window.ethereum.request({ method: 'eth_accounts' });
+    const clan = await getclanSignerContract();
+    const tileMap = await getContract();
 
-        if (!userAddress.length) {
-            setUserClan(null);
-            return;
-        }
+    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+    const account = accounts && accounts[0] ? accounts[0] : null;
 
-        const clanId = await contract.members(userAddress[0]);
-        if (clanId.isMember) {
-            setUserClan(clanId.clanId);
-            const details = await contract.getClanInfo(clanId.clanId);
-            setClanDetails(details);
-        } else {
-            setUserClan(null);
-            setClanDetails(null);
-        }
-    } catch (error) {
-        console.error("Error fetching clan info:", error);
-        toast.error("Failed to fetch clan information.");
+    if (!account) {
+      setUserClan(null);
+      setClanDetails(null);
+      return;
     }
-}, []);
+
+    const x = tileCoords.x - 1;
+    const y = tileCoords.y - 1;
+
+    // Double-check ownership
+    const occupant = await tileMap.getTileOccupant(x, y);
+    if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
+      setUserClan(null);
+      setClanDetails(null);
+      return;
+    }
+
+    // Clan by tile
+    const clanIdRaw = await clan.getTileClan(x, y);
+    const clanId = parseInt(clanIdRaw);
+
+    if (clanId > 0) {
+      setUserClan(clanId);
+
+      const info = await clan.getClanInfo(clanId);
+      const details = {
+        name: info.name,
+        leaderX: parseInt(info.leaderX) + 1,
+        leaderY: parseInt(info.leaderY) + 1,
+        memberCount: parseInt(info.memberCount),
+        exists: info.exists,
+        isLeader: parseInt(info.leaderX) === x && parseInt(info.leaderY) === y,
+      };
+
+      setClanDetails(details);
+    } else {
+      setUserClan(null);
+      setClanDetails(null);
+    }
+  } catch (error) {
+    console.error("Error fetching clan info:", error);
+    toast.error("Failed to fetch clan information.");
+    setUserClan(null);
+    setClanDetails(null);
+  }
+}, [tileCoords.x, tileCoords.y]);
 
 
 
 
 const createClan = async () => {
-    if (!newClanName || newClanName.trim() === "") {
-        toast.error("Please enter a clan name.");
-        return;
+  if (!newClanName || newClanName.trim() === "") {
+    toast.error("Please enter a clan name.");
+    return;
+  }
+
+  try {
+    const clan = await getclanSignerContract();
+    const tileMap = await getContract();
+
+    // Check name availability first
+    const available = await clan.isClanNameAvailable(newClanName);
+    if (!available) {
+      toast.error("This clan name is already taken.");
+      return;
     }
 
-    try {
-        
-        const contract = await getclanSignerContract();
-
-      const available = await contract.isClanNameAvailable(newClanName);
-      if (!available) {
-        toast.error("This clan name is already taken.");
-        return;
-      }
-
-      setloadingClanCreate(true);
-      gameRef.current.sounds.clancreate.play();
-
-        const TokencontractSigner = await getTokenSignerContract();
-        const Allowancetx = await TokencontractSigner.increaseAllowance(
-            clancontractAddress,
-            clancreationcost
-        );
-        await Allowancetx.wait();
-
-        
-        const tx = await contract.createClan(newClanName);
-        await tx.wait();
-        toast.success("Clan created successfully!");
-        await checkUserClan();
-        setNewClanName(""); // Reset input
-    } catch (error) {
-        console.error("Error creating clan:", error);
-        toast.error("Failed to create clan.");
-    } finally {
-        setloadingClanCreate(false);
+    // Ensure wallet & find user's tile coords
+    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+    const account = accounts && accounts[0] ? accounts[0] : null;
+    if (!account) {
+      toast.error("Connect your wallet first.");
+      return;
     }
+
+    const x = tileCoords.x - 1;
+    const y = tileCoords.y - 1;
+
+    // Verify ownership of (x,y)
+    const occupant = await tileMap.getTileOccupant(x, y);
+    if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
+      toast.error("You must own a tile to create a clan.");
+      return;
+    }
+
+    setloadingClanCreate(true);
+    gameRef.current?.sounds?.clancreate?.play?.();
+
+    // Approve/increase allowance for creation cost
+    const token = await getTokenSignerContract();
+    const allowanceTx = await token.increaseAllowance(
+      clancontractAddress,
+      clancreationcost
+    );
+    await allowanceTx.wait();
+
+    // Create clan with tile coords + name
+    const tx = await clan.createClan(x, y, newClanName.trim());
+    await tx.wait();
+
+    toast.success("Clan created successfully!");
+    await checkUserClan();
+    setNewClanName(""); // Reset input
+  } catch (error) {
+    console.error("Error creating clan:", error);
+    toast.error("Failed to create clan.");
+  } finally {
+    setloadingClanCreate(false);
+  }
 };
+
 
 
 
@@ -1012,60 +1122,66 @@ const fetchTileTurns = async (x, y) => {
 
 
 const fetchMarketplaceItemsByType = async () => {
-    try {
-        setLoading(true);
-        const contract = await getMarketplaceSignerContract();
-        const items = await contract.getListingsByResourceType(selectedResourceType); // Fetch only selected category
 
-        let restype = '';
+  // label map (keys as numbers)
+  const RESOURCE_LABELS = {
+    1: "Food",
+    2: "Wood",
+    3: "Stone",
+    4: "Iron",
+    5: "Offensive Armor",
+    6: "Defensive Armor",
+    7: "Offensive Weapon",
+    8: "Defensive Weapon",
+  };
 
+  try {
+    setLoading(true);
 
-            switch (selectedResourceType) {
-        case "1":
-            restype = 'Food';
-            break;
-        case "2":
-            restype = 'Wood';
-            break;
-        case "3":
-            restype = 'Stone';
-            break;
-        case "4":
-            restype = 'Iron';
-            break;
-            case "5":
-            restype = 'Offensive Armor';
-            break;
-            case "6":
-            restype = 'Defensive Armor';
-            break;
-            case "7":
-            restype = 'Offensive Weapon';
-            break;
-            case "8":
-            restype = 'Defensive Weapon';
-            break;
-        default:
-            break;
+    const market = await getMarketplaceSignerContract();
+
+    // Ensure numeric type for the solidity fn param
+    const rtNum = parseInt(selectedResourceType);
+    if (!rtNum || isNaN(rtNum)) {
+      toast.error("Select a valid resource type.");
+      setMarketplaceItems([]);
+      return;
     }
 
-        const formattedItems = items.map((item, index) => ({
-            id: index, // Since we don't store an ID in the contract, use index
-            seller: item.seller,
-            resourceTypeX: restype,
-            resourceType: item.resourceType.toString(),
-            amount: item.amount.toString(),
-            price: item.price.toString(),
-        }));
+    // Fetch only this category
+    const items = await market.getListingsByResourceType(rtNum);
 
-        setMarketplaceItems(formattedItems);
-    } catch (error) {
-        console.error("Error fetching marketplace items:", error);
-        toast.error("Failed to load marketplace items.");
-    } finally {
-        setLoading(false);
-    }
+    const restype = RESOURCE_LABELS[rtNum] || "";
+
+    // Map results (works for ethers v5/v6 named + indexed structs)
+    const formattedItems = (items || []).map((item, index) => {
+      const sellerX = item.sellerX ?? item[0];
+      const sellerY = item.sellerY ?? item[1];
+      const resourceType = item.resourceType ?? item[2];
+      const amount = item.amount ?? item[3];
+      const price = item.price ?? item[4];
+
+      return {
+        id: index, // fallback index as id
+        sellerX: parseInt(sellerX) + 1,
+        sellerY: parseInt(sellerY) + 1,
+        resourceTypeX: restype,
+        resourceType: parseInt(resourceType),
+        amount: parseInt(amount),
+        price: parseInt(price), // raw (e.g., LOP has 6 decimals in your system)
+      };
+    });
+
+    setMarketplaceItems(formattedItems);
+  } catch (error) {
+    console.error("Error fetching marketplace items:", error);
+    toast.error("Failed to load marketplace items.");
+    setMarketplaceItems([]);
+  } finally {
+    setLoading(false);
+  }
 };
+
 
 
 
@@ -2655,29 +2771,61 @@ useEffect(() => {
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
             <button
                 onClick={async () => {
-    try {
-        setLoading(true);
-        const contract = await getclanSignerContract();
-        const memberCount = await contract.getClanMemberCount(pendingInviteClanId);
+   try {
+  setLoading(true);
 
-        let toastcontent = '';
-        if (memberCount >= 30) {
-            toastcontent = 'Clan Full, Invitation Removed';
-        } else {
-            toastcontent = 'Joined the Clan';
-        }
+  const clan = await getclanSignerContract();
+  const tileMap = await getContract();
 
-        const tx = await contract.acceptInvite();
-        await tx.wait();
-        await checkUserClan();
-        await fetchPendingInvite();
-        toast.info(toastcontent);
-        setLoading(false);
-    } catch (err) {
-        console.error("Accept failed:", err);
-        await fetchPendingInvite();
-        setLoading(false);
-    }
+  // Connected account
+  const accounts = await window.ethereum.request({ method: "eth_accounts" });
+  const account = accounts && accounts[0] ? accounts[0] : null;
+  if (!account) {
+    toast.error("Connect your wallet first.");
+    return;
+  }
+
+  // Resolve user's tile and verify ownership
+  const x = tileCoords.x - 1;
+  const y = tileCoords.y - 1;
+
+  const occupant = await tileMap.getTileOccupant(x, y);
+  if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
+    toast.error("You must own your tile to accept the invite.");
+    return;
+  }
+
+  // Look up the pending invite on this tile
+  const tileKey = x * 256 + y; // (x << 8) | y
+  const inviteClanIdRaw = await clan.pendingInvitesByTile(tileKey);
+  const inviteClanId = parseInt(inviteClanIdRaw);
+
+  if (inviteClanId === 0) {
+    toast.info("No pending invite for your tile.");
+    await fetchPendingInvite();
+    return;
+  }
+
+  // Check member count to pick a toast message (contract will auto-clean if full)
+  const mcRaw = await clan.getClanMemberCount(inviteClanId);
+  const memberCount = parseInt(mcRaw);
+  const toastcontent =
+    memberCount >= 30 ? "Clan Full, Invitation Removed" : "Joined the Clan";
+
+  // Accept for this tile
+  const tx = await clan.acceptInviteForTile(x, y);
+  await tx.wait();
+
+  await checkUserClan();
+  await fetchPendingInvite();
+  toast.info(toastcontent);
+} catch (err) {
+  console.error("Accept failed:", err);
+  await fetchPendingInvite();
+} finally {
+  setLoading(false);
+}
+
 }}
 
                 style={{ padding: '6px 10px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px' }}
@@ -2687,19 +2835,44 @@ useEffect(() => {
             <button
                 onClick={async () => {
                     try {
-                        setLoading(true);
-                        const contract = await getclanSignerContract();
-                        const tx = await contract.refuseInvite();
-                        await tx.wait();
-                        toast.info("Invite refused.");
-                        setPendingInviteClanId(null);
-                        setPendingInviteClanName("");
-                        setLoading(false);
-                    } catch (err) {
-                        console.error("Refuse failed:", err);
-                        toast.error("Failed to refuse invite.");
-                        setLoading(false);
-                    }
+  setLoading(true);
+
+  const clan = await getclanSignerContract();
+  const tileMap = await getContract();
+
+  // Get connected account
+  const accounts = await window.ethereum.request({ method: "eth_accounts" });
+  const account = accounts && accounts[0] ? accounts[0] : null;
+  if (!account) {
+    toast.error("Connect your wallet first.");
+    return;
+  }
+
+  // Resolve the user's tile
+  const x = tileCoords.x - 1;
+  const y = tileCoords.y - 1;
+
+  // Verify ownership of (x,y)
+  const occupant = await tileMap.getTileOccupant(x, y);
+  if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
+    toast.error("You must own your tile to refuse the invite.");
+    return;
+  }
+
+  // Refuse invite for this tile
+  const tx = await clan.refuseInviteForTile(x, y);
+  await tx.wait();
+
+  toast.info("Invite refused.");
+  setPendingInviteClanId(null);
+  setPendingInviteClanName("");
+} catch (err) {
+  console.error("Refuse failed:", err);
+  toast.error("Failed to refuse invite.");
+} finally {
+  setLoading(false);
+}
+
                 }}
                 style={{ padding: '6px 10px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '5px' }}
             >
@@ -3661,7 +3834,7 @@ style={{
                             padding: '5px 10px', 
                             borderBottom: '1px solid #ddd'
                         }}>
-                        <span style={{ paddingLeft: '10px', paddingRight: '10px' }}><strong>{item.seller.slice(0, 4)}...{item.seller.slice(-4)}</strong></span>
+                        <span style={{ paddingLeft: '10px', paddingRight: '10px' }}><strong>{item.sellerX}, {item.sellerY}</strong></span>
                         <span style={{ paddingLeft: '10px', paddingRight: '10px' }}>Item: {item.resourceTypeX}</span>
                         <span style={{ paddingLeft: '10px', paddingRight: '10px' }}>Amount: {item.amount}</span>
                         <span style={{ paddingLeft: '10px', paddingRight: '10px' }}>Price: {item.price / (10 ** 6)} LOP</span>
@@ -3819,7 +3992,7 @@ className='fancy-input'
         {userClan ? (
             <div>
                 <p><strong>Clan:</strong> {clanDetails?.name}</p>
-                <p><strong>Leader:</strong> {clanDetails?.leader.slice(0, 6)}...{clanDetails?.leader.slice(-6)}</p>
+                <p><strong>Leader:</strong> {clanDetails?.leaderX}, {clanDetails?.leaderY}</p>
                 <p><strong>Members:</strong> {parseInt(clanDetails?.memberCount)}/30</p>
 
             {showFlagSelector && (
@@ -3882,7 +4055,7 @@ className='fancy-input'
 
 
 
-                {clanDetails?.leader?.toLowerCase() === metaMaskAccount?.toLowerCase() && (
+                {clanDetails?.isLeader && (
 <>
 <div>
                     <button className="card-button" onClick={() => fetchFlagNFTs()}>
@@ -3999,7 +4172,7 @@ className='fancy-input'
                 }}
             >
                 <div style={{ flex: 1, textAlign: 'center'}}>{clan.name}</div>
-                <div style={{ flex: 1, textAlign: 'center' }}>{clan.leader.slice(0, 6)}...{clan.leader.slice(-3)}</div>
+                <div style={{ flex: 1, textAlign: 'center' }}>{clanDetails.leaderX}, {clanDetails.leaderY}</div>
                 <div style={{ flex: 1, textAlign: 'center' }}>{parseInt(clan.memberCount)}/30</div>
             </div>
         ))}

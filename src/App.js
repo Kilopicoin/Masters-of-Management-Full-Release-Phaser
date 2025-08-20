@@ -1090,23 +1090,47 @@ useEffect(() => {
 
   useEffect(() => {
     const fetchUserClan = async () => {
-      if (!metaMaskAccount) return;
-      try {
-        const clanContract = await getclanSignerContract();
-        const memberInfo = await clanContract.members(metaMaskAccount);
-        if (memberInfo.isMember) {
-          const info = await clanContract.getClanInfo(memberInfo.clanId);
-          setUserClan({
-            id: memberInfo.clanId,
-            isLeader: info.leader.toLowerCase() === metaMaskAccount.toLowerCase(),
-          });
-        } else {
-          setUserClan(null);
-        }
-      } catch (err) {
-        console.error('Failed to fetch user clan', err);
+    if (!metaMaskAccount) {
+      setUserClan(null);
+      return;
+    }
+    try {
+      const clanContract = await getclanSignerContract();
+      const tileMap = await getContract(); // make sure you have this getter
+
+      // Get the player's tile coords
+      const coords = await tileMap.getOccupiedTileByAddress(metaMaskAccount);
+      const x = parseInt(coords[0]);
+      const y = parseInt(coords[1]);
+
+      // Verify the address actually occupies (x,y)
+      const occupant = await tileMap.getTileOccupant(x, y);
+      if (!occupant || occupant.toLowerCase() !== metaMaskAccount.toLowerCase()) {
+        setUserClan(null);
+        return;
       }
-    };
+
+      // Clan by tile
+      const clanIdRaw = await clanContract.getTileClan(x, y);
+      const clanId = parseInt(clanIdRaw);
+
+      if (clanId > 0) {
+        const info = await clanContract.getClanInfo(clanId);
+        const leaderX = parseInt(info.leaderX);
+        const leaderY = parseInt(info.leaderY);
+
+        setUserClan({
+          id: clanId,
+          isLeader: leaderX === x && leaderY === y,
+        });
+      } else {
+        setUserClan(null);
+      }
+    } catch (err) {
+      console.error('Failed to fetch user clan', err);
+      setUserClan(null);
+    }
+  };
   
     fetchUserClan();
   }, [metaMaskAccount]);
@@ -1478,11 +1502,29 @@ if (clanId > 0) {
   };
 }
 
-const occupantPendingClanId = await clanContract.pendingInvites(occupant);
+
+const tileKey = x * 256 + y;   
+
+const clanIdBN = await clanContract.pendingInvitesByTile(tileKey);
+
+const occupantPendingClanId = parseInt(clanIdBN);
 let hasPendingInvite = false;
 if (occupantPendingClanId > 0) {
   hasPendingInvite = true;
 }
+
+
+
+
+
+ 
+
+
+
+
+
+
+
 
 
 
@@ -2695,38 +2737,45 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
     <button
       onClick={async () => {
         try {
-          setLoading(true);
+              setLoading(true);
 
-          const tokenContractSigner = await getTokenSignerContract();
-    const allowanceTx = await tokenContractSigner.increaseAllowance(clancontractAddress, 1000000000);
-    await allowanceTx.wait();
+              // Approve 1000 LOP (1e3 * 1e6)
+              const token = await getTokenSignerContract();
+              const allowanceTx = await token.increaseAllowance(
+                clancontractAddress,
+                1_000_000_000 // 1000 * 10^6
+              );
+              await allowanceTx.wait();
 
-          const clanContract = await getclanSignerContract();
-          const tx = await clanContract.leaveClan();
-          await tx.wait();
-          toast.success("You have left the clan.");
-          // Reset clan info in UI
-          setUserClan(null);
-          setTileCoords((prev) => ({
-            ...prev,
-            clan: null,
-            hasPendingInviteToClan: false,
-          }));
-          const coords = await getContract().then(c => c.getOccupiedTileByAddress(metaMaskAccount));
-const [x, y] = coords.map(n => Number(n));
-tilesRef.current[x][y].flagUrl = null; // Clear the flag URL
-updateTileMap(); // Refresh map visuals
+              // Leave by tile coords
+              const clan = await getclanSignerContract();
+              const tx = await clan.leaveClanForTile(tileCoords.x - 1, tileCoords.y - 1);
+              await tx.wait();
 
-          setLoading(false);
-        } catch (err) {
-          console.error("Error leaving clan:", err);
-          toast.error("Failed to leave the clan.");
-          setLoading(false);
-        }
-      }}
-    >
-      Leave Clan (1000 LOP)
-    </button>
+              toast.success("You have left the clan.");
+              setUserClan(null);
+              setTileCoords((prev) => ({
+                ...prev,
+                clan: null,
+                hasPendingInviteToClan: false,
+              }));
+
+              // Clear the flag on this tile and refresh visuals
+              if (tilesRef?.current?.[tileCoords.x]?.[tileCoords.y]) {
+                tilesRef.current[tileCoords.x][tileCoords.y].flagUrl = null;
+              }
+              updateTileMap();
+
+              setLoading(false);
+            } catch (err) {
+              console.error("Error leaving clan:", err);
+              toast.error("Failed to leave the clan.");
+              setLoading(false);
+            }
+          }}
+        >
+          Leave Clan (1000 LOP)
+        </button>
 )}
 
 
@@ -2736,54 +2785,71 @@ updateTileMap(); // Refresh map visuals
 
 
 
-    {tileCoords.clan.leader.toLowerCase() === metaMaskAccount.toLowerCase() &&
+    {userClan.isLeader &&
   tileCoords.occupant.toLowerCase() !== metaMaskAccount.toLowerCase() && (
     <button
     style={{ marginBottom: '9px'}}
       onClick={async () => {
-        try {
-          setLoading(true);
+         try {
+              setLoading(true);
 
-          const landContract = await getTheLandContract(); // call theLand.hasClanHall(userAddress)
-      const hasClan = await landContract.hasClanHall(metaMaskAccount); // replace `account` with connected wallet address
+              const clan = await getclanSignerContract();
+              const land = await getTheLandContract();
 
-      if (!hasClan) {
-        toast.error("Can not remove members without Clan Hall");
-        setLoading(false);
-        return;
-      }
+              // Fetch leader coords from on-chain clan info
+              const info = await clan.getClanInfo(userClan.id);
+              const leaderX = parseInt(info.leaderX);
+              const leaderY = parseInt(info.leaderY);
 
+              // Must have Clan Hall at the leader tile
+              const hasHall = await land.hasClanHallAtCoord(leaderX, leaderY);
+              if (!hasHall) {
+                toast.error("Can not remove members without Clan Hall at your leader tile.");
+                setLoading(false);
+                return;
+              }
 
-      const tokenContractSigner = await getTokenSignerContract();
-    const allowanceTx = await tokenContractSigner.increaseAllowance(clancontractAddress, 1000000000);
-    await allowanceTx.wait();
+              // Approve 1000 LOP (1e3 * 1e6)
+              const token = await getTokenSignerContract();
+              const allowanceTx = await token.increaseAllowance(
+                clancontractAddress,
+                1_000_000_000 // 1000 * 10^6
+              );
+              await allowanceTx.wait();
 
-          const clanContract = await getclanSignerContract();
-          const tx = await clanContract.removeMember(userClan.id, tileCoords.occupant);
-          await tx.wait();
-          toast.success("Member removed from clan");
-          setTileCoords(prev => ({
-            ...prev,
-            clan: null,
-            hasPendingInviteToClan: false
-          }));
+              // Remove member by tile coords
+              const tx = await clan.removeMemberTile(
+                userClan.id,
+                leaderX,
+                leaderY,
+                tileCoords.x - 1,
+                tileCoords.y - 1
+              );
+              await tx.wait();
 
-          const coords = await getContract().then(c => c.getOccupiedTileByAddress(tileCoords.occupant));
-const [x, y] = coords.map(n => Number(n));
-tilesRef.current[x][y].flagUrl = null; // Clear the flag URL
-updateTileMap(); // Refresh map visuals
+              toast.success("Member removed from clan");
+              setTileCoords((prev) => ({
+                ...prev,
+                clan: null,
+                hasPendingInviteToClan: false,
+              }));
 
+              // Clear flag on the removed member's tile & refresh
+              if (tilesRef?.current?.[tileCoords.x]?.[tileCoords.y]) {
+                tilesRef.current[tileCoords.x][tileCoords.y].flagUrl = null;
+              }
+              updateTileMap();
 
-          setLoading(false);
-        } catch (err) {
-          console.error("Failed to remove member from clan:", err);
-          toast.error("Failed to remove member");
-          setLoading(false);
-        }
-      }}
-    >
-      RemoveFromClan (1000 LOP)
-    </button>
+              setLoading(false);
+            } catch (err) {
+              console.error("Failed to remove member from clan:", err);
+              toast.error("Failed to remove member");
+              setLoading(false);
+            }
+          }}
+        >
+          RemoveFromClan (1000 LOP)
+        </button>
 )}
 
 
@@ -2809,27 +2875,38 @@ updateTileMap(); // Refresh map visuals
         <button
           onClick={async () => {
 
-
-
             setLoading(true);
             try {
+              const clan = await getclanSignerContract();
+              const land = await getTheLandContract();
 
-               const landContract = await getTheLandContract(); // call theLand.hasClanHall(userAddress)
-      const hasClan = await landContract.hasClanHall(metaMaskAccount); // replace `account` with connected wallet address
+              // Get leader tile coords from on-chain clan info
+              const info = await clan.getClanInfo(userClan.id);
+              const leaderX = parseInt(info.leaderX);
+              const leaderY = parseInt(info.leaderY);
 
-      if (!hasClan) {
-        toast.error("Can not send invites without Clan Hall");
-        setLoading(false);
-        return;
-      }
+              // Must have a Clan Hall at the leader tile
+              const hasHall = await land.hasClanHallAtCoord(leaderX, leaderY);
+              if (!hasHall) {
+                toast.error("Can not send invites without a Clan Hall at your leader tile.");
+                setLoading(false);
+                return;
+              }
 
-
-              const clanContract = await getclanSignerContract();
-              const tx = await clanContract.inviteToClan(userClan.id, tileCoords.occupant);
+              // Send invite to the TARGET tile coordinates
+              const tx = await clan.inviteTileToClan(
+                userClan.id,
+                leaderX,
+                leaderY,
+                tileCoords.x - 1,
+                tileCoords.y - 1
+              );
               await tx.wait();
+
               toast.success("Invitation sent!");
-              // Refresh tileCoords after invite
-              setTileCoords(prev => ({
+
+              // Mark pending in UI
+              setTileCoords((prev) => ({
                 ...prev,
                 hasPendingInviteToClan: true,
               }));
@@ -2839,7 +2916,6 @@ updateTileMap(); // Refresh map visuals
               toast.error("Failed to send invite");
               setLoading(false);
             }
-            
           }}
         >
           Invite to Clan
@@ -2847,6 +2923,7 @@ updateTileMap(); // Refresh map visuals
       )}
     </p>
 )}
+
 
 
 
