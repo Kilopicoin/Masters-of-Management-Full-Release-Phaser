@@ -2855,7 +2855,7 @@ updateTileMap(); // Refresh map visuals
       )}
 
 
-      {tileCoords.occupied &&
+      {tileCoords.occupied && hasTileG &&
  metaMaskAccount &&
  getAddress(metaMaskAccount) !== tileCoords.occupant && (
   <div>
@@ -2867,7 +2867,7 @@ updateTileMap(); // Refresh map visuals
 
 
 
-      {tileCoords.occupied &&
+      {tileCoords.occupied && hasTileG &&
  metaMaskAccount &&
  getAddress(metaMaskAccount) !== tileCoords.occupant &&
  (!tileCoords.clan || !userClan || (
@@ -2993,7 +2993,7 @@ updateTileMap(); // Refresh map visuals
     <ul>
       {referralNetwork.referrals.length > 0 ? (
         referralNetwork.referrals.map((referral, index) => (
-          <li key={index}>{`${referral.slice(0, 6)}...${referral.slice(-4)}`}</li>
+          <li key={index} style={{ color: '#aaac96ff' }}>{`${referral.slice(0, 6)}...${referral.slice(-4)}`}</li>
         ))
       ) : (
         <p>No referrals</p>

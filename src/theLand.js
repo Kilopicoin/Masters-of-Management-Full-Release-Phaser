@@ -376,7 +376,15 @@ const fetchFlagNFTs = async () => {
 
 
 
-
+const fetchTileNameX = async () => {
+        try {
+            const contract = await getclanSignerContract();
+            const name = await contract.getTileName(tileCoords.x - 1, tileCoords.y - 1);
+            setTileName(name);
+        } catch (error) {
+            console.error("Error fetching tile name:", error);
+        }
+    };
 
 
 
@@ -416,6 +424,8 @@ const handleNameTile = async () => {
         const contract = await getclanSignerContract();
         const tx = await contract.nameTile(tileCoords.x - 1, tileCoords.y - 1, tileNameInput);
         await tx.wait();
+
+        await fetchTileNameX();
 
         toast.success("Tile named successfully!");
         setShowNameInput(false);
