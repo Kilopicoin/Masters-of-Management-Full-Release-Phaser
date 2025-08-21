@@ -959,16 +959,45 @@ const fetchMyAllWarLogs = async () => {
 };
 
 
-
+const normalizeWar = (w) => ({
+  attackerX: parseInt(w.attackerX),
+  attackerY: parseInt(w.attackerY),
+  defenderX: parseInt(w.defenderX),
+  defenderY: parseInt(w.defenderY),
+  timestamp: parseInt(w.timestamp), 
+  attackerWon: Boolean(w.attackerWon),
+  attackerSoldiers: parseInt(w.attackerSoldiers),
+  attackerCasualties: parseInt(w.attackerCasualties),
+  attackerPower: parseInt(w.attackerPower),
+  defenderSoldiers: parseInt(w.defenderSoldiers),
+  defenderCasualties: parseInt(w.defenderCasualties),
+  defenderPower: parseInt(w.defenderPower),
+  resourcesStolen: parseInt(w.resourcesStolen),
+});
 
 
 const fetchRecentWarLogs = async () => {
   try {
     setLoading(true);
-    gameRef.current.sounds.paper.play();
+    gameRef.current?.sounds?.paper?.play?.();
+
     const marketContract = await getMarketplaceSignerContract();
-    const data = await marketContract.getRecentWarHistory();
-    setWarLogsData(data);
+
+    // NEW: get wars + clans in parallel arrays
+    const [wars, clans] = await marketContract.getRecentWarHistoryWithClans();
+
+    // Zip arrays and attach clan ids onto each war record
+    const combined = wars.map((w, i) => {
+      const ww = normalizeWar(w);
+      const c = clans[i] || {};
+      return {
+        ...ww,
+        attackerClanName: c.attackerClanNam === "" ? "None" : `${c.attackerClanNam}`,
+        defenderClanName: c.defenderClanNam === "" ? "None" : `${c.defenderClanNam}`,
+      };
+    });
+
+    setWarLogsData(combined);
   } catch (err) {
     console.error("Error fetching recent war logs:", err);
     toast.error("Failed to fetch recent war logs.");
@@ -977,13 +1006,23 @@ const fetchRecentWarLogs = async () => {
   }
 };
 
+
+
 const fetchAllWarLogs = async () => {
   try {
     setLoading(true);
-    gameRef.current.sounds.paper.play();
     const marketContract = await getMarketplaceSignerContract();
-    const data = await marketContract.getAllWarHistory();
-    setWarLogsData(data);
+    const [wars, clans] = await marketContract.getAllWarHistoryWithClans();
+    const combined = wars.map((w, i) => {
+      const ww = normalizeWar(w);
+      const c = clans[i] || {};
+      return {
+        ...ww,
+        attackerClanName: c.attackerClanNam === "" ? "None" : `${c.attackerClanNam}`,
+        defenderClanName: c.defenderClanNam === "" ? "None" : `${c.defenderClanNam}`,
+      };
+    });
+    setWarLogsData(combined);
   } catch (err) {
     console.error("Error fetching all war logs:", err);
     toast.error("Failed to fetch all war logs.");
@@ -991,6 +1030,7 @@ const fetchAllWarLogs = async () => {
     setLoading(false);
   }
 };
+
 
 
 
@@ -3713,7 +3753,9 @@ style={{
         <thead>
           <tr style={{ backgroundColor: '#6c757d' }}>
             <th>Attacker</th>
+            <th>Attacker Clan</th>
             <th>Defender</th>
+            <th>Defender Clan</th>
             <th>Date</th>
             <th>Result</th>
           </tr>
@@ -3722,7 +3764,9 @@ style={{
           {warLogsData.map((item, index) => (
             <tr key={index}>
               <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
+              <td>{item.attackerClanName}</td>
 <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
+<td>{item.defenderClanName}</td>
 <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
 
               <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
@@ -3762,7 +3806,9 @@ style={{
         <thead>
           <tr style={{ backgroundColor: '#6c757d' }}>
             <th>Attacker</th>
+            <th>Attacker Clan</th>
             <th>Defender</th>
+            <th>Defender Clan</th>
             <th>Date</th>
             <th>Result</th>
           </tr>
@@ -3771,7 +3817,9 @@ style={{
           {warLogsData.map((item, index) => (
             <tr key={index}>
               <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
+              <td>{item.attackerClanName}</td>
 <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
+<td>{item.defenderClanName}</td>
 <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
 
               <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
