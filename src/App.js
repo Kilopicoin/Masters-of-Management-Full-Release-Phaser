@@ -105,6 +105,8 @@ const attackAnimationLoopRef = useRef(null);
 const battleGifRef = useRef(null);
 const [txCounter, setTxCounter] = useState(0);
 
+const flagSpritesRef = useRef({});
+
 const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/1.png": "nftflag_1",
   "https://kilopi.net/mom/nfts/2.png": "nftflag_2",
@@ -137,6 +139,74 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/29.png": "nftflag_29",
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
+
+
+
+const removeClanFlagFromTile = (x, y) => {
+  const k = `${x}-${y}`;
+  const sprite = flagSpritesRef.current[k];
+  if (sprite && sprite.active) {
+    sprite.destroy();             // removes the image from the scene
+    delete flagSpritesRef.current[k];
+  }
+
+  // Also update your tilesRef so that next redraw won’t re-add a flag
+  if (tilesRef.current[x] && tilesRef.current[x][y]) {
+    tilesRef.current[x][y].flagUrl = null;
+    tilesRef.current[x][y].clanId = "0";
+  }
+};
+
+
+
+
+const refreshTileCard = async (x1Based, y1Based) => {
+  const x0 = x1Based - 1;
+  const y0 = y1Based - 1;
+
+  const contract = await getContract();
+  const clanContract = await getclanSignerContract();
+  const landContract = await getTheLandSignerContract();
+
+  const occupant = await contract.getTileOccupant(x0, y0);
+  const tile = await contract.tiles(x0, y0);
+  const bonusX = await contract.bonuses(x0, y0);
+  const tileName = await clanContract.getTileName(x0, y0);
+
+  const tileData = await landContract.getTileData(x0, y0);
+  const points = Number(tileData.points);
+  const level  = Number(tileData.level);
+
+ let bonusType;
+switch (parseInt(bonusX)) {
+  case 1: bonusType = 'Food'; break;
+  case 2: bonusType = 'Wood'; break;
+  case 3: bonusType = 'Stone'; break;
+  case 4: bonusType = 'Iron'; break;
+  default: bonusType = 'None';
+}
+
+
+  const twitterHandle = occupant
+    ? await clanContract.getTwitterHandle(occupant)
+    : null;
+
+  setTileCoords({
+    x: x1Based,
+    y: y1Based,
+    occupied: occupant && occupant !== '0x0000000000000000000000000000000000000000',
+    occupant,
+    isOnSale: tile.isOnSale,
+    salePrice: Number(tile.salePrice + tile.saleBurnAmount),
+    bonusType,
+    tileName: tileName && tileName.trim().length > 0 ? tileName : null,
+    points,
+    twitterHandle: twitterHandle || null,
+    level
+  });
+};
+
+
 
 
 
@@ -655,16 +725,28 @@ const drawRedArrowBetweenTiles = (from, to) => {
 
 const checkMarketplacePresence = useCallback(async () => {
   try {
-    if (!attackerTileCoords.x || !attackerTileCoords.y) return;
+    const { x, y } = attackerTileCoords || {};
+    if (x === undefined || y === undefined) return;
 
-    const landContract = await getTheLandContract(); 
-      const hasMarket = await landContract.hasMarket(metaMaskAccount);
-    setHasMarketplace(hasMarket);
+    const land = await getTheLandContract();
+    const tileMap = await getContract();
+
+    // Optional: ensure the tile is yours
+    const occupant = await tileMap.getTileOccupant(x, y);
+    if (!occupant || occupant.toLowerCase() !== metaMaskAccount?.toLowerCase()) {
+      setHasMarketplace(false);
+      return;
+    }
+
+    // Tile-based marketplace check
+    const hasMarket = await land.hasMarketAtCoord(x, y);
+    setHasMarketplace(Boolean(hasMarket));
   } catch (err) {
     console.error("Error checking marketplace presence:", err);
     setHasMarketplace(false);
   }
 }, [attackerTileCoords, metaMaskAccount]);
+
 
 
 
@@ -798,11 +880,36 @@ async function sendToSmartContract(twitterHandle) {
 
 
 const fetchMyRecentWarLogs = async () => {
+
   try {
     setLoading(true);
-    gameRef.current.sounds.paper.play();
-    const marketContract = await getMarketplaceSignerContract();
-    const data = await marketContract.getRecentPlayerWars(metaMaskAccount);
+    gameRef.current?.sounds?.paper?.play?.();
+
+    const market = await getMarketplaceSignerContract();
+    const tileMap = await getContract();
+
+    // Connected account
+    const accounts = await window.ethereum.request({ method: "eth_accounts" });
+    const account = accounts && accounts[0] ? accounts[0] : null;
+    if (!account) {
+      toast.error("Connect your wallet first.");
+      return;
+    }
+
+    // Resolve user tile + verify ownership
+    const x = tileCoords.x - 1;
+    const y = tileCoords.y - 1;
+
+    const occupant = await tileMap.getTileOccupant(x, y);
+    if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
+      toast.error("You must own your tile to fetch war logs.");
+      return;
+    }
+
+    // Fetch wars for this tile (tile-based API)
+    // If your contract uses a different name, adapt the call accordingly.
+    const data = await market.getRecentTileWars(x, y);
+
     setWarLogsData(data);
   } catch (err) {
     console.error("Error fetching my recent war logs:", err);
@@ -812,12 +919,36 @@ const fetchMyRecentWarLogs = async () => {
   }
 };
 
+
 const fetchMyAllWarLogs = async () => {
+
   try {
     setLoading(true);
-    gameRef.current.sounds.paper.play();
-    const marketContract = await getMarketplaceSignerContract();
-    const data = await marketContract.getAllPlayerWars(metaMaskAccount);
+    gameRef.current?.sounds?.paper?.play?.();
+
+    const market = await getMarketplaceSignerContract();
+    const tileMap = await getContract();
+
+    // Connected account
+    const accounts = await window.ethereum.request({ method: "eth_accounts" });
+    const account = accounts && accounts[0] ? accounts[0] : null;
+    if (!account) {
+      toast.error("Connect your wallet first.");
+      return;
+    }
+
+    // Resolve user's tile and verify ownership
+    const x = tileCoords.x - 1;
+    const y = tileCoords.y - 1;
+
+    const occupant = await tileMap.getTileOccupant(x, y);
+    if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
+      toast.error("You must own your tile to fetch war logs.");
+      return;
+    }
+
+    // Tile-based API
+    const data = await market.getAllTileWars(x, y);
     setWarLogsData(data);
   } catch (err) {
     console.error("Error fetching all my war logs:", err);
@@ -826,6 +957,7 @@ const fetchMyAllWarLogs = async () => {
     setLoading(false);
   }
 };
+
 
 
 
@@ -866,28 +998,28 @@ const fetchAllWarLogs = async () => {
 
 const handleConfirmAttack = async () => {
   try {
-    
     if (!attackerTileCoords || !tileCoords) return;
-
 
     if (!attackerTroops || attackerTroops.offensiveSoldier < 10) {
       toast.warn("You need at least 10 Offensive Soldiers to launch an attack.");
       return;
     }
 
-
     setLoadingAttack(true);
-    gameRef.current.sounds.battle.play();
+    gameRef.current?.sounds?.battle?.play?.();
     startAttackTransferLoop(attackerTileCoords, tileCoords);
 
-    const marketContract = await getMarketplaceSignerContract();
+    const market = await getMarketplaceSignerContract();
+    const tileMap = await getContract();
+    const clan = await getclanSignerContract();
 
     const ax = attackerTileCoords.x;
     const ay = attackerTileCoords.y;
     const dx = tileCoords.x - 1;
     const dy = tileCoords.y - 1;
 
-    const tx = await marketContract.attackTile(ax, ay, dx, dy);
+    // Execute attack (ownsTile(ax,ay) enforced on-chain)
+    const tx = await market.attackTile(ax, ay, dx, dy);
     await tx.wait();
 
     toast.success("Attack executed successfully!");
@@ -897,27 +1029,35 @@ const handleConfirmAttack = async () => {
     await calculateAttackCost(tileCoords.x, tileCoords.y);
     await checkIfAccountOccupiedTile();
 
-    // ✅ Immediately fetch updated war logs
-    const updatedLogs = await marketContract.getAllPlayerWars(metaMaskAccount);
-    const latest = updatedLogs[updatedLogs.length - 1];
+    // Fetch updated war logs for the ATTACKER tile
+    const updatedLogs = await market.getAllTileWars(ax, ay);
+    const latest = updatedLogs && updatedLogs.length ? updatedLogs[updatedLogs.length - 1] : null;
 
-    const defenderAddress = await getContract().then(c => c.getTileOccupant(dx, dy));
-const defenderHandleX = await getclanSignerContract().then(c => c.getTwitterHandle(defenderAddress));
-
-setdefenderHandle(defenderHandleX);
-
+    // Defender info (address -> twitter handle)
+    try {
+      const defenderAddress = await tileMap.getTileOccupant(dx, dy);
+      if (defenderAddress && defenderAddress !== "0x0000000000000000000000000000000000000000") {
+        const handle = await clan.getTwitterHandle(defenderAddress);
+        setdefenderHandle(handle);
+      } else {
+        setdefenderHandle("");
+      }
+    } catch {
+      setdefenderHandle("");
+    }
 
     // Update state and show result
-    setWarLogsData([latest]); // show only this result
+    if (latest) setWarLogsData([latest]); // show only this result
     setinteractionMenuTypeA("warlogsAllMineX");
   } catch (err) {
     console.error("Attack failed:", err);
-    toast.error("Attack failed: " + (err.reason || err.message));
+    toast.error("Attack failed: " + (err?.reason || err?.message || "Unknown error"));
   } finally {
     stopAttackTransferLoop();
     setLoadingAttack(false);
   }
 };
+
 
 
 
@@ -1322,8 +1462,12 @@ useEffect(() => {
       toast.success('Tile purchased successfully!');
       setTileCoords((prev) => ({ ...prev, occupied: true, occupant: metaMaskAccount }));
 
+      await refreshTileCard(x, y);
+
       await updateTileSaleInfo(x, y);
       await checkIfAccountOccupiedTile();
+
+      setAttackerTileCoords({ x: x - 1, y: y - 1 });
 
     } catch (error) {
       console.error('Error buying tile:', error);
@@ -2733,7 +2877,7 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
 
     {tileCoords.occupant.toLowerCase() === metaMaskAccount?.toLowerCase() &&
   userClan &&
-  !userClan.isLeader && (
+  !userClan?.isLeader && (
     <button
       onClick={async () => {
         try {
@@ -2751,6 +2895,17 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
               const clan = await getclanSignerContract();
               const tx = await clan.leaveClanForTile(tileCoords.x - 1, tileCoords.y - 1);
               await tx.wait();
+
+
+              // after await tx.wait()
+const tileMap = await getContract();
+const coords = await tileMap.getOccupiedTileByAddress(metaMaskAccount);
+const x0 = Number(coords[0]), y0 = Number(coords[1]);
+
+removeClanFlagFromTile(x0, y0);
+
+
+
 
               toast.success("You have left the clan.");
               setUserClan(null);
@@ -2785,7 +2940,7 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
 
 
 
-    {userClan.isLeader &&
+    {userClan?.isLeader &&
   tileCoords.occupant.toLowerCase() !== metaMaskAccount.toLowerCase() && (
     <button
     style={{ marginBottom: '9px'}}
@@ -2826,6 +2981,10 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
                 tileCoords.y - 1
               );
               await tx.wait();
+
+
+removeClanFlagFromTile(tileCoords.x - 1, tileCoords.y - 1);
+
 
               toast.success("Member removed from clan");
               setTileCoords((prev) => ({
