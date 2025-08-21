@@ -1396,7 +1396,7 @@ useEffect(() => {
       const tx = await contractSigner.setTileOnSale(x - 1, y - 1, isOnSale, salePriceX);
       await tx.wait();
   
-      toast.success(`Tile is now ${isOnSale ? 'on' : 'off'} sale at ${salePrice} LOP tokens`);
+      toast.success(`Realm is now ${isOnSale ? 'on' : 'off'} sale at ${salePrice} LOP tokens`);
   
       // Reset sale price after setting the tile for sale
       setSalePrice('');
@@ -1459,7 +1459,7 @@ useEffect(() => {
       const tx = await contractSigner.buyTile(x - 1, y - 1 ); // Set tile price here
       await tx.wait();
 
-      toast.success('Tile purchased successfully!');
+      toast.success('Realm purchased successfully!');
       setTileCoords((prev) => ({ ...prev, occupied: true, occupant: metaMaskAccount }));
 
       await refreshTileCard(x, y);
@@ -1775,7 +1775,7 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     const clanFlagMap = {};
 
     for (let i = 0; i < clanList.length; i++) {
-      const clanId = i + 1;
+      const clanId = i + 2;
       const clan = clanList[i];
 
       if (!clan.exists) continue;

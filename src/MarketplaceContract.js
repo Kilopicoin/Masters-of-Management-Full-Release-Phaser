@@ -2,7 +2,7 @@
 import { BrowserProvider, Contract, JsonRpcProvider } from 'ethers';
 import contractABI from './MarketplaceContractABI.json'; // Import the ABI JSON file
 
-export const MarketplacecontractAddress = '0x3CAb0fC30C665F751500DA69026c8020F62bdFAe';
+export const MarketplacecontractAddress = '0x3D422EC275B922F006eD946e24098DFE6BE404A8';
 const RPC = 'https://api.s0.b.hmny.io';
 
 const getMarketplaceContract = async () => {

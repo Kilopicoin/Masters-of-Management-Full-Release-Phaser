@@ -458,7 +458,7 @@ const handleNameTile = async () => {
 
         await fetchTileNameX();
 
-        toast.success("Tile named successfully!");
+        toast.success("Realm named successfully!");
         setShowNameInput(false);
         setTileNameInput('');
     } catch (error) {
@@ -722,22 +722,44 @@ const createClan = async () => {
 
 
 const handleDisbandClan = async () => {
-    if (!userClan) return;
-    
-    try {
-        setLoading(true);
-        const contract = await getclanSignerContract();
-        const tx = await contract.disbandClan(userClan);
-        await tx.wait();
-        toast.success("Clan disbanded successfully!");
-        await checkUserClan(); // refresh clan data
-    } catch (error) {
-        console.error("Error disbanding clan:", error);
-        toast.error("Failed to disband clan.");
-    } finally {
-        setLoading(false);
+  // If you store just the id, rename to userClanId; if it's an object, adapt accordingly.
+  const clanId = parseInt(userClan);
+  if (!clanId) return;
+
+  try {
+    setLoading(true);
+
+    const clanContract = await getclanSignerContract();
+
+    // getClanInfo returns: { name, leaderX, leaderY, memberCount, exists }
+    // ethers v5/v6 both also allow tuple indexing; we guard for both.
+    const info = await clanContract.getClanInfo(clanId);
+    const leaderX = info.leaderX ?? info[1];
+    const leaderY = info.leaderY ?? info[2];
+
+
+    if (
+      parseInt(tileCoords.x) - 1 !== parseInt(leaderX) ||
+      parseInt(tileCoords.y) - 1 !== parseInt(leaderY)
+    ) {
+      toast.error("Only the leader tile can disband the clan.");
+      return;
     }
+
+    // Call requires (clanId, lx, ly)
+    const tx = await clanContract.disbandClan(clanId, leaderX, leaderY);
+    await tx.wait();
+
+    toast.success("Clan disbanded successfully!");
+    await checkUserClan(); // refresh local UI/state
+  } catch (error) {
+    toast.info("Error disbanding clan:", error);
+
+  } finally {
+    setLoading(false);
+  }
 };
+
 
 
 
@@ -4172,7 +4194,7 @@ className='fancy-input'
                 }}
             >
                 <div style={{ flex: 1, textAlign: 'center'}}>{clan.name}</div>
-                <div style={{ flex: 1, textAlign: 'center' }}>{clanDetails.leaderX}, {clanDetails.leaderY}</div>
+                <div style={{ flex: 1, textAlign: 'center' }}>{parseInt(clan?.leaderX) + 1}, {parseInt(clan?.leaderY) + 1}</div>
                 <div style={{ flex: 1, textAlign: 'center' }}>{parseInt(clan.memberCount)}/30</div>
             </div>
         ))}
