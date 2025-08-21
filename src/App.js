@@ -1680,6 +1680,7 @@ let clanInfo = null;
 if (clanId > 0) {
   const info = await clanContract.getClanInfo(clanId);
   clanInfo = {
+    clanId: parseInt(clanId),
     name: info.name,
     leader: info.leader,
     memberCount: Number(info.memberCount)
@@ -1803,53 +1804,64 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     const tilesWithClans = await clanContract.getAllTilesWithClans();
 
     // Build quick lookup of clan data per tile
-    const clanTileMap = {};
-    for (let i = 0; i < tilesWithClans.length; i++) {
-      const { x, y, clanId, flagTokenId } = tilesWithClans[i];
-      clanTileMap[`${x}-${y}`] = { clanId, flagTokenId };
-    }
+    // Build quick lookup of clan data per tile
+const clanTileMap = {};
+const clanIdSet = new Set(); // <- collect real clan IDs in use
+for (let i = 0; i < tilesWithClans.length; i++) {
+  const { x, y, clanId, flagTokenId } = tilesWithClans[i];
+  clanTileMap[`${x}-${y}`] = { clanId: Number(clanId), flagTokenId: Number(flagTokenId) };
+  if (Number(clanId) > 0) clanIdSet.add(Number(clanId));
+}
 
-    // Fetch and map all clanId -> flagURL
-    const clanList = await clanContract.getAllClans();
-    setallclansX(clanList);
-    const clanFlagMap = {};
 
-    for (let i = 0; i < clanList.length; i++) {
-      const clanId = i + 2;
-      const clan = clanList[i];
 
-      if (!clan.exists) continue;
+// Build clanId -> flagURL map using the ACTUAL IDs we saw on tiles
+const clanFlagMap = {};
+const clanInfoMap = {}; // optional: clanId -> { name, memberCount, ... }
 
-      const tokenId = await clanContract.clanFlags(clanId);
-      if (tokenId.toString() === '0') continue;
+for (const id of clanIdSet) {
+  // guard against nonexistent/old IDs
+  try {
+    const info = await clanContract.getClanInfo(id);
+    if (!info.exists) continue;
 
+    // optional: cache name/info keyed by clanId so you never rely on array index
+    clanInfoMap[id] = { name: info.name, memberCount: Number(info.memberCount), leaderX: Number(info.leaderX), leaderY: Number(info.leaderY) };
+
+    const tokenId = await clanContract.clanFlags(id);
+    if (tokenId && tokenId.toString() !== '0') {
       const [, , url] = await nftContract.getNFTData(tokenId);
-      clanFlagMap[clanId.toString()] = url;
+      clanFlagMap[id] = url; // ← key is the real clanId
     }
+  } catch (e) {
+    // ignore missing/old ids
+  }
+}
 
-    // Inject data into each tile
+
     for (let x = 0; x < occupiedTiles.length; x++) {
-      for (let y = 0; y < occupiedTiles[x].length; y++) {
-        const value = occupiedTiles[x][y];
+  for (let y = 0; y < occupiedTiles[x].length; y++) {
+    const val = occupiedTiles[x][y];
+    if (val === true) {
+      const key = `${x}-${y}`;
+      const clanData = clanTileMap[key] || { clanId: 0, flagTokenId: 0 };
+      const cid = Number(clanData.clanId);
 
-        if (value === true) {
-          const key = `${x}-${y}`;
-          const clanData = clanTileMap[key] || { clanId: 0, flagTokenId: 0 };
-          const clanIdStr = clanData.clanId.toString();
-
-          occupiedTiles[x][y] = {
-            occupied: true,
-            clanId: clanIdStr,
-            flagTokenId: clanData.flagTokenId,
-            flagUrl: clanFlagMap[clanIdStr] || null,
-          };
-        } else {
-          occupiedTiles[x][y] = null;
-        }
-      }
+      occupiedTiles[x][y] = {
+        occupied: true,
+        clanId: cid,                       // keep as number
+        flagTokenId: clanData.flagTokenId, // number
+        flagUrl: cid ? (clanFlagMap[cid] || null) : null,
+        // optionally: clanName: clanInfoMap[cid]?.name || "None"
+      };
+    } else {
+      occupiedTiles[x][y] = null;
     }
+  }
+}
 
-    tilesRef.current = occupiedTiles;
+tilesRef.current = occupiedTiles;
+setallclansX(clanInfoMap);
 
 
     updateTileMap();
@@ -2980,7 +2992,7 @@ removeClanFlagFromTile(x0, y0);
 
 
 
-    {userClan?.isLeader &&
+    {userClan?.isLeader && tileCoords.clan.clanId === userClan.id &&
   tileCoords.occupant.toLowerCase() !== metaMaskAccount.toLowerCase() && (
     <button
     style={{ marginBottom: '9px'}}
@@ -3143,15 +3155,12 @@ removeClanFlagFromTile(tileCoords.x - 1, tileCoords.y - 1);
 
 
 
-      {tileCoords.occupied && hasTileG &&
+      {tileCoords.occupied &&
+ hasTileG &&
  metaMaskAccount &&
- getAddress(metaMaskAccount) !== tileCoords.occupant &&
- (!tileCoords.clan || !userClan || (
-   (() => {
-     const index = Number(userClan.id) - 1;
-     return index >= 0 && index < allclansX.length && tileCoords.clan.name !== allclansX[index]?.[0];
-   })()
- )) && (
+  metaMaskAccount.toLowerCase() !== tileCoords.occupant.toLowerCase() &&
+  userClan.id !== tileCoords.clan?.clanId &&
+ (!userClan?.id || !tileCoords.clanId) && (
   <div>
     {attackCooldownMessage ? (
       <p style={{ fontWeight: 'bold', color: 'orange' }}>{attackCooldownMessage}</p>
