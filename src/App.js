@@ -1149,7 +1149,7 @@ const calculateAttackCost = useCallback(async (targetX, targetY) => {
 
   const distance = Math.abs(ax - dx) + Math.abs(ay - dy);
    setAttackDistance(distance);
-  const ATTACK_COST_FACTOR = 100;
+  const ATTACK_COST_FACTOR = 10;
 
   const landContract = await getTheLandSignerContract();
   const tileData = await landContract.getTileData(ax, ay);
