@@ -2857,7 +2857,7 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
           </a>
         </p>
       ) : (
-        <button onClick={handleTwitterConnect}>Connect Twitter</button>
+        <button onClick={handleTwitterConnect}>Connect Twitter (1000 LOP)</button>
       )
     ) : (
       tileCoords.twitterHandle ? (
