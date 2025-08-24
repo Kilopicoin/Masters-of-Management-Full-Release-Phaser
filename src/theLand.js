@@ -187,6 +187,32 @@ const [calculatedResources, setCalculatedResources] = useState({
 
 
 
+const cancelListing = async (item, index) => {
+  try {
+    setLoading(true);
+    const contract = await getMarketplaceSignerContract();
+    const tx = await contract.cancelListing(
+      item.sellerX - 1,
+      item.sellerY - 1,
+      item.resourceType,
+      index
+    );
+    await tx.wait();
+
+    toast.success("Listing canceled.");
+    await fetchTileData(tileCoords.x, tileCoords.y);
+    await fetchMarketplaceItemsByType();
+  } catch (error) {
+    console.error("Error canceling listing:", error);
+    toast.error("Failed to cancel listing.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+
 const demolishBuilding = async (interiorX, interiorY) => {
   try {
     setLoading(true);
@@ -1171,7 +1197,7 @@ const fetchMarketplaceItemsByType = async () => {
     }
 
     // Fetch only this category
-    const items = await market.getListingsByResourceType(rtNum);
+    const items = await market.getListingsByResourceType(tileCoords.x - 1, tileCoords.y -1, rtNum);
 
     const restype = RESOURCE_LABELS[rtNum] || "";
 
@@ -1183,6 +1209,9 @@ const fetchMarketplaceItemsByType = async () => {
       const amount = item.amount ?? item[3];
       const price = item.price ?? item[4];
 
+       const isOwnListing =
+   parseInt(sellerX) === tileCoords.x - 1 && parseInt(sellerY) === tileCoords.y - 1;
+
       return {
         id: index, // fallback index as id
         sellerX: parseInt(sellerX) + 1,
@@ -1190,7 +1219,8 @@ const fetchMarketplaceItemsByType = async () => {
         resourceTypeX: restype,
         resourceType: parseInt(resourceType),
         amount: parseInt(amount),
-        price: parseInt(price), // raw (e.g., LOP has 6 decimals in your system)
+        price: parseInt(price),
+        isOwnListing: isOwnListing
       };
     });
 
@@ -3873,6 +3903,26 @@ style={{
                         >
                             Buy
                         </button>
+
+
+                        {item.isOwnListing && (
+          <button
+            style={{
+              padding: '5px 10px',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer'
+            }}
+            onClick={() => cancelListing(item, index)}
+          >
+            Remove
+          </button>
+        )}
+
+
+
                     </div>
                 ))}
             </div>
@@ -3958,7 +4008,7 @@ style={{
                 <div className="card-content">
                     <div style={{ fontWeight: '900' }}>List an Item for Sale</div>
                     <div>min:10.000 for resources - min:100 for equipments</div>
-                    <div>min price: 10 LOP</div>
+                    <div>min price: 10 LOP ( Maximum 5 Listings )</div>
                     <select className="medieval-select" value={selectedResource} onChange={(e) => setSelectedResource(e.target.value)}>
     <option value="1">Food</option>
     <option value="2">Wood</option>

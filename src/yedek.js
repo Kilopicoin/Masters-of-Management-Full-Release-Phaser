@@ -1070,7 +1070,7 @@ const handleConfirmAttack = async () => {
     await checkIfAccountOccupiedTile();
 
     // Fetch updated war logs for the ATTACKER tile
-    const updatedLogs = await market.getAllTileWars(ax, ay);
+    const updatedLogs = await market.getRecentTileWars(ax, ay);
     const latest = updatedLogs && updatedLogs.length ? updatedLogs[updatedLogs.length - 1] : null;
 
     // Defender info (address -> twitter handle)
@@ -1149,7 +1149,7 @@ const calculateAttackCost = useCallback(async (targetX, targetY) => {
 
   const distance = Math.abs(ax - dx) + Math.abs(ay - dy);
    setAttackDistance(distance);
-  const ATTACK_COST_FACTOR = 100;
+  const ATTACK_COST_FACTOR = 10;
 
   const landContract = await getTheLandSignerContract();
   const tileData = await landContract.getTileData(ax, ay);
@@ -1670,11 +1670,12 @@ const flag = scene.add.image(worldX, worldY, textureKey).setDepth(worldY + 1);
 const clanId = await clanContract.getTileClan(x, y);
 
 const landContract = await getTheLandSignerContract();
-const tileData = await landContract.getTileData(x, y);
+const tileData = await landContract.getTilePublic(x, y);
 
 const totalPoints = Number(tileData.points);
 const tileLevel = Number(tileData.level);
 
+const resourceReceiveFlag = await landContract.resourceMessage(x, y);
 
 let clanInfo = null;
 if (clanId > 0) {
@@ -1751,7 +1752,8 @@ const twitterHandle = await clanContract.getTwitterHandle(occupant);
                   tileName: tileName && tileName.trim().length > 0 ? tileName : null,
                   points: totalPoints,
                   twitterHandle: twitterHandle || null,
-                  level: tileLevel
+                  level: tileLevel,
+                  resourceReceiveFlag: resourceReceiveFlag
                 });
 
 
@@ -1772,7 +1774,6 @@ const twitterHandle = await clanContract.getTwitterHandle(occupant);
     } else {
       setAttackCooldownMessage("");
     }
-
 
 
 
@@ -1804,53 +1805,64 @@ const nftContract = metaMaskAccount ? await getNFTSignerContract() : await getNF
     const tilesWithClans = await clanContract.getAllTilesWithClans();
 
     // Build quick lookup of clan data per tile
-    const clanTileMap = {};
-    for (let i = 0; i < tilesWithClans.length; i++) {
-      const { x, y, clanId, flagTokenId } = tilesWithClans[i];
-      clanTileMap[`${x}-${y}`] = { clanId, flagTokenId };
-    }
+    // Build quick lookup of clan data per tile
+const clanTileMap = {};
+const clanIdSet = new Set(); // <- collect real clan IDs in use
+for (let i = 0; i < tilesWithClans.length; i++) {
+  const { x, y, clanId, flagTokenId } = tilesWithClans[i];
+  clanTileMap[`${x}-${y}`] = { clanId: Number(clanId), flagTokenId: Number(flagTokenId) };
+  if (Number(clanId) > 0) clanIdSet.add(Number(clanId));
+}
 
-    // Fetch and map all clanId -> flagURL
-    const clanList = await clanContract.getAllClans();
-    setallclansX(clanList);
-    const clanFlagMap = {};
 
-    for (let i = 0; i < clanList.length ; i++) {
-      const clanId = i + 1;
-      const clan = clanList[i];
 
-      if (!clan.exists) continue;
+// Build clanId -> flagURL map using the ACTUAL IDs we saw on tiles
+const clanFlagMap = {};
+const clanInfoMap = {}; // optional: clanId -> { name, memberCount, ... }
 
-      const tokenId = await clanContract.clanFlags(clanId);
-      if (tokenId.toString() === '0') continue;
+for (const id of clanIdSet) {
+  // guard against nonexistent/old IDs
+  try {
+    const info = await clanContract.getClanInfo(id);
+    if (!info.exists) continue;
 
+    // optional: cache name/info keyed by clanId so you never rely on array index
+    clanInfoMap[id] = { name: info.name, memberCount: Number(info.memberCount), leaderX: Number(info.leaderX), leaderY: Number(info.leaderY) };
+
+    const tokenId = await clanContract.clanFlags(id);
+    if (tokenId && tokenId.toString() !== '0') {
       const [, , url] = await nftContract.getNFTData(tokenId);
-      clanFlagMap[clanId.toString()] = url;
+      clanFlagMap[id] = url; // ← key is the real clanId
     }
+  } catch (e) {
+    // ignore missing/old ids
+  }
+}
 
-    // Inject data into each tile
+
     for (let x = 0; x < occupiedTiles.length; x++) {
-      for (let y = 0; y < occupiedTiles[x].length; y++) {
-        const value = occupiedTiles[x][y];
+  for (let y = 0; y < occupiedTiles[x].length; y++) {
+    const val = occupiedTiles[x][y];
+    if (val === true) {
+      const key = `${x}-${y}`;
+      const clanData = clanTileMap[key] || { clanId: 0, flagTokenId: 0 };
+      const cid = Number(clanData.clanId);
 
-        if (value === true) {
-          const key = `${x}-${y}`;
-          const clanData = clanTileMap[key] || { clanId: 0, flagTokenId: 0 };
-          const clanIdStr = clanData.clanId.toString();
-
-          occupiedTiles[x][y] = {
-            occupied: true,
-            clanId: clanIdStr,
-            flagTokenId: clanData.flagTokenId,
-            flagUrl: clanFlagMap[clanIdStr] || null,
-          };
-        } else {
-          occupiedTiles[x][y] = null;
-        }
-      }
+      occupiedTiles[x][y] = {
+        occupied: true,
+        clanId: cid,                       // keep as number
+        flagTokenId: clanData.flagTokenId, // number
+        flagUrl: cid ? (clanFlagMap[cid] || null) : null,
+        // optionally: clanName: clanInfoMap[cid]?.name || "None"
+      };
+    } else {
+      occupiedTiles[x][y] = null;
     }
+  }
+}
 
-    tilesRef.current = occupiedTiles;
+tilesRef.current = occupiedTiles;
+setallclansX(clanInfoMap);
 
 
     updateTileMap();
@@ -2846,7 +2858,7 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
           </a>
         </p>
       ) : (
-        <button onClick={handleTwitterConnect}>Connect Twitter</button>
+        <button onClick={handleTwitterConnect}>Connect Twitter (1000 LOP)</button>
       )
     ) : (
       tileCoords.twitterHandle ? (
@@ -2916,7 +2928,7 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
 
 
 
-    {tileCoords.occupant.toLowerCase() === metaMaskAccount?.toLowerCase() &&
+    {tileCoords.occupant?.toLowerCase() === metaMaskAccount?.toLowerCase() &&
   userClan &&
   !userClan?.isLeader && (
     <button
@@ -2981,8 +2993,8 @@ removeClanFlagFromTile(x0, y0);
 
 
 
-    {userClan?.isLeader && tileCoords.clan.clanId === userClan.id &&
-  tileCoords.occupant.toLowerCase() !== metaMaskAccount.toLowerCase() && (
+    {userClan?.isLeader && tileCoords.clan.clanId === userClan?.id &&
+  tileCoords.occupant?.toLowerCase() !== metaMaskAccount.toLowerCase() && (
     <button
     style={{ marginBottom: '9px'}}
       onClick={async () => {
@@ -3135,34 +3147,46 @@ removeClanFlagFromTile(tileCoords.x - 1, tileCoords.y - 1);
       {tileCoords.occupied && hasTileG &&
  metaMaskAccount &&
  getAddress(metaMaskAccount) !== tileCoords.occupant && (
-  <div>
-    <button className='card-button' onClick={() => setinteractionMenuTypeA("sendResources")}>
+  <>
+    {  tileCoords.resourceReceiveFlag === true ? (
+<div>
+Resource Receive Cooldown
+</div>
+    ) : (
+<div>
+<button className='card-button' onClick={() => setinteractionMenuTypeA("sendResources")}>
       Send Resources Here
     </button>
-  </div>
-)}
-
-
-
-      {tileCoords.occupied && hasTileG &&
- metaMaskAccount &&
- getAddress(metaMaskAccount) !== tileCoords.occupant &&
- (!tileCoords.clan || !userClan || (
-   (() => {
-     const index = Number(userClan.id) - 1;
-     return index >= 0 && index < allclansX.length && tileCoords.clan.name !== allclansX[index]?.[0];
-   })()
- )) && (
-  <div>
-    {attackCooldownMessage ? (
-      <p style={{ fontWeight: 'bold', color: 'orange' }}>{attackCooldownMessage}</p>
-    ) : (
-      <button className='card-button' onClick={() => setinteractionMenuTypeA("attackMenu")}>
-        Attack here
-      </button>
+</div>
     )}
-  </div>
+    
+  </>
 )}
+
+
+{tileCoords.occupied &&
+  hasTileG &&
+  metaMaskAccount &&
+  metaMaskAccount.toLowerCase() !== tileCoords.occupant?.toLowerCase() &&
+  // allow attack if (either no clan, or clans differ)
+  (
+    (!userClan?.id || !tileCoords.clan?.clanId) ||
+    (userClan?.id !== tileCoords.clan?.clanId)
+  ) && (
+    <div>
+      {attackCooldownMessage ? (
+        <p style={{ fontWeight: 'bold', color: 'orange' }}>{attackCooldownMessage}</p>
+      ) : (
+        <button
+          className="card-button"
+          onClick={() => setinteractionMenuTypeA("attackMenu")}
+        >
+          Attack here
+        </button>
+      )}
+    </div>
+)}
+
 
 
 

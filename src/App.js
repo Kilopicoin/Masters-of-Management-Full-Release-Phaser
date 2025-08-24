@@ -107,6 +107,17 @@ const [txCounter, setTxCounter] = useState(0);
 
 const flagSpritesRef = useRef({});
 
+const [rangeFrom, setRangeFrom] = useState(""); // "YYYY-MM-DD"
+const [rangeTo, setRangeTo] = useState("");     // "YYYY-MM-DD"
+
+
+// NEW — date range state for *my* war logs
+const [myRangeFrom, setMyRangeFrom] = useState(""); // "YYYY-MM-DD"
+const [myRangeTo, setMyRangeTo] = useState("");     // "YYYY-MM-DD"
+
+
+
+
 const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/1.png": "nftflag_1",
   "https://kilopi.net/mom/nfts/2.png": "nftflag_2",
@@ -139,6 +150,134 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/29.png": "nftflag_29",
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
+
+
+
+
+// NEW — load *my* war logs for a specific date range (inclusive by day)
+const fetchMyWarLogsInRange = async () => {
+  try {
+    setLoading(true);
+    gameRef.current?.sounds?.paper?.play?.();
+
+    const market = await getMarketplaceSignerContract();
+    const tileMap = await getContract();
+
+    // Connected account
+    const accounts = await window.ethereum.request({ method: "eth_accounts" });
+    const account = accounts && accounts[0] ? accounts[0] : null;
+    if (!account) {
+      toast.error("Connect your wallet first.");
+      return;
+    }
+
+    // Use the currently selected tile (like your other “my” loaders)
+    const x = tileCoords.x - 1;
+    const y = tileCoords.y - 1;
+
+    // Verify ownership (required by ownsTile(x,y))
+    const occupant = await tileMap.getTileOccupant(x, y);
+    if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
+      toast.error("You must own the selected tile to load your war logs.");
+      return;
+    }
+
+    // Parse "YYYY-MM-DD" → local midnight
+    const parseYMD = (s) => {
+      if (!s) return null;
+      const [yy, mm, dd] = s.split("-").map(Number);
+      if (!yy || !mm || !dd) return null;
+      return new Date(yy, mm - 1, dd); // local 00:00
+    };
+
+    // Defaults if empty: last 30 days
+    const now = new Date();
+    const defaultTo = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const defaultFrom = new Date(defaultTo);
+    defaultFrom.setDate(defaultFrom.getDate() - 30);
+
+    const fromDate = parseYMD(myRangeFrom) || defaultFrom;
+    const toDateStart = parseYMD(myRangeTo) || defaultTo;
+    const toDateEnd = new Date(toDateStart);
+    toDateEnd.setDate(toDateEnd.getDate() + 1);       // next day 00:00
+    toDateEnd.setSeconds(toDateEnd.getSeconds() - 1); // 23:59:59 of chosen day
+
+    const fromTs = Math.floor(fromDate.getTime() / 1000);
+    const toTs   = Math.floor(toDateEnd.getTime() / 1000);
+
+    const wars = await market.getTileWarsInRange(x, y, fromTs, toTs);
+
+    // Same shape you expect elsewhere
+    const normalized = wars.map(normalizeWar);
+    setWarLogsData(normalized);
+    setinteractionMenuTypeA("warlogsRangeResultMine");
+  } catch (err) {
+    console.error("Error fetching my war logs in range:", err);
+    toast.error("Failed to load your war logs for the selected range.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+
+
+// NEW — load world war logs for a specific date range (inclusive by day)
+const fetchWarLogsInRange = async () => {
+  try {
+    setLoading(true);
+    gameRef.current?.sounds?.paper?.play?.();
+
+    // Default: last 7 days if user left fields empty
+    const now = new Date();
+    const defaultTo = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // today at 00:00 local
+    const defaultFrom = new Date(defaultTo);
+    defaultFrom.setDate(defaultFrom.getDate() - 7);
+
+    // Parse "YYYY-MM-DD" safely
+    const parseYMD = (s) => {
+      if (!s) return null;
+      const [y, m, d] = s.split("-").map(Number);
+      if (!y || !m || !d) return null;
+      // Construct local date at 00:00
+      return new Date(y, m - 1, d);
+    };
+
+    const fromDate = parseYMD(rangeFrom) || defaultFrom;
+    const toDateStart = parseYMD(rangeTo) || defaultTo;
+
+    // We want full “to” day inclusive → end of that day:
+    const toDateEnd = new Date(toDateStart);
+    toDateEnd.setDate(toDateEnd.getDate() + 1);          // move to next day 00:00
+    toDateEnd.setSeconds(toDateEnd.getSeconds() - 1);    // back 1 second → 23:59:59
+
+    const fromTs = Math.floor(fromDate.getTime() / 1000);
+    const toTs   = Math.floor(toDateEnd.getTime() / 1000);
+
+    const market = await getMarketplaceSignerContract();
+    const [wars, clans] = await market.getWarHistoryWithClansInRange(fromTs, toTs);
+
+    const combined = wars.map((w, i) => {
+      const ww = normalizeWar(w);
+      const c = clans[i] || {};
+      return {
+        ...ww,
+        attackerClanName: c.attackerClanNam === "" ? "None" : `${c.attackerClanNam}`,
+        defenderClanName: c.defenderClanNam === "" ? "None" : `${c.defenderClanNam}`,
+      };
+    });
+
+    setWarLogsData(combined);
+    setinteractionMenuTypeA("warlogsRangeResult");
+  } catch (err) {
+    console.error("Error fetching war logs in range:", err);
+    toast.error("Failed to load war logs for the selected range.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
 
 
@@ -920,43 +1059,7 @@ const fetchMyRecentWarLogs = async () => {
 };
 
 
-const fetchMyAllWarLogs = async () => {
 
-  try {
-    setLoading(true);
-    gameRef.current?.sounds?.paper?.play?.();
-
-    const market = await getMarketplaceSignerContract();
-    const tileMap = await getContract();
-
-    // Connected account
-    const accounts = await window.ethereum.request({ method: "eth_accounts" });
-    const account = accounts && accounts[0] ? accounts[0] : null;
-    if (!account) {
-      toast.error("Connect your wallet first.");
-      return;
-    }
-
-    // Resolve user's tile and verify ownership
-    const x = tileCoords.x - 1;
-    const y = tileCoords.y - 1;
-
-    const occupant = await tileMap.getTileOccupant(x, y);
-    if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
-      toast.error("You must own your tile to fetch war logs.");
-      return;
-    }
-
-    // Tile-based API
-    const data = await market.getAllTileWars(x, y);
-    setWarLogsData(data);
-  } catch (err) {
-    console.error("Error fetching all my war logs:", err);
-    toast.error("Failed to fetch your all war logs.");
-  } finally {
-    setLoading(false);
-  }
-};
 
 
 const normalizeWar = (w) => ({
@@ -1008,32 +1111,6 @@ const fetchRecentWarLogs = async () => {
 
 
 
-const fetchAllWarLogs = async () => {
-  try {
-    setLoading(true);
-    const marketContract = await getMarketplaceSignerContract();
-    const [wars, clans] = await marketContract.getAllWarHistoryWithClans();
-    const combined = wars.map((w, i) => {
-      const ww = normalizeWar(w);
-      const c = clans[i] || {};
-      return {
-        ...ww,
-        attackerClanName: c.attackerClanNam === "" ? "None" : `${c.attackerClanNam}`,
-        defenderClanName: c.defenderClanNam === "" ? "None" : `${c.defenderClanNam}`,
-      };
-    });
-    setWarLogsData(combined);
-  } catch (err) {
-    console.error("Error fetching all war logs:", err);
-    toast.error("Failed to fetch all war logs.");
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-
-
 
 
 const handleConfirmAttack = async () => {
@@ -1070,7 +1147,7 @@ const handleConfirmAttack = async () => {
     await checkIfAccountOccupiedTile();
 
     // Fetch updated war logs for the ATTACKER tile
-    const updatedLogs = await market.getAllTileWars(ax, ay);
+    const updatedLogs = await market.getRecentTileWars(ax, ay);
     const latest = updatedLogs && updatedLogs.length ? updatedLogs[updatedLogs.length - 1] : null;
 
     // Defender info (address -> twitter handle)
@@ -1670,11 +1747,12 @@ const flag = scene.add.image(worldX, worldY, textureKey).setDepth(worldY + 1);
 const clanId = await clanContract.getTileClan(x, y);
 
 const landContract = await getTheLandSignerContract();
-const tileData = await landContract.getTileData(x, y);
+const tileData = await landContract.getTilePublic(x, y);
 
 const totalPoints = Number(tileData.points);
 const tileLevel = Number(tileData.level);
 
+const resourceReceiveFlag = await landContract.resourceMessage(x, y);
 
 let clanInfo = null;
 if (clanId > 0) {
@@ -1701,7 +1779,16 @@ if (occupantPendingClanId > 0) {
 
 
 
+const lastActiveBN = await landContract.getTileLastActiveAt(x, y);
+let lastActiveAt = parseInt(lastActiveBN);
+const nowSec = Math.floor(Date.now() / 1000);
 
+if (lastActiveAt === 0) {
+        lastActiveAt = 1756252800; // 27 August 2025 00:00:00 UTC
+    }
+
+const THREE_MONTHS = 90 * 60; // 3 ay ===== 90 * 24 * 60 * 60
+const isInactive = ((nowSec - lastActiveAt) >= THREE_MONTHS);
  
 
 
@@ -1751,7 +1838,9 @@ const twitterHandle = await clanContract.getTwitterHandle(occupant);
                   tileName: tileName && tileName.trim().length > 0 ? tileName : null,
                   points: totalPoints,
                   twitterHandle: twitterHandle || null,
-                  level: tileLevel
+                  level: tileLevel,
+                  resourceReceiveFlag: resourceReceiveFlag,
+                  isInactive: isInactive
                 });
 
 
@@ -1772,7 +1861,6 @@ const twitterHandle = await clanContract.getTwitterHandle(occupant);
     } else {
       setAttackCooldownMessage("");
     }
-
 
 
 
@@ -2927,7 +3015,7 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
 
 
 
-    {tileCoords.occupant.toLowerCase() === metaMaskAccount?.toLowerCase() &&
+    {tileCoords.occupant?.toLowerCase() === metaMaskAccount?.toLowerCase() &&
   userClan &&
   !userClan?.isLeader && (
     <button
@@ -2992,8 +3080,8 @@ removeClanFlagFromTile(x0, y0);
 
 
 
-    {userClan?.isLeader && tileCoords.clan.clanId === userClan.id &&
-  tileCoords.occupant.toLowerCase() !== metaMaskAccount.toLowerCase() && (
+    {userClan?.isLeader && tileCoords.clan.clanId === userClan?.id &&
+  tileCoords.occupant?.toLowerCase() !== metaMaskAccount.toLowerCase() && (
     <button
     style={{ marginBottom: '9px'}}
       onClick={async () => {
@@ -3146,34 +3234,105 @@ removeClanFlagFromTile(tileCoords.x - 1, tileCoords.y - 1);
       {tileCoords.occupied && hasTileG &&
  metaMaskAccount &&
  getAddress(metaMaskAccount) !== tileCoords.occupant && (
-  <div>
-    <button className='card-button' onClick={() => setinteractionMenuTypeA("sendResources")}>
+  <>
+    {  tileCoords.resourceReceiveFlag === true ? (
+<div>
+Resource Receive Cooldown
+</div>
+    ) : (
+<div>
+<button className='card-button' onClick={() => setinteractionMenuTypeA("sendResources")}>
       Send Resources Here
     </button>
-  </div>
-)}
-
-
-
-      {tileCoords.occupied &&
- hasTileG &&
- metaMaskAccount &&
-  metaMaskAccount.toLowerCase() !== tileCoords.occupant.toLowerCase() &&
-  userClan.id !== tileCoords.clan?.clanId &&
- (!userClan?.id || !tileCoords.clanId) && (
-  <div>
-    {attackCooldownMessage ? (
-      <p style={{ fontWeight: 'bold', color: 'orange' }}>{attackCooldownMessage}</p>
-    ) : (
-      <button className='card-button' onClick={() => setinteractionMenuTypeA("attackMenu")}>
-        Attack here
-      </button>
+</div>
     )}
-  </div>
+    
+  </>
 )}
 
 
 
+
+
+
+
+
+
+
+
+{tileCoords.occupied &&
+  hasTileG &&
+  metaMaskAccount &&
+  metaMaskAccount.toLowerCase() !== tileCoords.occupant?.toLowerCase() &&
+  // allow attack if (either no clan, or clans differ)
+  (
+    (!userClan?.id || !tileCoords.clan?.clanId) ||
+    (userClan?.id !== tileCoords.clan?.clanId)
+  ) && (
+    <div>
+      {attackCooldownMessage ? (
+        <p style={{ fontWeight: 'bold', color: 'orange' }}>{attackCooldownMessage}</p>
+      ) : (
+        <button
+          className="card-button"
+          onClick={() => setinteractionMenuTypeA("attackMenu")}
+        >
+          Attack here
+        </button>
+      )}
+    </div>
+)}
+
+
+
+{tileCoords.occupied && hasTileG &&
+ metaMaskAccount &&
+ getAddress(metaMaskAccount) !== tileCoords.occupant && (
+  <>
+    {tileCoords.isInactive ? (
+
+<div style={{ fontSize: '16px', color: 'red' }}>
+Land is Inactive
+
+
+<br />
+    <button
+      style={{ backgroundColor: "black" , fontSize: "14px"}}
+      onClick={async () => {
+        try {
+          setLoading(true);
+          const contractSigner = await getMarketplaceSignerContract();
+          const tx = await contractSigner.maybeAutoListIfInactive(
+            tileCoords.x - 1,
+            tileCoords.y - 1
+          );
+          await tx.wait();
+          toast.success("Tile has been force-listed on sale!");
+        } catch (err) {
+          console.error("ForceToSetOnSale failed:", err);
+          toast.error("Failed to set tile on sale.");
+        } finally {
+          setLoading(false);
+        }
+      }}
+    >
+      Force To Set On Sale
+    </button>
+
+
+</div>
+
+    ) : (
+
+<div style={{ fontSize: '16px', color: 'green' }}>
+Land is Active
+</div>
+
+    )
+    }
+    
+  </>
+)}
   
 
 
@@ -3604,69 +3763,176 @@ style={{
 
 
 {interactionMenuTypeA === "warlogsMine" && (
-    <div className="interaction-menuA">
-        <p style={{ marginBottom: '15px', fontWeight: '400' }}>
-            Loading My War Logs require waiting time, please choose your preference
-        </p>
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("warlogsWeekMine");
-                fetchMyRecentWarLogs();
+  <div className="interaction-menuA">
+    <p style={{ marginBottom: '15px', fontWeight: '400' }}>
+      Load your war logs:
+    </p>
 
-            }}
-        >
-            Last Week's Logs (Loading Approx. 30 Seconds)
-        </button>
+    <button
+      style={{
+        padding: '10px 20px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        cursor: 'pointer',
+        fontWeight: 'bold',
+        margin: '5px'
+      }}
+      onClick={() => {
+        setinteractionMenuTypeA("warlogsWeekMine");
+        fetchMyRecentWarLogs();
+      }}
+    >
+      Last Week's Logs (Fast)
+    </button>
 
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("warlogsAllMine");
-                fetchMyAllWarLogs();
+    {/* NEW — Date range option (replaces “All Time Logs…”) */}
+    <button
+      style={{
+        padding: '10px 20px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        cursor: 'pointer',
+        fontWeight: 'bold',
+        margin: '5px'
+      }}
+      onClick={() => setinteractionMenuTypeA("warlogsRangeMine")}
+    >
+      War Logs for Specific Date Range
+    </button>
 
-            }}
-        >
-            All Time Logs (Loading Up To 3 Minutes)
-        </button>
+    <button
+      style={{
+        padding: '10px 20px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        cursor: 'pointer',
+        fontWeight: 'bold',
+        margin: '5px'
+      }}
+      onClick={() => setinteractionMenuTypeA("")}
+    >
+      Cancel
+    </button>
+  </div>
+)}
 
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("");
-            }}
-        >
-            Cancel
-        </button>
 
+
+
+{/* NEW — My War Logs: Date-range input */}
+{interactionMenuTypeA === "warlogsRangeMine" && (
+  <div className="interaction-menuA" style={{ textAlign: 'center' }}>
+    <h4>My War Logs — Specific Date Range</h4>
+
+    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '10px' }}>
+      <div>
+        <label style={{ display: 'block', marginBottom: '4px' }}>From (inclusive)</label>
+        <input
+          type="date"
+          className="fancy-input"
+          value={myRangeFrom}
+          onChange={(e) => setMyRangeFrom(e.target.value)}
+          style={{ minWidth: 180 }}
+        />
+      </div>
+      <div>
+        <label style={{ display: 'block', marginBottom: '4px' }}>To (inclusive)</label>
+        <input
+          type="date"
+          className="fancy-input"
+          value={myRangeTo}
+          onChange={(e) => setMyRangeTo(e.target.value)}
+          style={{ minWidth: 180 }}
+        />
+      </div>
     </div>
+
+    <div style={{ marginTop: '10px' }}>
+      <button
+        className="card-button"
+        onClick={fetchMyWarLogsInRange}
+        style={{ marginRight: '8px' }}
+      >
+        Load Logs
+      </button>
+      <button
+        className="card-button"
+        onClick={() => setinteractionMenuTypeA("")}
+      >
+        Cancel
+      </button>
+    </div>
+
+    <div style={{ marginTop: '10px', fontSize: '12px', opacity: 0.8 }}>
+      Tip: Leaving dates empty loads the last 30 days.
+    </div>
+  </div>
+)}
+
+
+
+
+{/* NEW — My War Logs: Range results */}
+{interactionMenuTypeA === "warlogsRangeResultMine" && (
+  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
+    <h3 style={{ marginBottom: '10px' }}>⚔️ My War Logs (Selected Range) ⚔️</h3>
+
+    <button
+      onClick={() => setinteractionMenuTypeA("")}
+      style={{
+        padding: '8px 12px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        marginBottom: '10px',
+        cursor: 'pointer'
+      }}
+    >
+      Close
+    </button>
+
+    {warLogsData.length > 0 ? (
+      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#6c757d' }}>
+            <th>Attacker</th>
+            <th>Attacker Power</th>
+            <th>Attacker Soldiers</th>
+            <th>Defender</th>
+            <th>Defender Power</th>
+            <th>Defender Soldiers</th>
+            <th>Date</th>
+            <th>Result</th>
+            <th>Resources Stolen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {warLogsData.map((item, index) => (
+            <tr key={index}>
+              <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
+              <td>{item.attackerPower?.toString()}</td>
+              <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()}</td>
+              <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
+              <td>{item.defenderPower?.toString()}</td>
+              <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()}</td>
+              <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+              <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+              <td>{item.resourcesStolen?.toString()}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    ) : (
+      <p>No war logs for that range.</p>
+    )}
+  </div>
 )}
 
 
@@ -3674,68 +3940,175 @@ style={{
 
 
 {interactionMenuTypeA === "warlogsX" && (
-    <div className="interaction-menuA">
-        <p style={{ marginBottom: '15px', fontWeight: '400' }}>
-            Loading War Logs (World) require waiting time, please choose your preference
-        </p>
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("warlogsWeek");
-                fetchRecentWarLogs();
-            }}
-        >
-            Last Week's Logs (Loading Approx. 1 Minute)
-        </button>
+  <div className="interaction-menuA">
+    <p style={{ marginBottom: '15px', fontWeight: '400' }}>
+      Loading War Logs (World) requires time, choose an option:
+    </p>
 
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("warlogsAll");
-                fetchAllWarLogs();
-            }}
-        >
-            All Time Logs (Loading Up To 10 Minutes)
-        </button>
+    <button
+      style={{
+        padding: '10px 20px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        cursor: 'pointer',
+        fontWeight: 'bold',
+        margin: '5px'
+      }}
+      onClick={() => {
+        setinteractionMenuTypeA("warlogsWeek");
+        fetchRecentWarLogs();
+      }}
+    >
+      Last Week's Logs (Fast)
+    </button>
 
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("");
-            }}
-        >
-            Cancel
-        </button>
+    {/* NEW — Date range option */}
+    <button
+      style={{
+        padding: '10px 20px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        cursor: 'pointer',
+        fontWeight: 'bold',
+        margin: '5px'
+      }}
+      onClick={() => setinteractionMenuTypeA("warlogsRange")}
+    >
+      War Logs for Specific Date Range
+    </button>
 
-    </div>
+    <button
+      style={{
+        padding: '10px 20px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        cursor: 'pointer',
+        fontWeight: 'bold',
+        margin: '5px'
+      }}
+      onClick={() => setinteractionMenuTypeA("")}
+    >
+      Cancel
+    </button>
+  </div>
 )}
+
+
+
+
+{/* NEW — Date-range input UI */}
+{interactionMenuTypeA === "warlogsRange" && (
+  <div className="interaction-menuA" style={{ textAlign: 'center' }}>
+    <h4>War Logs for Specific Date Range</h4>
+
+    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '10px' }}>
+      <div>
+        <label style={{ display: 'block', marginBottom: '4px' }}>From (inclusive)</label>
+        <input
+          type="date"
+          className="fancy-input"
+          value={rangeFrom}
+          onChange={(e) => setRangeFrom(e.target.value)}
+          style={{ minWidth: 180 }}
+        />
+      </div>
+      <div>
+        <label style={{ display: 'block', marginBottom: '4px' }}>To (inclusive)</label>
+        <input
+          type="date"
+          className="fancy-input"
+          value={rangeTo}
+          onChange={(e) => setRangeTo(e.target.value)}
+          style={{ minWidth: 180 }}
+        />
+      </div>
+    </div>
+
+    <div style={{ marginTop: '10px' }}>
+      <button
+        className="card-button"
+        onClick={fetchWarLogsInRange}
+        style={{ marginRight: '8px' }}
+      >
+        Load Logs
+      </button>
+      <button
+        className="card-button"
+        onClick={() => setinteractionMenuTypeA("")}
+      >
+        Cancel
+      </button>
+    </div>
+
+    <div style={{ marginTop: '10px', fontSize: '12px', opacity: 0.8 }}>
+      Tip: Leaving dates empty loads the last 7 days.
+    </div>
+  </div>
+)}
+
+
+
+
+
+{/* NEW — Range results */}
+{interactionMenuTypeA === "warlogsRangeResult" && (
+  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
+    <h3 style={{ marginBottom: '10px' }}>⚔️ War Logs (Selected Range) ⚔️</h3>
+
+    <button
+      onClick={() => setinteractionMenuTypeA("")}
+      style={{
+        padding: '8px 12px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '5px',
+        marginBottom: '10px',
+        cursor: 'pointer'
+      }}
+    >
+      Close
+    </button>
+
+    {warLogsData.length > 0 ? (
+      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr style={{ backgroundColor: '#6c757d' }}>
+            <th>Attacker</th>
+            <th>Attacker Clan</th>
+            <th>Defender</th>
+            <th>Defender Clan</th>
+            <th>Date</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          {warLogsData.map((item, index) => (
+            <tr key={index}>
+              <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
+              <td>{item.attackerClanName}</td>
+              <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
+              <td>{item.defenderClanName}</td>
+              <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+              <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    ) : (
+      <p>No war logs for that range.</p>
+    )}
+  </div>
+)}
+
+
+
 
 
 {interactionMenuTypeA === "warlogsWeek" && (
