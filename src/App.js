@@ -1780,15 +1780,16 @@ if (occupantPendingClanId > 0) {
 
 
 const lastActiveBN = await landContract.getTileLastActiveAt(x, y);
+const timeStampBN = await landContract.getCurrentTimestamp();
 let lastActiveAt = parseInt(lastActiveBN);
-const nowSec = Math.floor(Date.now() / 1000);
+const timeStampAt = parseInt(timeStampBN);
 
 if (lastActiveAt === 0) {
         lastActiveAt = 1756252800; // 27 August 2025 00:00:00 UTC
     }
 
-const THREE_MONTHS = 90 * 60; // 3 ay ===== 90 * 24 * 60 * 60
-const isInactive = ((nowSec - lastActiveAt) >= THREE_MONTHS);
+const THREE_MONTHS = 5 * 60; // 3 ay ===== 90 * 24 * 60 * 60
+const isInactive = ((timeStampAt - lastActiveAt) >= THREE_MONTHS);
  
 
 
@@ -3293,7 +3294,8 @@ Resource Receive Cooldown
 <div style={{ fontSize: '16px', color: 'red' }}>
 Land is Inactive
 
-
+{!tileCoords.isOnSale && (
+  <>
 <br />
     <button
       style={{ backgroundColor: "black" , fontSize: "14px"}}
@@ -3323,7 +3325,8 @@ Land is Inactive
     >
       Force To Set On Sale
     </button>
-
+    </>
+)}
 
 </div>
 
