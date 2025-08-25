@@ -3301,6 +3301,10 @@ Land is Inactive
         try {
           setLoading(true);
           const contractSigner = await getMarketplaceSignerContract();
+          console.log(attackerTileCoords.x,
+            attackerTileCoords.y,
+            tileCoords.x - 1,
+            tileCoords.y - 1)
           const tx = await contractSigner.maybeAutoListIfInactive(
             attackerTileCoords.x,
             attackerTileCoords.y,
