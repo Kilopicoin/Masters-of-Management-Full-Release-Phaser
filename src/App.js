@@ -3286,8 +3286,7 @@ Resource Receive Cooldown
 
 
 {tileCoords.occupied && hasTileG &&
- metaMaskAccount &&
- getAddress(metaMaskAccount) !== tileCoords.occupant && (
+ metaMaskAccount && (
   <>
     {tileCoords.isInactive ? (
 
@@ -3303,6 +3302,8 @@ Land is Inactive
           setLoading(true);
           const contractSigner = await getMarketplaceSignerContract();
           const tx = await contractSigner.maybeAutoListIfInactive(
+            attackerTileCoords.x,
+            attackerTileCoords.y,
             tileCoords.x - 1,
             tileCoords.y - 1
           );
