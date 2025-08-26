@@ -16,6 +16,14 @@ import marketImage from './assets/buildings/market.png';
 import towerImage from './assets/buildings/tower.png';
 import workshopImage from './assets/buildings/workshop.png';
 import backgroundMusicFile from './assets/background2.mp3';
+
+import armorySound from './assets/armory.mp3';
+import turnSound from './assets/turnuse.mp3';
+import constructionSound from './assets/construction.mp3';
+import clancreateSound from './assets/clancreate.mp3';
+import trainingSound from './assets/training.mp3';
+import upgradeSound from './assets/upgrade.mp3';
+
 import foodImage from './assets/res/food.png';
 import woodImage from './assets/res/wood.png';
 import stoneImage from './assets/res/stone.png';
@@ -42,7 +50,7 @@ import offensiveWeaponImage from './assets/weapons/offensive.png';
 import defensiveSoldierImage from './assets/soldiers/defensive.png';
 import offensiveSoldierImage from './assets/soldiers/offensive.png';
 
-import { getTheLandSignerContract } from './TheLandContract';
+import getTheLandContract, { getTheLandSignerContract } from './TheLandContract';
 import { getMarketplaceSignerContract, MarketplacecontractAddress } from './MarketplaceContract';
 import { getclanSignerContract, clancontractAddress } from './clancontract';
 import { getTokenSignerContract } from './Tokencontract';
@@ -50,6 +58,7 @@ import { getNFTSignerContract } from './nftContract';
 
 import { Circles } from 'react-loader-spinner';
 import './App.css';
+import getContract from './contract';
 
 const TheLand = ({ tileCoords, goBackToApp }) => {
     const gameRef = useRef(null);
@@ -178,6 +187,32 @@ const [calculatedResources, setCalculatedResources] = useState({
 
 
 
+const cancelListing = async (item, index) => {
+  try {
+    setLoading(true);
+    const contract = await getMarketplaceSignerContract();
+    const tx = await contract.cancelListing(
+      item.sellerX - 1,
+      item.sellerY - 1,
+      item.resourceType,
+      index
+    );
+    await tx.wait();
+
+    toast.success("Listing canceled.");
+    await fetchTileData(tileCoords.x, tileCoords.y);
+    await fetchMarketplaceItemsByType();
+  } catch (error) {
+    console.error("Error canceling listing:", error);
+    toast.error("Failed to cancel listing.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+
 const demolishBuilding = async (interiorX, interiorY) => {
   try {
     setLoading(true);
@@ -295,27 +330,58 @@ useEffect(() => {
 
 
 const handleSetClanFlag = async (tokenId) => {
+
   try {
+    if (!userClan) {
+      toast.error("Join or create a clan first.");
+      return;
+    }
+    if (!clanDetails?.isLeader) {
+      toast.error("Only the clan leader can set the flag.");
+      return;
+    }
+
     setLoading(true);
+    gameRef.current?.sounds?.clancreate?.play?.();
 
-    const TokenContract = await getTokenSignerContract();
-        const approvalTx = await TokenContract.increaseAllowance(clancontractAddress, 10000 * 10 ** 6);
-        await approvalTx.wait();
+    const clan = await getclanSignerContract();
+    const land = await getTheLandContract();
 
-        
-    const clanContract = await getclanSignerContract();
-    const tx = await clanContract.setClanFlag(userClan, tokenId);
+    // Get leader tile coords from on-chain info
+    const info = await clan.getClanInfo(userClan);
+    const leaderX = parseInt(info.leaderX);
+    const leaderY = parseInt(info.leaderY);
 
+    // Must have a Clan Hall at the leader tile
+    const hasHall = await land.hasClanHallAtCoord(leaderX, leaderY);
+    if (!hasHall) {
+      toast.error("You need a Clan Hall at your leader tile to set a flag.");
+      setLoading(false);
+      return;
+    }
+
+    // Approve 10,000 LOP (10,000 * 10^6)
+    const token = await getTokenSignerContract();
+    const approvalTx = await token.increaseAllowance(
+      clancontractAddress,
+      10_000 * 10 ** 6
+    );
+    await approvalTx.wait();
+
+    // Set flag with leader coords
+    const tx = await clan.setClanFlag(userClan, leaderX, leaderY, tokenId);
     await tx.wait();
+
     toast.success("Clan flag set!");
     setShowFlagSelector(false);
-    setLoading(false);
   } catch (err) {
     console.error("Failed to set clan flag", err);
     toast.error("Failed to set flag");
+  } finally {
     setLoading(false);
   }
 };
+
 
 
 useEffect(() => {
@@ -367,7 +433,15 @@ const fetchFlagNFTs = async () => {
 
 
 
-
+const fetchTileNameX = async () => {
+        try {
+            const contract = await getclanSignerContract();
+            const name = await contract.getTileName(tileCoords.x - 1, tileCoords.y - 1);
+            setTileName(name);
+        } catch (error) {
+            console.error("Error fetching tile name:", error);
+        }
+    };
 
 
 
@@ -408,7 +482,9 @@ const handleNameTile = async () => {
         const tx = await contract.nameTile(tileCoords.x - 1, tileCoords.y - 1, tileNameInput);
         await tx.wait();
 
-        toast.success("Tile named successfully!");
+        await fetchTileNameX();
+
+        toast.success("Realm named successfully!");
         setShowNameInput(false);
         setTileNameInput('');
     } catch (error) {
@@ -435,26 +511,53 @@ const fetchAllClans = async () => {
 };
 
 
-
-const fetchPendingInvite = async () => {
+const fetchPendingInvite = useCallback(async () => {
     try {
-        const contract = await getclanSignerContract();
-        const userAddress = await window.ethereum.request({ method: 'eth_accounts' });
-        if (!userAddress.length) return;
+    const clan = await getclanSignerContract();
+    const tileMap = await getContract();
 
-        const clanId = await contract.pendingInvites(userAddress[0]);
-        if (clanId > 0) {
-            const info = await contract.getClanInfo(clanId);
-            setPendingInviteClanId(clanId);
-            setPendingInviteClanName(info.name);
-        } else {
-            setPendingInviteClanId(null);
-            setPendingInviteClanName("");
-        }
-    } catch (error) {
-        console.error("Error fetching pending invite:", error);
+    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+    const account = accounts && accounts[0] ? accounts[0] : null;
+    if (!account) {
+      setPendingInviteClanId(null);
+      setPendingInviteClanName("");
+      return;
     }
-};
+
+
+
+    const x = tileCoords.x - 1;
+    const y = tileCoords.y - 1;
+
+    // Verify ownership of that tile
+    const occupant = await tileMap.getTileOccupant(x, y);
+    if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
+      setPendingInviteClanId(null);
+      setPendingInviteClanName("");
+      return;
+    }
+
+    // Compute tile key: (x<<8)|y  ==> use multiply to avoid bitwise sign quirks
+    const tileKey = x * 256 + y;
+
+    // Read pending invite by tile
+    const clanIdRaw = await clan.pendingInvitesByTile(tileKey);
+    const clanId = parseInt(clanIdRaw);
+
+    if (clanId > 0) {
+      setPendingInviteClanId(clanId);
+      const info = await clan.getClanInfo(clanId);
+      setPendingInviteClanName(info.name);
+    } else {
+      setPendingInviteClanId(null);
+      setPendingInviteClanName("");
+    }
+  } catch (error) {
+    console.error("Error fetching pending invite:", error);
+    setPendingInviteClanId(null);
+    setPendingInviteClanName("");
+  }
+}, [tileCoords.x, tileCoords.y]);
 
 const fetchResourceMessage = useCallback(async () => {
     try {
@@ -463,7 +566,7 @@ const fetchResourceMessage = useCallback(async () => {
 
         if (messageX) {
             const marketContract = await getMarketplaceSignerContract();
-            const messageC = await marketContract.resourceMessages(tileCoords.x - 1, tileCoords.y - 1);
+            const messageC = await marketContract.getMyResourceMessage(tileCoords.x - 1, tileCoords.y - 1);
             const fromx = (parseInt(messageC.fromX) + 1).toString();
             const fromy = (parseInt(messageC.fromY) + 1).toString();
             const resourcetype = (messageC.resourceType).toString();
@@ -519,95 +622,170 @@ useEffect(() => {
         fetchPendingInvite();
         fetchResourceMessage();
     }
-}, [metaMaskAccount, fetchResourceMessage]);
+}, [metaMaskAccount, fetchResourceMessage, fetchPendingInvite]);
 
 const checkUserClan = useCallback(async () => {
     try {
-        const contract = await getclanSignerContract();
-        const userAddress = await window.ethereum.request({ method: 'eth_accounts' });
+    const clan = await getclanSignerContract();
+    const tileMap = await getContract();
 
-        if (!userAddress.length) {
-            setUserClan(null);
-            return;
-        }
+    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+    const account = accounts && accounts[0] ? accounts[0] : null;
 
-        const clanId = await contract.members(userAddress[0]);
-        if (clanId.isMember) {
-            setUserClan(clanId.clanId);
-            const details = await contract.getClanInfo(clanId.clanId);
-            setClanDetails(details);
-        } else {
-            setUserClan(null);
-            setClanDetails(null);
-        }
-    } catch (error) {
-        console.error("Error fetching clan info:", error);
-        toast.error("Failed to fetch clan information.");
+    if (!account) {
+      setUserClan(null);
+      setClanDetails(null);
+      return;
     }
-}, []);
+
+    const x = tileCoords.x - 1;
+    const y = tileCoords.y - 1;
+
+    // Double-check ownership
+    const occupant = await tileMap.getTileOccupant(x, y);
+    if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
+      setUserClan(null);
+      setClanDetails(null);
+      return;
+    }
+
+    // Clan by tile
+    const clanIdRaw = await clan.getTileClan(x, y);
+    const clanId = parseInt(clanIdRaw);
+
+    if (clanId > 0) {
+      setUserClan(clanId);
+
+      const info = await clan.getClanInfo(clanId);
+      const details = {
+        name: info.name,
+        leaderX: parseInt(info.leaderX) + 1,
+        leaderY: parseInt(info.leaderY) + 1,
+        memberCount: parseInt(info.memberCount),
+        exists: info.exists,
+        isLeader: parseInt(info.leaderX) === x && parseInt(info.leaderY) === y,
+      };
+
+      setClanDetails(details);
+    } else {
+      setUserClan(null);
+      setClanDetails(null);
+    }
+  } catch (error) {
+    console.error("Error fetching clan info:", error);
+    toast.error("Failed to fetch clan information.");
+    setUserClan(null);
+    setClanDetails(null);
+  }
+}, [tileCoords.x, tileCoords.y]);
 
 
 
 
 const createClan = async () => {
-    if (!newClanName || newClanName.trim() === "") {
-        toast.error("Please enter a clan name.");
-        return;
+  if (!newClanName || newClanName.trim() === "") {
+    toast.error("Please enter a clan name.");
+    return;
+  }
+
+  try {
+    const clan = await getclanSignerContract();
+    const tileMap = await getContract();
+
+    // Check name availability first
+    const available = await clan.isClanNameAvailable(newClanName);
+    if (!available) {
+      toast.error("This clan name is already taken.");
+      return;
     }
 
-    try {
-        
-        const contract = await getclanSignerContract();
-
-      const available = await contract.isClanNameAvailable(newClanName);
-      if (!available) {
-        toast.error("This clan name is already taken.");
-        return;
-      }
-
-      setloadingClanCreate(true);
-
-        const TokencontractSigner = await getTokenSignerContract();
-        const Allowancetx = await TokencontractSigner.increaseAllowance(
-            clancontractAddress,
-            clancreationcost
-        );
-        await Allowancetx.wait();
-
-        
-        const tx = await contract.createClan(newClanName);
-        await tx.wait();
-        toast.success("Clan created successfully!");
-        await checkUserClan();
-        setNewClanName(""); // Reset input
-    } catch (error) {
-        console.error("Error creating clan:", error);
-        toast.error("Failed to create clan.");
-    } finally {
-        setloadingClanCreate(false);
+    // Ensure wallet & find user's tile coords
+    const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+    const account = accounts && accounts[0] ? accounts[0] : null;
+    if (!account) {
+      toast.error("Connect your wallet first.");
+      return;
     }
+
+    const x = tileCoords.x - 1;
+    const y = tileCoords.y - 1;
+
+    // Verify ownership of (x,y)
+    const occupant = await tileMap.getTileOccupant(x, y);
+    if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
+      toast.error("You must own a tile to create a clan.");
+      return;
+    }
+
+    setloadingClanCreate(true);
+    gameRef.current?.sounds?.clancreate?.play?.();
+
+    // Approve/increase allowance for creation cost
+    const token = await getTokenSignerContract();
+    const allowanceTx = await token.increaseAllowance(
+      clancontractAddress,
+      clancreationcost
+    );
+    await allowanceTx.wait();
+
+    // Create clan with tile coords + name
+    const tx = await clan.createClan(x, y, newClanName.trim());
+    await tx.wait();
+
+    toast.success("Clan created successfully!");
+    await checkUserClan();
+    setNewClanName(""); // Reset input
+  } catch (error) {
+    console.error("Error creating clan:", error);
+    toast.error("Failed to create clan.");
+  } finally {
+    setloadingClanCreate(false);
+  }
 };
+
 
 
 
 
 const handleDisbandClan = async () => {
-    if (!userClan) return;
-    
-    try {
-        setLoading(true);
-        const contract = await getclanSignerContract();
-        const tx = await contract.disbandClan(userClan);
-        await tx.wait();
-        toast.success("Clan disbanded successfully!");
-        await checkUserClan(); // refresh clan data
-    } catch (error) {
-        console.error("Error disbanding clan:", error);
-        toast.error("Failed to disband clan.");
-    } finally {
-        setLoading(false);
+  // If you store just the id, rename to userClanId; if it's an object, adapt accordingly.
+  const clanId = parseInt(userClan);
+  if (!clanId) return;
+
+  try {
+    setLoading(true);
+
+    const clanContract = await getclanSignerContract();
+
+    // getClanInfo returns: { name, leaderX, leaderY, memberCount, exists }
+    // ethers v5/v6 both also allow tuple indexing; we guard for both.
+    const info = await clanContract.getClanInfo(clanId);
+    const leaderX = info.leaderX ?? info[1];
+    const leaderY = info.leaderY ?? info[2];
+
+
+    if (
+      parseInt(tileCoords.x) - 1 !== parseInt(leaderX) ||
+      parseInt(tileCoords.y) - 1 !== parseInt(leaderY)
+    ) {
+      toast.error("Only the leader tile can disband the clan.");
+      return;
     }
+
+    // Call requires (clanId, lx, ly)
+    const tx = await clanContract.disbandClan(clanId, leaderX, leaderY);
+    await tx.wait();
+
+    toast.success("Clan disbanded successfully!");
+    await checkUserClan(); // refresh local UI/state
+  } catch (error) {
+    toast.info("Error disbanding clan:", error);
+
+  } finally {
+    setLoading(false);
+  }
 };
+
 
 
 
@@ -628,6 +806,7 @@ const produceArmor = async (armorType, quantity) => {
 
     try {
         setloadingArmoryForge(true);
+        gameRef.current.sounds.armory.play();
         const contract = await getTheLandSignerContract();
         const tx = await contract.produceArmor(
             tileCoords.x - 1,
@@ -639,6 +818,7 @@ const produceArmor = async (armorType, quantity) => {
         toast.success(`${armorType === 1 ? "Offensive" : "Defensive"} armor produced successfully!`);
         await fetchTileData(tileCoords.x, tileCoords.y); // Refresh tile data
     } catch (error) {
+        
         console.error("Error producing armor:", error);
         toast.error("Failed to produce armor. Please try again.");
     } finally {
@@ -657,6 +837,7 @@ const produceWeapon = async (weaponType, quantity) => {
 
     try {
         setloadingBlacksmithForge(true);
+        gameRef.current.sounds.armory.play();
         const contract = await getTheLandSignerContract();
         const tx = await contract.produceWeapon(
             tileCoords.x - 1,
@@ -687,8 +868,10 @@ const trainSoldier = async (soldierType, quantity) => {
 
         if (soldierType === 1) {
         setloadingOffensiveTraining(true);
+        gameRef.current.sounds.training.play();
         } else  if (soldierType === 2) {
         setloadingDefensiveTraining(true);
+        gameRef.current.sounds.training.play();
         }
 
         const contract = await getTheLandSignerContract();
@@ -717,8 +900,10 @@ const upgradeTech = async (techType) => {
 
          if (techType === 1) {
         setlaodingOffensiveTech(true);
+        gameRef.current.sounds.upgrade.play();
         } else  if (techType === 2) {
         setloadingDefensiveTech(true);
+        gameRef.current.sounds.upgrade.play();
         }
 
 
@@ -985,60 +1170,70 @@ const fetchTileTurns = async (x, y) => {
 
 
 const fetchMarketplaceItemsByType = async () => {
-    try {
-        setLoading(true);
-        const contract = await getMarketplaceSignerContract();
-        const items = await contract.getListingsByResourceType(selectedResourceType); // Fetch only selected category
 
-        let restype = '';
+  // label map (keys as numbers)
+  const RESOURCE_LABELS = {
+    1: "Food",
+    2: "Wood",
+    3: "Stone",
+    4: "Iron",
+    5: "Offensive Armor",
+    6: "Defensive Armor",
+    7: "Offensive Weapon",
+    8: "Defensive Weapon",
+  };
 
+  try {
+    setLoading(true);
 
-            switch (selectedResourceType) {
-        case "1":
-            restype = 'Food';
-            break;
-        case "2":
-            restype = 'Wood';
-            break;
-        case "3":
-            restype = 'Stone';
-            break;
-        case "4":
-            restype = 'Iron';
-            break;
-            case "5":
-            restype = 'Offensive Armor';
-            break;
-            case "6":
-            restype = 'Defensive Armor';
-            break;
-            case "7":
-            restype = 'Offensive Weapon';
-            break;
-            case "8":
-            restype = 'Defensive Weapon';
-            break;
-        default:
-            break;
+    const market = await getMarketplaceSignerContract();
+
+    // Ensure numeric type for the solidity fn param
+    const rtNum = parseInt(selectedResourceType);
+    if (!rtNum || isNaN(rtNum)) {
+      toast.error("Select a valid resource type.");
+      setMarketplaceItems([]);
+      return;
     }
 
-        const formattedItems = items.map((item, index) => ({
-            id: index, // Since we don't store an ID in the contract, use index
-            seller: item.seller,
-            resourceTypeX: restype,
-            resourceType: item.resourceType.toString(),
-            amount: item.amount.toString(),
-            price: item.price.toString(),
-        }));
+    // Fetch only this category
+    const items = await market.getListingsByResourceType(tileCoords.x - 1, tileCoords.y -1, rtNum);
 
-        setMarketplaceItems(formattedItems);
-    } catch (error) {
-        console.error("Error fetching marketplace items:", error);
-        toast.error("Failed to load marketplace items.");
-    } finally {
-        setLoading(false);
-    }
+    const restype = RESOURCE_LABELS[rtNum] || "";
+
+    // Map results (works for ethers v5/v6 named + indexed structs)
+    const formattedItems = (items || []).map((item, index) => {
+      const sellerX = item.sellerX ?? item[0];
+      const sellerY = item.sellerY ?? item[1];
+      const resourceType = item.resourceType ?? item[2];
+      const amount = item.amount ?? item[3];
+      const price = item.price ?? item[4];
+
+       const isOwnListing =
+   parseInt(sellerX) === tileCoords.x - 1 && parseInt(sellerY) === tileCoords.y - 1;
+
+      return {
+        id: index, // fallback index as id
+        sellerX: parseInt(sellerX) + 1,
+        sellerY: parseInt(sellerY) + 1,
+        resourceTypeX: restype,
+        resourceType: parseInt(resourceType),
+        amount: parseInt(amount),
+        price: parseInt(price),
+        isOwnListing: isOwnListing
+      };
+    });
+
+    setMarketplaceItems(formattedItems);
+  } catch (error) {
+    console.error("Error fetching marketplace items:", error);
+    toast.error("Failed to load marketplace items.");
+    setMarketplaceItems([]);
+  } finally {
+    setLoading(false);
+  }
 };
+
 
 
 
@@ -1117,6 +1312,18 @@ const contract = await getMarketplaceSignerContract();
         const x = tileCoords.x - 1;
         const y = tileCoords.y - 1;
 
+
+        // compute the same key the contract uses: (x << 8) | y
+    const tileKey = x * 256 + y;
+
+    // 1) hard cap: max 5 active listings per tile
+    const active = await contract.activeListingsByTile(tileKey); // public mapping getter
+    if (parseInt(active) >= 5) {
+      toast.info("You already have 5 active listings for this realm. Remove one first.");
+      return; // stop before any tx
+    }
+
+
         const tx = await contract.listItemForSale(x, y, resourceType, amount, price);
         await tx.wait();
 
@@ -1194,6 +1401,7 @@ useEffect(() => {
 const placeBuildingOnTile = useCallback(
     async (mainX, mainY, interiorX, interiorY, buildingType, onTransactionStart, onTransactionEnd) => {
         setLoading(true);
+        gameRef.current.sounds.construction.play();
         try {
             onTransactionStart(); // Temporarily place the transparent image
             const contract = await getTheLandSignerContract();
@@ -1346,6 +1554,14 @@ const fetchAllBuildings = async (mainX, mainY) => {
 
         function preload() {
             this.load.audio('backgroundMusic2', backgroundMusicFile);
+
+            this.load.audio('armorySound', armorySound);
+            this.load.audio('turnSound', turnSound);
+            this.load.audio('constructionSound', constructionSound);
+            this.load.audio('clancreateSound', clancreateSound);
+            this.load.audio('trainingSound', trainingSound);
+            this.load.audio('upgradeSound', upgradeSound);
+
             this.load.image('grassX', grassXImage);
             this.load.image('foodX', foodXImage);
             this.load.image('woodX', woodXImage);
@@ -1389,6 +1605,19 @@ const fetchAllBuildings = async (mainX, mainY) => {
         }
 
         async function create() {
+
+            gameRef.current.sounds = {
+  armory: this.sound.add('armorySound', { volume: 0.6 }),
+  turn: this.sound.add('turnSound', { volume: 0.6 }),
+   construction: this.sound.add('constructionSound', { volume: 0.6 }),
+   clancreate: this.sound.add('clancreateSound', { volume: 0.6 }),
+   training: this.sound.add('trainingSound', { volume: 0.3 }),
+   upgrade: this.sound.add('upgradeSound', { volume: 0.6 }),
+
+};
+
+
+
             this.buildingSprites = Array(mapSize).fill(null).map(() => Array(mapSize).fill(null));
 
             const tileWidth = 386;
@@ -1585,19 +1814,19 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             });
 
 
-                            const clockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+                            const houseClockOverlays = this.add.dom(worldX, worldY).createFromHTML(`
     <img 
       src="${clockLoadingImage}" 
       style="width: 96px; height: 96px; display: none; filter: brightness(2.1); transform: translate(-40px, -10px);" 
     />
   `);
-  clockOverlay.setDepth(worldY + 2);
+  houseClockOverlays.setDepth(worldY + 2);
 
   // Save references so you can toggle them later
   if (!gameRef.current.houseClockOverlays) {
     gameRef.current.houseClockOverlays = [];
   }
-  gameRef.current.houseClockOverlays.push(clockOverlay);
+  gameRef.current.houseClockOverlays.push(houseClockOverlays);
 
 
 
@@ -1837,6 +2066,27 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                     setinteractionMenuType('armory');
                 }
             });
+
+
+
+
+             const forgeOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${forgekLoadingImage}" 
+      style="width: 150px; height: 150px; display: none; filter: brightness(1.9); transform: translate(-120px, -80px);" 
+    />
+  `);
+  forgeOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.armoryForgeOverlays) {
+    gameRef.current.armoryForgeOverlays = [];
+  }
+  gameRef.current.armoryForgeOverlays.push(forgeOverlay);
+
+
+
+
         } else if (imageKey === 'blacksmith') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
@@ -1844,6 +2094,26 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                     setinteractionMenuType('blacksmith');
                 }
             });
+
+
+
+            const forgeOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${forgekLoadingImage}" 
+      style="width: 150px; height: 150px; display: none; filter: brightness(1.9); transform: translate(-120px, -80px);" 
+    />
+  `);
+  forgeOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.blacksmithForgeOverlays) {
+    gameRef.current.blacksmithForgeOverlays = [];
+  }
+  gameRef.current.blacksmithForgeOverlays.push(forgeOverlay);
+
+
+
+
         } else if (imageKey === 'fightingpit') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
@@ -1851,6 +2121,44 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                     setinteractionMenuType('train-soldier');
                 }
             });
+
+
+
+            const trainingOffensiveOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${offensiveLoadingImage}" 
+      style="width: 120px; height: 120px; display: none; filter: brightness(1.9); transform: translate(-60px, -40px);" 
+    />
+  `);
+  trainingOffensiveOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.trainingOffensiveOverlays) {
+    gameRef.current.trainingOffensiveOverlays = [];
+  }
+  gameRef.current.trainingOffensiveOverlays.push(trainingOffensiveOverlay);
+
+
+
+
+
+
+   const trainingDefensiveOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${defensiveLoadingImage}" 
+      style="width: 120px; height: 120px; display: none; filter: brightness(1.9); transform: translate(-60px, -40px);" 
+    />
+  `);
+  trainingDefensiveOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.trainingDefensiveOverlays) {
+    gameRef.current.trainingDefensiveOverlays = [];
+  }
+  gameRef.current.trainingDefensiveOverlays.push(trainingDefensiveOverlay);
+
+
+
         } else if (imageKey === 'house') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
@@ -1858,6 +2166,25 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                     setinteractionMenuType('house-info');
                 }
             });
+
+
+const houseClockOverlays = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${clockLoadingImage}" 
+      style="width: 96px; height: 96px; display: none; filter: brightness(2.1); transform: translate(-40px, -10px);" 
+    />
+  `);
+  houseClockOverlays.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.houseClockOverlays) {
+    gameRef.current.houseClockOverlays = [];
+  }
+  gameRef.current.houseClockOverlays.push(houseClockOverlays);
+
+
+
+
         } else if (imageKey === 'tower') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
@@ -1872,6 +2199,45 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                     setinteractionMenuType('workshop');
                 }
             });
+
+
+
+            const offensiveTechOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${offensiveTechLoadingImage}" 
+      style="width: 96px; height: 96px; display: none; filter: brightness(1.3); transform: translate(-60px, -20px);" 
+    />
+  `);
+  offensiveTechOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.offensiveTechOverlays) {
+    gameRef.current.offensiveTechOverlays = [];
+  }
+  gameRef.current.offensiveTechOverlays.push(offensiveTechOverlay);
+
+
+
+
+
+
+
+  const defensiveTechOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${defensiveTechLoadingImage}" 
+      style="width: 96px; height: 96px; display: none; filter: brightness(1.3); transform: translate(-60px, -20px);" 
+    />
+  `);
+  defensiveTechOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.defensiveTechOverlays) {
+    gameRef.current.defensiveTechOverlays = [];
+  }
+  gameRef.current.defensiveTechOverlays.push(defensiveTechOverlay);
+
+
+
         } else if (imageKey === 'market') {
             tempImage.on('pointerdown', (pointer) => {
                 if (pointer.button === 2) {
@@ -1886,6 +2252,25 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                     setinteractionMenuType('clanhall');
                 }
             });
+
+
+
+            const flagOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+    <img 
+      src="${clancreateLoadingImage}" 
+      style="width: 150px; height: 150px; display: none; filter: brightness(2.1); transform: translate(-120px, -90px);" 
+    />
+  `);
+  flagOverlay.setDepth(worldY + 2);
+
+  // Save references so you can toggle them later
+  if (!gameRef.current.flagOverlays) {
+    gameRef.current.flagOverlays = [];
+  }
+  gameRef.current.flagOverlays.push(flagOverlay);
+
+
+  
         }
 
     } else {
@@ -2119,6 +2504,7 @@ useEffect(() => {
     }
 
     setLoadingTurns(true);
+    gameRef.current.sounds.turn.play();
 
     try {
         const contract = await getTheLandSignerContract(); // Replace with your function to get a signer instance
@@ -2449,29 +2835,61 @@ useEffect(() => {
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
             <button
                 onClick={async () => {
-    try {
-        setLoading(true);
-        const contract = await getclanSignerContract();
-        const memberCount = await contract.getClanMemberCount(pendingInviteClanId);
+   try {
+  setLoading(true);
 
-        let toastcontent = '';
-        if (memberCount >= 30) {
-            toastcontent = 'Clan Full, Invitation Removed';
-        } else {
-            toastcontent = 'Joined the Clan';
-        }
+  const clan = await getclanSignerContract();
+  const tileMap = await getContract();
 
-        const tx = await contract.acceptInvite();
-        await tx.wait();
-        await checkUserClan();
-        await fetchPendingInvite();
-        toast.info(toastcontent);
-        setLoading(false);
-    } catch (err) {
-        console.error("Accept failed:", err);
-        await fetchPendingInvite();
-        setLoading(false);
-    }
+  // Connected account
+  const accounts = await window.ethereum.request({ method: "eth_accounts" });
+  const account = accounts && accounts[0] ? accounts[0] : null;
+  if (!account) {
+    toast.error("Connect your wallet first.");
+    return;
+  }
+
+  // Resolve user's tile and verify ownership
+  const x = tileCoords.x - 1;
+  const y = tileCoords.y - 1;
+
+  const occupant = await tileMap.getTileOccupant(x, y);
+  if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
+    toast.error("You must own your tile to accept the invite.");
+    return;
+  }
+
+  // Look up the pending invite on this tile
+  const tileKey = x * 256 + y; // (x << 8) | y
+  const inviteClanIdRaw = await clan.pendingInvitesByTile(tileKey);
+  const inviteClanId = parseInt(inviteClanIdRaw);
+
+  if (inviteClanId === 0) {
+    toast.info("No pending invite for your tile.");
+    await fetchPendingInvite();
+    return;
+  }
+
+  // Check member count to pick a toast message (contract will auto-clean if full)
+  const mcRaw = await clan.getClanMemberCount(inviteClanId);
+  const memberCount = parseInt(mcRaw);
+  const toastcontent =
+    memberCount >= 30 ? "Clan Full, Invitation Removed" : "Joined the Clan";
+
+  // Accept for this tile
+  const tx = await clan.acceptInviteForTile(x, y);
+  await tx.wait();
+
+  await checkUserClan();
+  await fetchPendingInvite();
+  toast.info(toastcontent);
+} catch (err) {
+  console.error("Accept failed:", err);
+  await fetchPendingInvite();
+} finally {
+  setLoading(false);
+}
+
 }}
 
                 style={{ padding: '6px 10px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px' }}
@@ -2481,19 +2899,44 @@ useEffect(() => {
             <button
                 onClick={async () => {
                     try {
-                        setLoading(true);
-                        const contract = await getclanSignerContract();
-                        const tx = await contract.refuseInvite();
-                        await tx.wait();
-                        toast.info("Invite refused.");
-                        setPendingInviteClanId(null);
-                        setPendingInviteClanName("");
-                        setLoading(false);
-                    } catch (err) {
-                        console.error("Refuse failed:", err);
-                        toast.error("Failed to refuse invite.");
-                        setLoading(false);
-                    }
+  setLoading(true);
+
+  const clan = await getclanSignerContract();
+  const tileMap = await getContract();
+
+  // Get connected account
+  const accounts = await window.ethereum.request({ method: "eth_accounts" });
+  const account = accounts && accounts[0] ? accounts[0] : null;
+  if (!account) {
+    toast.error("Connect your wallet first.");
+    return;
+  }
+
+  // Resolve the user's tile
+  const x = tileCoords.x - 1;
+  const y = tileCoords.y - 1;
+
+  // Verify ownership of (x,y)
+  const occupant = await tileMap.getTileOccupant(x, y);
+  if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
+    toast.error("You must own your tile to refuse the invite.");
+    return;
+  }
+
+  // Refuse invite for this tile
+  const tx = await clan.refuseInviteForTile(x, y);
+  await tx.wait();
+
+  toast.info("Invite refused.");
+  setPendingInviteClanId(null);
+  setPendingInviteClanName("");
+} catch (err) {
+  console.error("Refuse failed:", err);
+  toast.error("Failed to refuse invite.");
+} finally {
+  setLoading(false);
+}
+
                 }}
                 style={{ padding: '6px 10px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '5px' }}
             >
@@ -3455,7 +3898,7 @@ style={{
                             padding: '5px 10px', 
                             borderBottom: '1px solid #ddd'
                         }}>
-                        <span style={{ paddingLeft: '10px', paddingRight: '10px' }}><strong>{item.seller.slice(0, 4)}...{item.seller.slice(-4)}</strong></span>
+                        <span style={{ paddingLeft: '10px', paddingRight: '10px' }}><strong>{item.sellerX}, {item.sellerY}</strong></span>
                         <span style={{ paddingLeft: '10px', paddingRight: '10px' }}>Item: {item.resourceTypeX}</span>
                         <span style={{ paddingLeft: '10px', paddingRight: '10px' }}>Amount: {item.amount}</span>
                         <span style={{ paddingLeft: '10px', paddingRight: '10px' }}>Price: {item.price / (10 ** 6)} LOP</span>
@@ -3472,6 +3915,26 @@ style={{
                         >
                             Buy
                         </button>
+
+
+                        {item.isOwnListing && (
+          <button
+            style={{
+              padding: '5px 10px',
+              backgroundColor: '#dc3545',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: 'pointer'
+            }}
+            onClick={() => cancelListing(item, index)}
+          >
+            Remove
+          </button>
+        )}
+
+
+
                     </div>
                 ))}
             </div>
@@ -3557,7 +4020,7 @@ style={{
                 <div className="card-content">
                     <div style={{ fontWeight: '900' }}>List an Item for Sale</div>
                     <div>min:10.000 for resources - min:100 for equipments</div>
-                    <div>min price: 10 LOP</div>
+                    <div>min price: 10 LOP ( Maximum 5 Listings )</div>
                     <select className="medieval-select" value={selectedResource} onChange={(e) => setSelectedResource(e.target.value)}>
     <option value="1">Food</option>
     <option value="2">Wood</option>
@@ -3613,7 +4076,7 @@ className='fancy-input'
         {userClan ? (
             <div>
                 <p><strong>Clan:</strong> {clanDetails?.name}</p>
-                <p><strong>Leader:</strong> {clanDetails?.leader.slice(0, 6)}...{clanDetails?.leader.slice(-6)}</p>
+                <p><strong>Leader:</strong> {clanDetails?.leaderX}, {clanDetails?.leaderY}</p>
                 <p><strong>Members:</strong> {parseInt(clanDetails?.memberCount)}/30</p>
 
             {showFlagSelector && (
@@ -3676,7 +4139,7 @@ className='fancy-input'
 
 
 
-                {clanDetails?.leader?.toLowerCase() === metaMaskAccount?.toLowerCase() && (
+                {clanDetails?.isLeader && (
 <>
 <div>
                     <button className="card-button" onClick={() => fetchFlagNFTs()}>
@@ -3793,7 +4256,7 @@ className='fancy-input'
                 }}
             >
                 <div style={{ flex: 1, textAlign: 'center'}}>{clan.name}</div>
-                <div style={{ flex: 1, textAlign: 'center' }}>{clan.leader.slice(0, 6)}...{clan.leader.slice(-3)}</div>
+                <div style={{ flex: 1, textAlign: 'center' }}>{parseInt(clan?.leaderX) + 1}, {parseInt(clan?.leaderY) + 1}</div>
                 <div style={{ flex: 1, textAlign: 'center' }}>{parseInt(clan.memberCount)}/30</div>
             </div>
         ))}

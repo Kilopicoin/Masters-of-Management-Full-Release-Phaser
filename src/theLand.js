@@ -261,6 +261,38 @@ if (gameRef.current && gameRef.current.scene && gameRef.current.scene.keys && ga
   }
 }
 
+
+
+const overlayGroups = [
+      "houseClockOverlays",
+      "trainingOffensiveOverlays",
+      "trainingDefensiveOverlays",
+      "armoryForgeOverlays",
+      "blacksmithForgeOverlays",
+      "offensiveTechOverlays",
+      "defensiveTechOverlays",
+      "flagOverlays"
+    ];
+
+    overlayGroups.forEach((group) => {
+      let overlays = gameRef.current[group];
+      if (!overlays) return;
+
+      if (Array.isArray(overlays)) {
+        // remove overlays matching (x, y)
+        gameRef.current[group] = overlays.filter(({ x: ox, y: oy, overlay }) => {
+          if (ox === interiorX && oy === interiorY) {
+            overlay.destroy(); // destroy DOM element
+            return false; // remove from array
+          }
+          return true;
+        });
+      }
+    });
+
+
+
+
     // 3. Reset interaction menu
     setinteractionMenuType('home');
 
@@ -1726,8 +1758,12 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
   if (!gameRef.current.armoryForgeOverlays) {
     gameRef.current.armoryForgeOverlays = [];
   }
-  gameRef.current.armoryForgeOverlays.push(forgeOverlay);
 
+gameRef.current.armoryForgeOverlays.push({ 
+  x, 
+  y, 
+  overlay: forgeOverlay 
+});
 
 
                         } else if (buildingImage === 'blacksmith') {
@@ -1753,8 +1789,12 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
   if (!gameRef.current.blacksmithForgeOverlays) {
     gameRef.current.blacksmithForgeOverlays = [];
   }
-  gameRef.current.blacksmithForgeOverlays.push(forgeOverlay);
 
+gameRef.current.blacksmithForgeOverlays.push({ 
+  x, 
+  y, 
+  overlay: forgeOverlay 
+});
 
 
                         } else if (buildingImage === 'fightingpit') {
@@ -1780,9 +1820,13 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
   if (!gameRef.current.trainingOffensiveOverlays) {
     gameRef.current.trainingOffensiveOverlays = [];
   }
-  gameRef.current.trainingOffensiveOverlays.push(trainingOffensiveOverlay);
+  
 
-
+gameRef.current.trainingOffensiveOverlays.push({ 
+  x, 
+  y, 
+  overlay: trainingOffensiveOverlay
+});
 
 
 
@@ -1799,8 +1843,12 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
   if (!gameRef.current.trainingDefensiveOverlays) {
     gameRef.current.trainingDefensiveOverlays = [];
   }
-  gameRef.current.trainingDefensiveOverlays.push(trainingDefensiveOverlay);
-
+ 
+gameRef.current.trainingDefensiveOverlays.push({ 
+  x, 
+  y, 
+  overlay: trainingDefensiveOverlay 
+});
 
 
 
@@ -1814,19 +1862,23 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                             });
 
 
-                            const clockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+                            const houseClockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
     <img 
       src="${clockLoadingImage}" 
       style="width: 96px; height: 96px; display: none; filter: brightness(2.1); transform: translate(-40px, -10px);" 
     />
   `);
-  clockOverlay.setDepth(worldY + 2);
+  houseClockOverlay.setDepth(worldY + 2);
 
   // Save references so you can toggle them later
   if (!gameRef.current.houseClockOverlays) {
     gameRef.current.houseClockOverlays = [];
   }
-  gameRef.current.houseClockOverlays.push(clockOverlay);
+ gameRef.current.houseClockOverlays.push({ 
+  x, 
+  y, 
+  overlay: houseClockOverlay
+});
 
 
 
@@ -1861,9 +1913,13 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
   if (!gameRef.current.offensiveTechOverlays) {
     gameRef.current.offensiveTechOverlays = [];
   }
-  gameRef.current.offensiveTechOverlays.push(offensiveTechOverlay);
 
 
+gameRef.current.offensiveTechOverlays.push({ 
+  x, 
+  y, 
+  overlay: offensiveTechOverlay 
+});
 
 
 
@@ -1881,7 +1937,11 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
   if (!gameRef.current.defensiveTechOverlays) {
     gameRef.current.defensiveTechOverlays = [];
   }
-  gameRef.current.defensiveTechOverlays.push(defensiveTechOverlay);
+  gameRef.current.defensiveTechOverlays.push({ 
+  x, 
+  y, 
+  overlay: defensiveTechOverlay 
+});
 
 
 
@@ -1917,8 +1977,11 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
   if (!gameRef.current.flagOverlays) {
     gameRef.current.flagOverlays = [];
   }
-  gameRef.current.flagOverlays.push(flagOverlay);
-
+gameRef.current.flagOverlays.push({ 
+  x, 
+  y, 
+  overlay: flagOverlay 
+});
 
 
 
@@ -2082,9 +2145,13 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
   if (!gameRef.current.armoryForgeOverlays) {
     gameRef.current.armoryForgeOverlays = [];
   }
-  gameRef.current.armoryForgeOverlays.push(forgeOverlay);
 
 
+gameRef.current.armoryForgeOverlays.push({ 
+  x, 
+  y, 
+  overlay: forgeOverlay 
+});
 
 
         } else if (imageKey === 'blacksmith') {
@@ -2109,7 +2176,11 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
   if (!gameRef.current.blacksmithForgeOverlays) {
     gameRef.current.blacksmithForgeOverlays = [];
   }
-  gameRef.current.blacksmithForgeOverlays.push(forgeOverlay);
+  gameRef.current.blacksmithForgeOverlays.push({ 
+  x, 
+  y, 
+  overlay: forgeOverlay 
+});
 
 
 
@@ -2136,7 +2207,11 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
   if (!gameRef.current.trainingOffensiveOverlays) {
     gameRef.current.trainingOffensiveOverlays = [];
   }
-  gameRef.current.trainingOffensiveOverlays.push(trainingOffensiveOverlay);
+  gameRef.current.trainingOffensiveOverlays.push({ 
+  x, 
+  y, 
+  overlay: trainingOffensiveOverlay
+});
 
 
 
@@ -2155,8 +2230,12 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
   if (!gameRef.current.trainingDefensiveOverlays) {
     gameRef.current.trainingDefensiveOverlays = [];
   }
-  gameRef.current.trainingDefensiveOverlays.push(trainingDefensiveOverlay);
 
+gameRef.current.trainingDefensiveOverlays.push({ 
+  x, 
+  y, 
+  overlay: trainingDefensiveOverlay 
+});
 
 
         } else if (imageKey === 'house') {
@@ -2168,19 +2247,23 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
             });
 
 
-const clockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+const houseClockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
     <img 
       src="${clockLoadingImage}" 
       style="width: 96px; height: 96px; display: none; filter: brightness(2.1); transform: translate(-40px, -10px);" 
     />
   `);
-  clockOverlay.setDepth(worldY + 2);
+  houseClockOverlay.setDepth(worldY + 2);
 
   // Save references so you can toggle them later
   if (!gameRef.current.houseClockOverlays) {
     gameRef.current.houseClockOverlays = [];
   }
-  gameRef.current.houseClockOverlays.push(clockOverlay);
+  gameRef.current.houseClockOverlays.push({ 
+  x, 
+  y, 
+  overlay: houseClockOverlay
+});
 
 
 
@@ -2214,7 +2297,11 @@ const clockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
   if (!gameRef.current.offensiveTechOverlays) {
     gameRef.current.offensiveTechOverlays = [];
   }
-  gameRef.current.offensiveTechOverlays.push(offensiveTechOverlay);
+  gameRef.current.offensiveTechOverlays.push({ 
+  x, 
+  y, 
+  overlay: offensiveTechOverlay 
+});
 
 
 
@@ -2234,7 +2321,11 @@ const clockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
   if (!gameRef.current.defensiveTechOverlays) {
     gameRef.current.defensiveTechOverlays = [];
   }
-  gameRef.current.defensiveTechOverlays.push(defensiveTechOverlay);
+  gameRef.current.defensiveTechOverlays.push({ 
+  x, 
+  y, 
+  overlay: defensiveTechOverlay 
+});
 
 
 
@@ -2267,7 +2358,11 @@ const clockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
   if (!gameRef.current.flagOverlays) {
     gameRef.current.flagOverlays = [];
   }
-  gameRef.current.flagOverlays.push(flagOverlay);
+gameRef.current.flagOverlays.push({ 
+  x, 
+  y, 
+  overlay: flagOverlay 
+});
 
 
   
@@ -2389,8 +2484,8 @@ const clockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
 
 useEffect(() => {
   if (gameRef.current?.houseClockOverlays) {
-    for (const overlay of gameRef.current.houseClockOverlays) {
-      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+    for (const entry of gameRef.current.houseClockOverlays) {
+      const imgEl = entry.overlay.getChildByName(''); 
       if (imgEl) {
         imgEl.style.display = loadingTurns ? 'block' : 'none';
       }
@@ -2403,8 +2498,8 @@ useEffect(() => {
 
 useEffect(() => {
   if (gameRef.current?.offensiveTechOverlays) {
-    for (const overlay of gameRef.current.offensiveTechOverlays) {
-      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+    for (const entry of gameRef.current.offensiveTechOverlays) {
+      const imgEl = entry.overlay.getChildByName(''); 
       if (imgEl) {
         imgEl.style.display = laodingOffensiveTech ? 'block' : 'none';
       }
@@ -2413,12 +2508,10 @@ useEffect(() => {
 }, [laodingOffensiveTech]);
 
 
-
-
 useEffect(() => {
   if (gameRef.current?.defensiveTechOverlays) {
-    for (const overlay of gameRef.current.defensiveTechOverlays) {
-      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+    for (const entry of gameRef.current.defensiveTechOverlays) {
+      const imgEl = entry.overlay.getChildByName(''); 
       if (imgEl) {
         imgEl.style.display = loadingDefensiveTech ? 'block' : 'none';
       }
@@ -2427,10 +2520,11 @@ useEffect(() => {
 }, [loadingDefensiveTech]);
 
 
+
 useEffect(() => {
   if (gameRef.current?.flagOverlays) {
-    for (const overlay of gameRef.current.flagOverlays) {
-      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+    for (const entry of gameRef.current.flagOverlays) {
+      const imgEl = entry.overlay.getChildByName(''); 
       if (imgEl) {
         imgEl.style.display = loadingClanCreate ? 'block' : 'none';
       }
@@ -2442,8 +2536,8 @@ useEffect(() => {
 
 useEffect(() => {
   if (gameRef.current?.armoryForgeOverlays) {
-    for (const overlay of gameRef.current.armoryForgeOverlays) {
-      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+    for (const entry of gameRef.current.armoryForgeOverlays) {
+      const imgEl = entry.overlay.getChildByName(''); 
       if (imgEl) {
         imgEl.style.display = loadingArmoryForge ? 'block' : 'none';
       }
@@ -2454,8 +2548,8 @@ useEffect(() => {
 
 useEffect(() => {
   if (gameRef.current?.blacksmithForgeOverlays) {
-    for (const overlay of gameRef.current.blacksmithForgeOverlays) {
-      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+    for (const entry of gameRef.current.blacksmithForgeOverlays) {
+      const imgEl = entry.overlay.getChildByName(''); 
       if (imgEl) {
         imgEl.style.display = loadingBlacksmithForge ? 'block' : 'none';
       }
@@ -2468,8 +2562,8 @@ useEffect(() => {
 
 useEffect(() => {
   if (gameRef.current?.trainingOffensiveOverlays) {
-    for (const overlay of gameRef.current.trainingOffensiveOverlays) {
-      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+    for (const entry of gameRef.current.trainingOffensiveOverlays) {
+      const imgEl = entry.overlay.getChildByName(''); 
       if (imgEl) {
         imgEl.style.display = loadingOffensiveTraining ? 'block' : 'none';
       }
@@ -2478,10 +2572,12 @@ useEffect(() => {
 }, [loadingOffensiveTraining]);
 
 
+
+
 useEffect(() => {
   if (gameRef.current?.trainingDefensiveOverlays) {
-    for (const overlay of gameRef.current.trainingDefensiveOverlays) {
-      const imgEl = overlay.getChildByName(''); // Gets the <img> element
+    for (const entry of gameRef.current.trainingDefensiveOverlays) {
+      const imgEl = entry.overlay.getChildByName(''); 
       if (imgEl) {
         imgEl.style.display = loadingDefensiveTraining ? 'block' : 'none';
       }
