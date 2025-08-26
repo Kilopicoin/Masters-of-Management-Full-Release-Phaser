@@ -1791,10 +1791,10 @@ let lastActiveAt = parseInt(lastActiveBN);
 const timeStampAt = parseInt(timeStampBN);
 
 if (lastActiveAt === 0) {
-        lastActiveAt = 1756252800; // 27 August 2025 00:00:00 UTC
+        lastActiveAt = 1756166400; // 26 August 2025 00:00:00 UTC
     }
 
-const THREE_MONTHS = 5 * 60; // 3 ay ===== 90 * 24 * 60 * 60
+const THREE_MONTHS = 90 * 24 * 60 * 60; // 3 ay ===== 90 * 24 * 60 * 60
 const isInactive = ((timeStampAt - lastActiveAt) >= THREE_MONTHS);
  
 
@@ -4579,7 +4579,7 @@ style={{
         fontFamily: "monospace"
       }}
     >
-      Total UseTurn TXs: {txCounter === 0 ? "Counting on-chain" : txCounter}
+      Total UseTurn TXs (Live): {txCounter === 0 ? "Counting on-chain" : txCounter}
     </div>
 
 
