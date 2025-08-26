@@ -1000,9 +1000,15 @@ async function sendToSmartContract(twitterHandle) {
     
 
     const clanContract = await getclanSignerContract();
+    const tokenContractSigner = await getTokenSignerContract();
+
+
+    const allowanceTx = await tokenContractSigner.increaseAllowance(clancontractAddress, 1_000_000_000);
+    setLoading(true); // show loader
+    await allowanceTx.wait();
     
     const tx = await clanContract.setTwitterHandle(twitterHandle);
-    setLoading(true); // show loader
+    
     await tx.wait();
 
   
@@ -1742,11 +1748,11 @@ const flag = scene.add.image(worldX, worldY, textureKey).setDepth(worldY + 1);
                 const occupant = await contract.getTileOccupant(x, y); // Fetch the occupant address
 
 
-                const clanContract = await getclanSignerContract();
+                const clanContract = await getclanContract();
                 const tileName = await clanContract.getTileName(x, y);
 const clanId = await clanContract.getTileClan(x, y);
 
-const landContract = await getTheLandSignerContract();
+const landContract = await getTheLandContract();
 const tileData = await landContract.getTilePublic(x, y);
 
 const totalPoints = Number(tileData.points);
@@ -1845,7 +1851,7 @@ const twitterHandle = await clanContract.getTwitterHandle(occupant);
                 });
 
 
-    const marketContract = await getMarketplaceSignerContract();
+    const marketContract = await getMarketplaceContract();
 
     const defTurnsUsedRaw = await landContract.getTotalTurnsUsedByTile(x, y);
     const defTurnsUsed = parseInt(defTurnsUsedRaw.toString());

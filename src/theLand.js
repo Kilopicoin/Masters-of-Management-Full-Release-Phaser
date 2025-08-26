@@ -566,7 +566,7 @@ const fetchResourceMessage = useCallback(async () => {
 
         if (messageX) {
             const marketContract = await getMarketplaceSignerContract();
-            const messageC = await marketContract.resourceMessages(tileCoords.x - 1, tileCoords.y - 1);
+            const messageC = await marketContract.getMyResourceMessage(tileCoords.x - 1, tileCoords.y - 1);
             const fromx = (parseInt(messageC.fromX) + 1).toString();
             const fromy = (parseInt(messageC.fromY) + 1).toString();
             const resourcetype = (messageC.resourceType).toString();
@@ -1311,6 +1311,18 @@ const listItemForSale = async () => {
 const contract = await getMarketplaceSignerContract();
         const x = tileCoords.x - 1;
         const y = tileCoords.y - 1;
+
+
+        // compute the same key the contract uses: (x << 8) | y
+    const tileKey = x * 256 + y;
+
+    // 1) hard cap: max 5 active listings per tile
+    const active = await contract.activeListingsByTile(tileKey); // public mapping getter
+    if (parseInt(active) >= 5) {
+      toast.info("You already have 5 active listings for this realm. Remove one first.");
+      return; // stop before any tx
+    }
+
 
         const tx = await contract.listItemForSale(x, y, resourceType, amount, price);
         await tx.wait();

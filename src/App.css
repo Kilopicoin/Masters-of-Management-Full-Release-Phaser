@@ -9,7 +9,7 @@ body {
 }
 
 p {
-  margin: 9px;
+  margin: 5px;
   font-family: 'EB Garamond', serif;
   color: #e8dbc0;
 }
@@ -155,7 +155,7 @@ box-shadow: 0 0 6px rgba(196, 170, 112, 0.3);
 
 .fancy-input,
 .fancy-inputX {
-  width: 95%;
+  width: 90%;
   padding: 10px;
   border-radius: 8px;
   border: 1px solid #a88f58;
