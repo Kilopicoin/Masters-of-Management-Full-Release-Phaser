@@ -190,6 +190,12 @@ const [calculatedResources, setCalculatedResources] = useState({
 const cancelListing = async (item, index) => {
   try {
     setLoading(true);
+
+    const TokenContract = await getTokenSignerContract();
+        const approvalTx = await TokenContract.increaseAllowance(MarketplacecontractAddress, 10000 * 10 ** 6);
+        await approvalTx.wait();
+
+
     const contract = await getMarketplaceSignerContract();
     const tx = await contract.cancelListing(
       item.sellerX - 1,
@@ -4025,7 +4031,7 @@ style={{
             }}
             onClick={() => cancelListing(item, index)}
           >
-            Remove
+            Remove (10000 LOP Tokens)
           </button>
         )}
 
