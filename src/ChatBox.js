@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 
-const CHAT_SERVER = 'http://localhost:4000';
+const CHAT_SERVER = 'https://kilopi.net';
 
 export default function ChatBox({
   account,
@@ -23,21 +23,17 @@ export default function ChatBox({
   }, [account, twitterHandle]);
 
   useEffect(() => {
-    const s = io(CHAT_SERVER, { transports: ['websocket'] });
-    socketRef.current = s;
+  const s = io(CHAT_SERVER, {
+    transports: ['polling', 'websocket'], // allow fallback + upgrade
+    path: '/socket.io'                    // explicit, matches server default
+  });
+  socketRef.current = s;
 
-    s.on('connect', () => {
-      // no room join needed; server puts all in 'global'
-    });
+  s.on('history', (items) => setMessages(items));
+  s.on('message', (msg) => { setMessages(m => [...m, msg]); if (!open) setUnread(u => u + 1); });
 
-    s.on('history', (items) => setMessages(items));
-    s.on('message', (msg) => {
-      setMessages((m) => [...m, msg]);
-      if (!open) setUnread((u) => u + 1);
-    });
-
-    return () => { s.disconnect(); };
-  }, [open]);
+  return () => { s.disconnect(); };
+}, [open]);
 
   useEffect(() => {
     if (viewRef.current) {

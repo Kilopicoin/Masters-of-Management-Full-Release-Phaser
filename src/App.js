@@ -937,7 +937,8 @@ const handleTwitterConnect = async () => {
     const address = await signer.getAddress();
     const signature = await signer.signMessage(`Linking wallet ${address}`);
 
-    window.location.href = `http://localhost:4000/twitter/login?wallet=${address}&signature=${signature}`;
+    window.location.href = `https://kilopi.net/twitter/login?wallet=${address}&signature=${signature}`;
+
   } catch (err) {
     console.error("Twitter connection failed", err);
     toast.error("Failed to connect Twitter");
