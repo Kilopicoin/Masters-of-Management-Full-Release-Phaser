@@ -1304,52 +1304,95 @@ useEffect(() => {
 
 
 
-  const fetchLeaderboardData = async () => {
-      try {
-          setLoading(true);
-          gameRef.current.sounds.leaderboard.play();
-          const Land = await getTheLandSignerContract();
-          const Clan = await getclanSignerContract();
-  
-          const tiles = [];
-  
-          for (let x = 0; x < 20; x++) {
-              for (let y = 0; y < 20; y++) {
-                  const tilePoints = await Land.pointsByCoords(x, y);
-                  const points = parseInt(tilePoints.toString());
-                  if (points > 0) {
-                      const name = await Clan.getTileName(x, y);
-                      const clan = await Clan.getTileClan(x, y);
-                      const clanNo = parseInt(clan) - 1;
-                      let clanName = "None";
+  // put this at component scope
+const tileNameCacheRef = useRef(new Map()); // key: "x,y" (0-based), value: string
 
-                      if (allclansX[clanNo]) {
-                        clanName = allclansX[clanNo][0];
-                      }
+// small helper to limit concurrency
+async function mapWithConcurrency(items, limit, mapper) {
+  const results = new Array(items.length);
+  let idx = 0;
+  const workers = Array(Math.min(limit, items.length)).fill(0).map(async () => {
+    while (idx < items.length) {
+      const cur = idx++;
+      results[cur] = await mapper(items[cur], cur);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
-                      
-                      
-                      tiles.push({
-                          x: x + 1,
-                          y: y + 1,
-                          name,
-                          clanName,
-                          points,
-                      });
-                  }
-              }
-          }
+const fetchLeaderboardData = async () => {
+  try {
+    setLoading(true);
+    gameRef.current?.sounds?.leaderboard?.play?.();
 
-  
-          tiles.sort((a, b) => b.points - a.points); // sort descending
-          setLeaderboardData(tiles);
-      } catch (error) {
-          console.error("Error fetching leaderboard:", error);
-          toast.error("Failed to load leaderboard.");
-      } finally {
-          setLoading(false);
+    const Land = await getTheLandSignerContract();
+    // read-only is fine; use non-signer to avoid wallet latency
+    const Clan = await getclanContract();
+
+    // 1) occupied coords from memory (0-based)
+    const occupied = [];
+    for (let x = 0; x < 20; x++) {
+      for (let y = 0; y < 20; y++) {
+        const cell = tilesRef.current?.[x]?.[y];
+        if (cell && cell.occupied) {
+          occupied.push({ x, y, clanId: cell.clanId || 0 });
+        }
       }
-  };
+    }
+    if (occupied.length === 0) {
+      setLeaderboardData([]);
+      return;
+    }
+
+    // 2) get points for all occupied tiles in parallel
+    const pointsArr = await Promise.all(
+      occupied.map(({ x, y }) => Land.pointsByCoords(x, y))
+    );
+
+    // 3) build rows (1-based coords), filter zeros, sort desc
+    let rows = occupied.map((c, i) => ({
+      x: c.x + 1,
+      y: c.y + 1,
+      clanId: c.clanId,
+      points: Number(pointsArr[i]),
+    })).filter(r => r.points > 0);
+
+    rows.sort((a, b) => b.points - a.points);
+
+    // 4) fetch ALL names with concurrency + cache
+    const nameInputs = rows.map(r => ({ x0: r.x - 1, y0: r.y - 1 }));
+    const names = await mapWithConcurrency(nameInputs, 10, async ({ x0, y0 }) => {
+      const key = `${x0},${y0}`;
+      const cached = tileNameCacheRef.current.get(key);
+      if (cached !== undefined) return cached;
+
+      // on-chain call
+      const name = await Clan.getTileName(x0, y0);
+      const trimmed = name && name.trim().length > 0 ? name : "Unnamed";
+      tileNameCacheRef.current.set(key, trimmed);
+      return trimmed;
+    });
+
+    // 5) decorate clan names from allclansX (already populated earlier)
+    const finalRows = rows.map((row, i) => {
+      const clanInfo = allclansX?.[row.clanId] || null;
+      return {
+        ...row,
+        name: names[i],
+        clanName: clanInfo?.name || "None",
+      };
+    });
+
+    setLeaderboardData(finalRows);
+  } catch (err) {
+    console.error("Error fetching leaderboard:", err);
+    toast.error("Failed to load leaderboard.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
 
 
