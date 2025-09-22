@@ -4495,7 +4495,7 @@ style={{
 {interactionMenuTypeA === "leaderboardX" && (
     <div className="interaction-menuA">
         <p style={{ marginBottom: '15px', fontWeight: '400' }}>
-            Loading Leaderboard requires around 1 minute, do you want to load the Leaderboard?
+            Loading Leaderboard requires around 20 seconds, do you want to load the Leaderboard?
         </p>
         <button
             style={{
@@ -4553,54 +4553,83 @@ style={{
 
 
 {interactionMenuTypeA === "leaderboard" && (
-    <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-        <h3 style={{ marginBottom: '10px' }}>🏆 Leaderboard 🏆</h3>
-
-        <button
-            style={{
-                padding: '8px 12px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                marginBottom: '10px',
-                cursor: 'pointer'
-            }}
-            onClick={() => {
-              setinteractionMenuTypeA("");
-          }}
-        >
-            Close Leaderboard
-        </button>
-
-        {leaderboardData.length > 0 ? (
-            <table style={{ width: '100%', fontSize: '20px', borderCollapse: 'collapse' }}>
-                <thead>
-                    <tr style={{ backgroundColor: '#6c757d' }}>
-                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>#</th>
-                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Realm</th>
-                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Clan</th>
-                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Coords</th>
-                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Points</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {leaderboardData.map((item, index) => (
-                        <tr key={index}>
-                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{index + 1}</td>
-                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.name || "Unnamed"}</td>
-                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.clanName || "None"}</td>
-                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.x},{item.y}</td>
-                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.points}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        ) : (
-            <p style={{ marginTop: '10px' }}>Leaderboard is empty or not loaded.</p>
-        )}
+  <div className="leaderboard-card">
+    <button
+      className="card-button leaderboard-card__close"
+      onClick={() => setinteractionMenuTypeA("")}
+    >
+      Close
+    </button>
+    <div className="leaderboard-card__header">
+      
+      <span className="leaderboard-card__icon"></span>
+      <h3 className="leaderboard-card__title">⚔️ The Leaderboard 👑</h3>
+      <span className="leaderboard-card__icon"></span>
     </div>
+
+    
+
+    {leaderboardData.length > 0 ? (
+      <div className="leaderboard-scroll">
+        <table className="fancy-table leaderboard-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Realm</th>
+              <th>Clan</th>
+              <th>Coords</th>
+              <th>Points</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leaderboardData.map((item, index) => {
+              const isMe = (item.x === attackerTileCoords.x + 1 && item.y === attackerTileCoords.y + 1); // keep your logic
+              const rank = index + 1;
+
+              return (
+                <tr key={index} className={`${isMe ? "row-me" : ""} ${rank <= 3 ? `rank-${rank}` : ""}`}>
+                  <td>
+                    <span className={`rank-badge ${rank <= 3 ? `badge-${rank}` : "badge-rest"}`}>
+                      {rank <= 3 ? (rank === 1 ? "👑" : rank === 2 ? "⚜️" : "🏵️") : rank}
+                    </span>
+                  </td>
+
+                  <td 
+  className="name-cell" 
+  style={{ padding: '6px', borderBottom: '1px solid #eee' }}
+>
+  {item.name || "Unnamed"}
+</td>
+
+
+                  <td>
+                    {item.clanName && item.clanName !== "None" ? (
+                      <span className="chip chip-clan">{item.clanName}</span>
+                    ) : (
+                      <span className="chip chip-none">None</span>
+                    )}
+                  </td>
+
+                  <td>
+                    <span className="chip chip-coord">{item.x},{item.y}</span>
+                  </td>
+
+                  <td className="points-cell">
+                    <span className="points">{item.points}</span>
+                    <span className="points-bar" style={{ width: `${Math.min(100, (item.points / (leaderboardData[0]?.points || 1)) * 100)}%` }} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      <p className="leaderboard-empty">Leaderboard is empty or not loaded.</p>
+    )}
+  </div>
 )}
+
 
 <ChatBox
   account={metaMaskAccount}
