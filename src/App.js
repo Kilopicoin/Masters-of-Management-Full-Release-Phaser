@@ -155,6 +155,15 @@ const urlToKeyMap = useMemo(() => ({
 
 
 
+const ClanPill = ({ name }) => (
+  <span className="clan-pill">{name || "None"}</span>
+);
+
+
+
+
+
+
 
 // NEW — load *my* war logs for a specific date range (inclusive by day)
 const fetchMyWarLogsInRange = async () => {
@@ -211,7 +220,8 @@ const fetchMyWarLogsInRange = async () => {
 
     // Same shape you expect elsewhere
     const normalized = wars.map(normalizeWar);
-    setWarLogsData(normalized);
+    setWarLogsData(normalized.slice().reverse());
+
     setinteractionMenuTypeA("warlogsRangeResultMine");
   } catch (err) {
     console.error("Error fetching my war logs in range:", err);
@@ -270,7 +280,7 @@ const fetchWarLogsInRange = async () => {
       };
     });
 
-    setWarLogsData(combined);
+    setWarLogsData(combined.slice().reverse());
     setinteractionMenuTypeA("warlogsRangeResult");
   } catch (err) {
     console.error("Error fetching war logs in range:", err);
@@ -1058,7 +1068,8 @@ const fetchMyRecentWarLogs = async () => {
     // If your contract uses a different name, adapt the call accordingly.
     const data = await market.getRecentTileWars(x, y);
 
-    setWarLogsData(data);
+
+    setWarLogsData(data.slice().reverse());
   } catch (err) {
     console.error("Error fetching my recent war logs:", err);
     toast.error("Failed to fetch your recent war logs.");
@@ -1109,7 +1120,8 @@ const fetchRecentWarLogs = async () => {
       };
     });
 
-    setWarLogsData(combined);
+
+    setWarLogsData(combined.slice().reverse());
   } catch (err) {
     console.error("Error fetching recent war logs:", err);
     toast.error("Failed to fetch recent war logs.");
@@ -3822,105 +3834,34 @@ style={{
 
 
 
+{/* ************ MY WAR LOGS – ENTRY MENU ************ */}
 {interactionMenuTypeA === "warlogsMine" && (
-  <div className="interaction-menuA">
-    <p style={{ marginBottom: '15px', fontWeight: '400' }}>
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">⚔️</span>
+      <h3 className="leaderboard-card__title">My War Logs</h3>
+      <span className="leaderboard-card__icon">📜</span>
+    </div>
+
+    <p style={{ marginBottom: 12, fontWeight: 400, textAlign: "center" }}>
       Load your war logs:
     </p>
 
-    <button
-      style={{
-        padding: '10px 20px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        cursor: 'pointer',
-        fontWeight: 'bold',
-        margin: '5px'
-      }}
-      onClick={() => {
-        setinteractionMenuTypeA("warlogsWeekMine");
-        fetchMyRecentWarLogs();
-      }}
-    >
-      Last Week's Logs (Fast)
-    </button>
-
-    {/* NEW — Date range option (replaces “All Time Logs…”) */}
-    <button
-      style={{
-        padding: '10px 20px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        cursor: 'pointer',
-        fontWeight: 'bold',
-        margin: '5px'
-      }}
-      onClick={() => setinteractionMenuTypeA("warlogsRangeMine")}
-    >
-      War Logs for Specific Date Range
-    </button>
-
-    <button
-      style={{
-        padding: '10px 20px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        cursor: 'pointer',
-        fontWeight: 'bold',
-        margin: '5px'
-      }}
-      onClick={() => setinteractionMenuTypeA("")}
-    >
-      Cancel
-    </button>
-  </div>
-)}
-
-
-
-
-{/* NEW — My War Logs: Date-range input */}
-{interactionMenuTypeA === "warlogsRangeMine" && (
-  <div className="interaction-menuA" style={{ textAlign: 'center' }}>
-    <h4>My War Logs — Specific Date Range</h4>
-
-    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '10px' }}>
-      <div>
-        <label style={{ display: 'block', marginBottom: '4px' }}>From (inclusive)</label>
-        <input
-          type="date"
-          className="fancy-input"
-          value={myRangeFrom}
-          onChange={(e) => setMyRangeFrom(e.target.value)}
-          style={{ minWidth: 180 }}
-        />
-      </div>
-      <div>
-        <label style={{ display: 'block', marginBottom: '4px' }}>To (inclusive)</label>
-        <input
-          type="date"
-          className="fancy-input"
-          value={myRangeTo}
-          onChange={(e) => setMyRangeTo(e.target.value)}
-          style={{ minWidth: 180 }}
-        />
-      </div>
-    </div>
-
-    <div style={{ marginTop: '10px' }}>
+    <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
       <button
         className="card-button"
-        onClick={fetchMyWarLogsInRange}
-        style={{ marginRight: '8px' }}
+        onClick={() => { setinteractionMenuTypeA("warlogsWeekMine"); fetchMyRecentWarLogs(); }}
       >
-        Load Logs
+        Last Week's Logs (Fast)
       </button>
+
+      <button
+        className="card-button"
+        onClick={() => setinteractionMenuTypeA("warlogsRangeMine")}
+      >
+        War Logs for Specific Date Range
+      </button>
+
       <button
         className="card-button"
         onClick={() => setinteractionMenuTypeA("")}
@@ -3928,8 +3869,39 @@ style={{
         Cancel
       </button>
     </div>
+  </div>
+)}
 
-    <div style={{ marginTop: '10px', fontSize: '12px', opacity: 0.8 }}>
+
+
+
+
+{/* ************ MY WAR LOGS – DATE RANGE INPUT ************ */}
+{interactionMenuTypeA === "warlogsRangeMine" && (
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">🗓️</span>
+      <h3 className="leaderboard-card__title">My War Logs — Specific Date Range</h3>
+      <span className="leaderboard-card__icon">📜</span>
+    </div>
+
+    <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+      <div>
+        <label style={{ display: 'block', marginBottom: 4 }}>From (inclusive)</label>
+        <input type="date" className="fancy-input" value={myRangeFrom} onChange={(e) => setMyRangeFrom(e.target.value)} style={{ minWidth: 180 }} />
+      </div>
+      <div>
+        <label style={{ display: 'block', marginBottom: 4 }}>To (inclusive)</label>
+        <input type="date" className="fancy-input" value={myRangeTo} onChange={(e) => setMyRangeTo(e.target.value)} style={{ minWidth: 180 }} />
+      </div>
+    </div>
+
+    <div style={{ marginTop: 10, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+      <button className="card-button" onClick={fetchMyWarLogsInRange}>Load Logs</button>
+      <button className="card-button" onClick={() => setinteractionMenuTypeA("")}>Cancel</button>
+    </div>
+
+    <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8, textAlign: "center" }}>
       Tip: Leaving dates empty loads the last 30 days.
     </div>
   </div>
@@ -3938,59 +3910,75 @@ style={{
 
 
 
-{/* NEW — My War Logs: Range results */}
-{interactionMenuTypeA === "warlogsRangeResultMine" && (
-  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-    <h3 style={{ marginBottom: '10px' }}>⚔️ My War Logs (Selected Range) ⚔️</h3>
 
-    <button
-      onClick={() => setinteractionMenuTypeA("")}
-      style={{
-        padding: '8px 12px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        marginBottom: '10px',
-        cursor: 'pointer'
-      }}
-    >
+{/* ************ MY WAR LOGS – RANGE RESULTS ************ */}
+{interactionMenuTypeA === "warlogsRangeResultMine" && (
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">⚔️</span>
+      <h3 className="leaderboard-card__title">My War Logs (Selected Range)</h3>
+      <span className="leaderboard-card__icon">📜</span>
+    </div>
+
+    <button className="card-button leaderboard-card__close" onClick={() => setinteractionMenuTypeA("")}>
       Close
     </button>
 
     {warLogsData.length > 0 ? (
-      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ backgroundColor: '#6c757d' }}>
-            <th>Attacker</th>
-            <th>Attacker Power</th>
-            <th>Attacker Soldiers</th>
-            <th>Defender</th>
-            <th>Defender Power</th>
-            <th>Defender Soldiers</th>
-            <th>Date</th>
-            <th>Result</th>
-            <th>Resources Stolen</th>
-          </tr>
-        </thead>
-        <tbody>
-          {warLogsData.map((item, index) => (
-            <tr key={index}>
-              <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-              <td>{item.attackerPower?.toString()}</td>
-              <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()}</td>
-              <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-              <td>{item.defenderPower?.toString()}</td>
-              <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()}</td>
-              <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
-              <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
-              <td>{item.resourcesStolen?.toString()}</td>
+      <div className="leaderboard-scroll">
+        <table className="fancy-table leaderboard-table">
+          <thead>
+            <tr>
+              <th>Attacker</th>
+              <th>Attacker Power</th>
+              <th>Attacker Soldiers</th>
+              <th>Defender</th>
+              <th>Defender Power</th>
+              <th>Defender Soldiers</th>
+              <th>Date</th>
+              <th>Result</th>
+              <th>Resources Stolen</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {warLogsData.map((item, i) => (
+              <tr key={i}>
+                <td> 
+                  <span className="coord-badge">
+                  {item.attackerName
+                    ? `${item.attackerName} (${Number(item.attackerX)+1},${Number(item.attackerY)+1})`
+                    : `${Number(item.attackerX)+1},${Number(item.attackerY)+1}`}
+                    </span>
+                </td>
+                <td>{item.attackerPower?.toString()}</td>
+                <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()}</td>
+                <td>
+                  <span className="coord-badge">
+                  {item.defenderName
+                    ? `${item.defenderName} (${Number(item.defenderX)+1},${Number(item.defenderY)+1})`
+                    : `${Number(item.defenderX)+1},${Number(item.defenderY)+1}`}
+                    </span>
+                </td>
+                <td>{item.defenderPower?.toString()}</td>
+                <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()}</td>
+                <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+                <td
+  style={{
+    color: item.attackerWon ? "#e57373" : "#81c784", // red vs green
+    fontWeight: "600"
+  }}
+>
+  {item.attackerWon ? "Attacker Won" : "Defender Won"}
+</td>
+
+                <td>{item.resourcesStolen?.toString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     ) : (
-      <p>No war logs for that range.</p>
+      <p className="leaderboard-empty">No war logs for that range.</p>
     )}
   </div>
 )}
@@ -3999,114 +3987,66 @@ style={{
 
 
 
+
+{/* ************ WORLD WAR LOGS – ENTRY MENU ************ */}
 {interactionMenuTypeA === "warlogsX" && (
-  <div className="interaction-menuA">
-    <p style={{ marginBottom: '15px', fontWeight: '400' }}>
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">🌍</span>
+      <h3 className="leaderboard-card__title">War Logs (World)</h3>
+      <span className="leaderboard-card__icon">⏳</span>
+    </div>
+
+    <p style={{ marginBottom: 12, fontWeight: 400, textAlign: "center" }}>
       Loading War Logs (World) requires time, choose an option:
     </p>
 
-    <button
-      style={{
-        padding: '10px 20px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        cursor: 'pointer',
-        fontWeight: 'bold',
-        margin: '5px'
-      }}
-      onClick={() => {
-        setinteractionMenuTypeA("warlogsWeek");
-        fetchRecentWarLogs();
-      }}
-    >
-      Last Week's Logs (Fast)
-    </button>
+    <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+      <button className="card-button" onClick={() => { setinteractionMenuTypeA("warlogsWeek"); fetchRecentWarLogs(); }}>
+        Last Week's Logs (Fast)
+      </button>
 
-    {/* NEW — Date range option */}
-    <button
-      style={{
-        padding: '10px 20px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        cursor: 'pointer',
-        fontWeight: 'bold',
-        margin: '5px'
-      }}
-      onClick={() => setinteractionMenuTypeA("warlogsRange")}
-    >
-      War Logs for Specific Date Range
-    </button>
+      <button className="card-button" onClick={() => setinteractionMenuTypeA("warlogsRange")}>
+        War Logs for Specific Date Range
+      </button>
 
-    <button
-      style={{
-        padding: '10px 20px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        cursor: 'pointer',
-        fontWeight: 'bold',
-        margin: '5px'
-      }}
-      onClick={() => setinteractionMenuTypeA("")}
-    >
-      Cancel
-    </button>
+      <button className="card-button" onClick={() => setinteractionMenuTypeA("")}>
+        Cancel
+      </button>
+    </div>
   </div>
 )}
 
 
 
 
-{/* NEW — Date-range input UI */}
+
+{/* ************ WORLD WAR LOGS – DATE RANGE INPUT ************ */}
 {interactionMenuTypeA === "warlogsRange" && (
-  <div className="interaction-menuA" style={{ textAlign: 'center' }}>
-    <h4>War Logs for Specific Date Range</h4>
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">🗓️</span>
+      <h3 className="leaderboard-card__title">War Logs — Specific Date Range</h3>
+      <span className="leaderboard-card__icon">📜</span>
+    </div>
 
-    <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginBottom: '10px' }}>
+    <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
       <div>
-        <label style={{ display: 'block', marginBottom: '4px' }}>From (inclusive)</label>
-        <input
-          type="date"
-          className="fancy-input"
-          value={rangeFrom}
-          onChange={(e) => setRangeFrom(e.target.value)}
-          style={{ minWidth: 180 }}
-        />
+        <label style={{ display: 'block', marginBottom: 4 }}>From (inclusive)</label>
+        <input type="date" className="fancy-input" value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} style={{ minWidth: 180 }} />
       </div>
       <div>
-        <label style={{ display: 'block', marginBottom: '4px' }}>To (inclusive)</label>
-        <input
-          type="date"
-          className="fancy-input"
-          value={rangeTo}
-          onChange={(e) => setRangeTo(e.target.value)}
-          style={{ minWidth: 180 }}
-        />
+        <label style={{ display: 'block', marginBottom: 4 }}>To (inclusive)</label>
+        <input type="date" className="fancy-input" value={rangeTo} onChange={(e) => setRangeTo(e.target.value)} style={{ minWidth: 180 }} />
       </div>
     </div>
 
-    <div style={{ marginTop: '10px' }}>
-      <button
-        className="card-button"
-        onClick={fetchWarLogsInRange}
-        style={{ marginRight: '8px' }}
-      >
-        Load Logs
-      </button>
-      <button
-        className="card-button"
-        onClick={() => setinteractionMenuTypeA("")}
-      >
-        Cancel
-      </button>
+    <div style={{ marginTop: 10, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+      <button className="card-button" onClick={fetchWarLogsInRange}>Load Logs</button>
+      <button className="card-button" onClick={() => setinteractionMenuTypeA("")}>Cancel</button>
     </div>
 
-    <div style={{ marginTop: '10px', fontSize: '12px', opacity: 0.8 }}>
+    <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8, textAlign: "center" }}>
       Tip: Leaving dates empty loads the last 7 days.
     </div>
   </div>
@@ -4116,53 +4056,69 @@ style={{
 
 
 
-{/* NEW — Range results */}
+
+{/* ************ WORLD WAR LOGS – RANGE RESULTS ************ */}
 {interactionMenuTypeA === "warlogsRangeResult" && (
-  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-    <h3 style={{ marginBottom: '10px' }}>⚔️ War Logs (Selected Range) ⚔️</h3>
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">⚔️</span>
+      <h3 className="leaderboard-card__title">War Logs (Selected Range)</h3>
+      <span className="leaderboard-card__icon">🌍</span>
+    </div>
 
-    <button
-      onClick={() => setinteractionMenuTypeA("")}
-      style={{
-        padding: '8px 12px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        marginBottom: '10px',
-        cursor: 'pointer'
-      }}
-    >
+    <button className="card-button leaderboard-card__close" onClick={() => setinteractionMenuTypeA("")}>
       Close
     </button>
 
     {warLogsData.length > 0 ? (
-      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ backgroundColor: '#6c757d' }}>
-            <th>Attacker</th>
-            <th>Attacker Clan</th>
-            <th>Defender</th>
-            <th>Defender Clan</th>
-            <th>Date</th>
-            <th>Result</th>
-          </tr>
-        </thead>
-        <tbody>
-          {warLogsData.map((item, index) => (
-            <tr key={index}>
-              <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-              <td>{item.attackerClanName}</td>
-              <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-              <td>{item.defenderClanName}</td>
-              <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
-              <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      <div className="leaderboard-scroll">
+        <table className="fancy-table leaderboard-table">
+          <thead>
+            <tr>
+              <th>Attacker</th>
+              <th>Attacker Clan</th>
+              <th>Defender</th>
+              <th>Defender Clan</th>
+              <th>Date</th>
+              <th>Result</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {warLogsData.map((item, i) => (
+              <tr key={i}>
+                <td>
+                  <span className="coord-badge">
+                  {item.attackerName
+                    ? `${item.attackerName} (${Number(item.attackerX)+1},${Number(item.attackerY)+1})`
+                    : `${Number(item.attackerX)+1},${Number(item.attackerY)+1}`}
+                    </span>
+                </td>
+                <td><ClanPill name={item.attackerClanName} /></td>
+                <td>
+                  <span className="coord-badge">
+                  {item.defenderName
+                    ? `${item.defenderName} (${Number(item.defenderX)+1},${Number(item.defenderY)+1})`
+                    : `${Number(item.defenderX)+1},${Number(item.defenderY)+1}`}
+                    </span>
+                </td>
+                <td><ClanPill name={item.defenderClanName} /></td>
+                <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+                <td
+  style={{
+    color: item.attackerWon ? "#e57373" : "#81c784", // red vs green
+    fontWeight: "600"
+  }}
+>
+  {item.attackerWon ? "Attacker Won" : "Defender Won"}
+</td>
+
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     ) : (
-      <p>No war logs for that range.</p>
+      <p className="leaderboard-empty">No war logs for that range.</p>
     )}
   </div>
 )}
@@ -4171,106 +4127,138 @@ style={{
 
 
 
+
+{/* ************ WORLD WAR LOGS – LAST WEEK ************ */}
 {interactionMenuTypeA === "warlogsWeek" && (
-  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-    <h3 style={{ marginBottom: '10px' }}>⚔️ Last Week's War Logs (World) ⚔️</h3>
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">⏱️</span>
+      <h3 className="leaderboard-card__title">Last Week's War Logs (World)</h3>
+      <span className="leaderboard-card__icon">🌍</span>
+    </div>
 
-    <button
-      onClick={() => setinteractionMenuTypeA("")}
-      style={{
-        padding: '8px 12px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        marginBottom: '10px',
-        cursor: 'pointer'
-      }}
-    >
+    <button className="card-button leaderboard-card__close" onClick={() => setinteractionMenuTypeA("")}>
       Close
     </button>
 
     {warLogsData.length > 0 ? (
-      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ backgroundColor: '#6c757d' }}>
-            <th>Attacker</th>
-            <th>Attacker Clan</th>
-            <th>Defender</th>
-            <th>Defender Clan</th>
-            <th>Date</th>
-            <th>Result</th>
-          </tr>
-        </thead>
-        <tbody>
-          {warLogsData.map((item, index) => (
-            <tr key={index}>
-              <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-              <td>{item.attackerClanName}</td>
-<td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-<td>{item.defenderClanName}</td>
-<td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
-
-              <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      <div className="leaderboard-scroll">
+        <table className="fancy-table leaderboard-table">
+          <thead>
+            <tr>
+              <th>Attacker</th>
+              <th>Attacker Clan</th>
+              <th>Defender</th>
+              <th>Defender Clan</th>
+              <th>Date</th>
+              <th>Result</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {warLogsData.map((item, i) => (
+              <tr key={i}>
+                <td>
+                  <span className="coord-badge">
+                  {item.attackerName
+                    ? `${item.attackerName} (${Number(item.attackerX)+1},${Number(item.attackerY)+1})`
+                    : `${Number(item.attackerX)+1},${Number(item.attackerY)+1}`}
+                    </span>
+                </td>
+                <td><ClanPill name={item.attackerClanName} /></td>
+                <td>
+                  <span className="coord-badge">
+                  {item.defenderName
+                    ? `${item.defenderName} (${Number(item.defenderX)+1},${Number(item.defenderY)+1})`
+                    : `${Number(item.defenderX)+1},${Number(item.defenderY)+1}`}
+                    </span>
+                </td>
+                <td><ClanPill name={item.defenderClanName} /></td>
+                <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+                <td
+  style={{
+    color: item.attackerWon ? "#e57373" : "#81c784", // red vs green
+    fontWeight: "600"
+  }}
+>
+  {item.attackerWon ? "Attacker Won" : "Defender Won"}
+</td>
+
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     ) : (
-      <p>No war logs available.</p>
+      <p className="leaderboard-empty">No war logs available.</p>
     )}
   </div>
 )}
 
 
 
+
+{/* ************ WORLD WAR LOGS – ALL ************ */}
 {interactionMenuTypeA === "warlogsAll" && (
-  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-    <h3 style={{ marginBottom: '10px' }}>⚔️ All War Logs (World) ⚔️</h3>
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">∞</span>
+      <h3 className="leaderboard-card__title">All War Logs (World)</h3>
+      <span className="leaderboard-card__icon">🌍</span>
+    </div>
 
-    <button
-      onClick={() => setinteractionMenuTypeA("")}
-      style={{
-        padding: '8px 12px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        marginBottom: '10px',
-        cursor: 'pointer'
-      }}
-    >
+    <button className="card-button leaderboard-card__close" onClick={() => setinteractionMenuTypeA("")}>
       Close
     </button>
 
     {warLogsData.length > 0 ? (
-      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ backgroundColor: '#6c757d' }}>
-            <th>Attacker</th>
-            <th>Attacker Clan</th>
-            <th>Defender</th>
-            <th>Defender Clan</th>
-            <th>Date</th>
-            <th>Result</th>
-          </tr>
-        </thead>
-        <tbody>
-          {warLogsData.map((item, index) => (
-            <tr key={index}>
-              <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-              <td>{item.attackerClanName}</td>
-<td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-<td>{item.defenderClanName}</td>
-<td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
-
-              <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      <div className="leaderboard-scroll">
+        <table className="fancy-table leaderboard-table">
+          <thead>
+            <tr>
+              <th>Attacker</th>
+              <th>Attacker Clan</th>
+              <th>Defender</th>
+              <th>Defender Clan</th>
+              <th>Date</th>
+              <th>Result</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {warLogsData.map((item, i) => (
+              <tr key={i}>
+                <td>
+                  <span className="coord-badge">
+                  {item.attackerName
+                    ? `${item.attackerName} (${Number(item.attackerX)+1},${Number(item.attackerY)+1})`
+                    : `${Number(item.attackerX)+1},${Number(item.attackerY)+1}`}
+                    </span>
+                </td>
+                <td><ClanPill name={item.attackerClanName} /></td>
+                <td>
+                  <span className="coord-badge">
+                  {item.defenderName
+                    ? `${item.defenderName} (${Number(item.defenderX)+1},${Number(item.defenderY)+1})`
+                    : `${Number(item.defenderX)+1},${Number(item.defenderY)+1}`}
+                    </span>
+                </td>
+                <td><ClanPill name={item.defenderClanName} /></td>
+                <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+                <td
+  style={{
+    color: item.attackerWon ? "#e57373" : "#81c784", // red vs green
+    fontWeight: "600"
+  }}
+>
+  {item.attackerWon ? "Attacker Won" : "Defender Won"}
+</td>
+
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     ) : (
-      <p>No war logs available.</p>
+      <p className="leaderboard-empty">No war logs available.</p>
     )}
   </div>
 )}
@@ -4278,62 +4266,75 @@ style={{
 
 
 
+
+{/* ************ MY WAR LOGS – LAST WEEK ************ */}
 {interactionMenuTypeA === "warlogsWeekMine" && (
-  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-    <h3 style={{ marginBottom: '10px' }}>⚔️ My Last Week's War Logs ⚔️</h3>
-    <button
-      onClick={() => setinteractionMenuTypeA("")}
-      style={{
-        padding: '8px 12px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        marginBottom: '10px',
-        cursor: 'pointer'
-      }}
-    >
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">⏱️</span>
+      <h3 className="leaderboard-card__title">My Last Week's War Logs</h3>
+      <span className="leaderboard-card__icon">⚔️</span>
+    </div>
+
+    <button className="card-button leaderboard-card__close" onClick={() => setinteractionMenuTypeA("")}>
       Close
     </button>
 
     {warLogsData.length > 0 ? (
-      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
-        <thead>
-  <tr style={{ backgroundColor: '#6c757d' }}>
-    <th>Attacker</th>
-    <th>Attacker Power</th>
-    <th>Attacker Soldiers</th>
-    <th>Defender</th>
-    <th>Defender Power</th>
-    <th>Defender Soldiers</th>
-    <th>Date</th>
-    <th>Result</th>
-    <th>Resources Stolen</th>
-    
-    
-  </tr>
-</thead>
-<tbody>
-  {warLogsData.map((item, index) => (
-    <tr key={index}>
-      <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-      <td>{item.attackerPower?.toString()}</td>
-      <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()} </td>
-      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-      <td>{item.defenderPower?.toString()}</td>
-      <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()} </td>
-      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
-      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
-      <td>{item.resourcesStolen?.toString()}</td>
-      
-      
-    </tr>
-  ))}
-</tbody>
+      <div className="leaderboard-scroll">
+        <table className="fancy-table leaderboard-table">
+          <thead>
+            <tr>
+              <th>Attacker</th>
+              <th>Attacker Power</th>
+              <th>Attacker Soldiers</th>
+              <th>Defender</th>
+              <th>Defender Power</th>
+              <th>Defender Soldiers</th>
+              <th>Date</th>
+              <th>Result</th>
+              <th>Resources Stolen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {warLogsData.map((item, i) => (
+              <tr key={i}>
+                <td>
+                  <span className="coord-badge">
+                  {item.attackerName
+                    ? `${item.attackerName} (${Number(item.attackerX)+1},${Number(item.attackerY)+1})`
+                    : `${Number(item.attackerX)+1},${Number(item.attackerY)+1}`}
+                    </span>
+                </td>
+                <td>{item.attackerPower?.toString()}</td>
+                <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()}</td>
+                <td>
+                  <span className="coord-badge">
+                  {item.defenderName
+                    ? `${item.defenderName} (${Number(item.defenderX)+1},${Number(item.defenderY)+1})`
+                    : `${Number(item.defenderX)+1},${Number(item.defenderY)+1}`}
+                    </span>
+                </td>
+                <td>{item.defenderPower?.toString()}</td>
+                <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()}</td>
+                <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+                <td
+  style={{
+    color: item.attackerWon ? "#e57373" : "#81c784", // red vs green
+    fontWeight: "600"
+  }}
+>
+  {item.attackerWon ? "Attacker Won" : "Defender Won"}
+</td>
 
-      </table>
+                <td>{item.resourcesStolen?.toString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     ) : (
-      <p>No war logs available.</p>
+      <p className="leaderboard-empty">No war logs available.</p>
     )}
   </div>
 )}
@@ -4341,63 +4342,75 @@ style={{
 
 
 
+
+{/* ************ MY WAR LOGS – ALL TIME ************ */}
 {interactionMenuTypeA === "warlogsAllMine" && (
-  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-    <h3 style={{ marginBottom: '10px' }}>⚔️ My All-Time War Logs ⚔️</h3>
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">∞</span>
+      <h3 className="leaderboard-card__title">My All-Time War Logs</h3>
+      <span className="leaderboard-card__icon">⚔️</span>
+    </div>
 
-    <button
-      onClick={() => setinteractionMenuTypeA("")}
-      style={{
-        padding: '8px 12px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        marginBottom: '10px',
-        cursor: 'pointer'
-      }}
-    >
+    <button className="card-button leaderboard-card__close" onClick={() => setinteractionMenuTypeA("")}>
       Close
     </button>
 
     {warLogsData.length > 0 ? (
-      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
-        <thead>
-  <tr style={{ backgroundColor: '#6c757d' }}>
-    <th>Attacker</th>
-    <th>Attacker Power</th>
-    <th>Attacker Soldiers</th>
-    <th>Defender</th>
-    <th>Defender Power</th>
-    <th>Defender Soldiers</th>
-    <th>Date</th>
-    <th>Result</th>
-    <th>Resources Stolen</th>
-    
-    
-  </tr>
-</thead>
-<tbody>
-  {warLogsData.map((item, index) => (
-    <tr key={index}>
-      <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-      <td>{item.attackerPower?.toString()}</td>
-      <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()} </td>
-      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-      <td>{item.defenderPower?.toString()}</td>
-      <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()} </td>
-      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
-      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
-      <td>{item.resourcesStolen?.toString()}</td>
-      
-      
-    </tr>
-  ))}
-</tbody>
+      <div className="leaderboard-scroll">
+        <table className="fancy-table leaderboard-table">
+          <thead>
+            <tr>
+              <th>Attacker</th>
+              <th>Attacker Power</th>
+              <th>Attacker Soldiers</th>
+              <th>Defender</th>
+              <th>Defender Power</th>
+              <th>Defender Soldiers</th>
+              <th>Date</th>
+              <th>Result</th>
+              <th>Resources Stolen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {warLogsData.map((item, i) => (
+              <tr key={i}>
+                <td>
+                  <span className="coord-badge">
+                  {item.attackerName
+                    ? `${item.attackerName} (${Number(item.attackerX)+1},${Number(item.attackerY)+1})`
+                    : `${Number(item.attackerX)+1},${Number(item.attackerY)+1}`}
+                    </span>
+                </td>
+                <td>{item.attackerPower?.toString()}</td>
+                <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()}</td>
+                <td>
+                  <span className="coord-badge">
+                  {item.defenderName
+                    ? `${item.defenderName} (${Number(item.defenderX)+1},${Number(item.defenderY)+1})`
+                    : `${Number(item.defenderX)+1},${Number(item.defenderY)+1}`}
+                    </span>
+                </td>
+                <td>{item.defenderPower?.toString()}</td>
+                <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()}</td>
+                <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+                <td
+  style={{
+    color: item.attackerWon ? "#e57373" : "#81c784", // red vs green
+    fontWeight: "600"
+  }}
+>
+  {item.attackerWon ? "Attacker Won" : "Defender Won"}
+</td>
 
-      </table>
+                <td>{item.resourcesStolen?.toString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     ) : (
-      <p>No war logs available.</p>
+      <p className="leaderboard-empty">No war logs available.</p>
     )}
   </div>
 )}
@@ -4405,149 +4418,148 @@ style={{
 
 
 
-{interactionMenuTypeA === "warlogsAllMineX" && (
-  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-    <h3 style={{ marginBottom: '10px' }}>⚔️ Result of the Recent War ⚔️</h3>
 
-    <button
-      onClick={() => setinteractionMenuTypeA("")}
-      style={{
-        padding: '8px 12px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        marginBottom: '10px',
-        cursor: 'pointer'
-      }}
-    >
+{/* ************ MY WAR LOGS – MOST RECENT RESULT (SINGLE) ************ */}
+{interactionMenuTypeA === "warlogsAllMineX" && (
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">🏁</span>
+      <h3 className="leaderboard-card__title">Result of the Recent War</h3>
+      <span className="leaderboard-card__icon">⚔️</span>
+    </div>
+
+    <button className="card-button leaderboard-card__close" onClick={() => setinteractionMenuTypeA("")}>
       Close
     </button>
 
     {warLogsData.length > 0 ? (
       <>
-      <table className="fancy-table" style={{ width: '100%', fontSize: '16px', borderCollapse: 'collapse' }}>
-        <thead>
-  <tr style={{ backgroundColor: '#6c757d' }}>
-    <th>Attacker</th>
-    <th>Attacker Power</th>
-    <th>Attacker Soldiers</th>
-    <th>Defender</th>
-    <th>Defender Power</th>
-    <th>Defender Soldiers</th>
-    <th>Date</th>
-    <th>Result</th>
-    <th>Resources Stolen</th>
-    
-    
-  </tr>
-</thead>
-<tbody>
-  {warLogsData.map((item, index) => (
-    <tr key={index}>
-      <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-      <td>{item.attackerPower?.toString()}</td>
-      <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()} </td>
-      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-      <td>{item.defenderPower?.toString()}</td>
-      <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()} </td>
-      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
-      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
-      <td>{item.resourcesStolen?.toString()}</td>
-      
-      
-    </tr>
-  ))}
-</tbody>
-
-      </table>
-
-<a
-  href={createTwitterStoryShareLink(warLogsData[0], defenderHandle)}
-  target="_blank"
-  rel="noopener noreferrer"
+        <div className="leaderboard-scroll">
+          <table className="fancy-table leaderboard-table" style={{ fontSize: '16px' }}>
+            <thead>
+              <tr>
+                <th>Attacker</th>
+                <th>Attacker Power</th>
+                <th>Attacker Soldiers</th>
+                <th>Defender</th>
+                <th>Defender Power</th>
+                <th>Defender Soldiers</th>
+                <th>Date</th>
+                <th>Result</th>
+                <th>Resources Stolen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {warLogsData.map((item, i) => (
+                <tr key={i}>
+                  <td>
+                    <span className="coord-badge">
+                    {item.attackerName
+                      ? `${item.attackerName} (${Number(item.attackerX)+1},${Number(item.attackerY)+1})`
+                      : `${Number(item.attackerX)+1},${Number(item.attackerY)+1}`}
+                      </span>
+                  </td>
+                  <td>{item.attackerPower?.toString()}</td>
+                  <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()}</td>
+                  <td>
+                    <span className="coord-badge">
+                    {item.defenderName
+                      ? `${item.defenderName} (${Number(item.defenderX)+1},${Number(item.defenderY)+1})`
+                      : `${Number(item.defenderX)+1},${Number(item.defenderY)+1}`}
+                      </span>
+                  </td>
+                  <td>{item.defenderPower?.toString()}</td>
+                  <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()}</td>
+                  <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+                  <td
   style={{
-    display: 'inline-block',
-    marginTop: '15px',
-    padding: '10px 20px',
-    backgroundColor: '#1DA1F2',
-    color: '#fff',
-    borderRadius: '5px',
-    textDecoration: 'none',
-    fontWeight: 'bold'
+    color: item.attackerWon ? "#e57373" : "#81c784", // red vs green
+    fontWeight: "600"
   }}
 >
-  🐦 Share on Twitter
-</a>
+  {item.attackerWon ? "Attacker Won" : "Defender Won"}
+</td>
 
+                  <td>{item.resourcesStolen?.toString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-</>
+        <a
+          href={createTwitterStoryShareLink(warLogsData[0], defenderHandle)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="card-button"
+          style={{ display: 'inline-block', marginTop: 12, textDecoration: 'none' }}
+        >
+          🐦 Share on Twitter
+        </a>
+      </>
     ) : (
-      <p>No war logs available.</p>
+      <p className="leaderboard-empty">No war logs available.</p>
     )}
   </div>
 )}
+
 
 
 
 
 
 {interactionMenuTypeA === "leaderboardX" && (
-    <div className="interaction-menuA">
-        <p style={{ marginBottom: '15px', fontWeight: '400' }}>
-            Loading Leaderboard requires around 20 seconds, do you want to load the Leaderboard?
-        </p>
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("leaderboard");
-                fetchLeaderboardData();
-            }}
-        >
-            Yes, load the Leaderboard
-        </button>
-
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("");
-            }}
-        >
-            Cancel
-        </button>
-
-<div>
-        <a
-            href={`https://twitter.com`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '16px' }}
-          >
-            Leaderboard Docs
-          </a>
-
-</div>
-
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">📜</span>
+      <h3 className="leaderboard-card__title">Load Leaderboard?</h3>
+      <span className="leaderboard-card__icon">⚔️</span>
     </div>
+
+    <p style={{ marginBottom: "15px", fontWeight: 400, textAlign: "center" }}>
+      Loading the Leaderboard may take around <strong>20 seconds</strong>.<br />
+      Do you wish to proceed?
+    </p>
+
+    <div style={{ textAlign: "center", marginBottom: "10px" }}>
+      <button
+        className="card-button"
+        style={{ margin: "6px" }}
+        onClick={() => {
+          setinteractionMenuTypeA("leaderboard");
+          fetchLeaderboardData();
+        }}
+      >
+        ✅ Yes, load the Leaderboard
+      </button>
+
+      <button
+        className="card-button"
+        style={{ margin: "6px" }}
+        onClick={() => setinteractionMenuTypeA("")}
+      >
+        ❌ Cancel
+      </button>
+    </div>
+
+    <div style={{ textAlign: "center", marginTop: "10px" }}>
+      <a
+        href="https://twitter.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          color: "#1DA1F2",
+          textDecoration: "underline",
+          fontSize: "16px",
+          fontWeight: "bold"
+        }}
+      >
+        📖 Leaderboard Docs
+      </a>
+    </div>
+  </div>
 )}
+
 
 
 

@@ -370,11 +370,11 @@ box-shadow: 0 0 6px rgba(196, 170, 112, 0.3);
 
 .leaderboard-card__title {
   margin: 0;
-  font-family: 'Uncial Antiqua', cursive;
-  letter-spacing: 0.5px;
+  font-family: 'MedievalSharp', cursive;
+  letter-spacing: 1px;
   color: #e4d2a3;
-  text-shadow: 1px 1px 2px #000;
 }
+
 
 .leaderboard-card__icon {
   display: inline-block;
@@ -554,4 +554,29 @@ box-shadow: 0 0 6px rgba(196, 170, 112, 0.3);
   text-align: center;
   color: #aaac96;
   padding: 10px 0 4px;
+}
+
+
+/* Reuseable bits from the leaderboard look */
+
+.coord-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: rgba(34, 139, 34, 0.15); /* subtle green wash */
+  color: #b6ffb6;                       /* “cute green” */
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.clan-pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border: 1px solid #c4aa70;            /* medieval border */
+  border-radius: 12px;
+  background: rgba(122,94,60,0.45);
+  color: #e8dbc0;
+  font-weight: 500;
+  white-space: nowrap;
+  font-size: 16px;
 }
