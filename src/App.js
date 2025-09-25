@@ -89,7 +89,7 @@ const [warLogsData, setWarLogsData] = useState([]);
 
 const [defenderHandle, setdefenderHandle] = useState("");
 
-const [sendResourceAmount, setSendResourceAmount] = useState("");
+const [sendResourceAmount, setSendResourceAmount] = useState(30);
 const [sendResourceType, setSendResourceType] = useState("1"); // 1 = Food, default
 const [sendResourceLOPCost, setSendResourceLOPCost] = useState(null);
 
@@ -160,6 +160,23 @@ const ClanPill = ({ name }) => (
 );
 
 
+useEffect(() => {
+  if (interactionMenuTypeA !== "sendResources") return;
+
+  const amount = parseInt(sendResourceAmount || "0", 10);
+  if (!attackDistance || !amount || amount < 30) {
+    setSendResourceLOPCost(null);
+    setSendResourceCost(null);
+    return;
+  }
+
+  const distance = attackDistance;
+  const lopCost = 100 * 10 ** 6 * distance;           // fee depends only on distance
+  const resourceCost = Math.floor((distance * amount) / 30);
+
+  setSendResourceLOPCost(lopCost);
+  setSendResourceCost(resourceCost);
+}, [interactionMenuTypeA, attackDistance, sendResourceAmount]);
 
 
 
@@ -3674,6 +3691,7 @@ style={{
   min={30}
   placeholder="Min: 30"
 />
+<p style={{ color: '#e07c7cff' }}>Min:30, Max:100,000</p>
 
 
     </div>
@@ -3694,6 +3712,51 @@ style={{
         const amount = parseInt(sendResourceAmount);
         const distance = Math.abs(fromX - toX) + Math.abs(fromY - toY);
         const lopFee = 100 * 10 ** 6 * distance;
+
+
+         if (!amount || amount < 30) {
+          toast.warn("Minimum amount is 30.");
+          return;
+        }
+        if (amount > 100000) {
+          toast.warn("Maximum amount is 100,000.");
+          return;
+        }
+
+
+        const lopBal = Number(await getLOPBalance(metaMaskAccount));
+        if (lopBal < lopFee) {
+          const shortfall = (lopFee - lopBal) / 1e6;
+          toast.warn(`Not enough LOP tokens. Short by ~${shortfall.toFixed(2)} LOP.`);
+          return;
+        }
+
+
+        const resourceCost = Math.floor((distance * amount) / 30);
+
+
+
+        // map sendResourceType → key in attackerResources
+        const resKeyByType = {
+          1: "food",
+          2: "wood",
+          3: "stone",
+          4: "iron",
+          5: "offensiveArmor",
+          6: "defensiveArmor",
+          7: "offensiveWeapon",
+          8: "defensiveWeapon",
+        };
+        const resKey = resKeyByType[sendResourceType];
+        const currentRes = attackerResources?.[resKey] ?? 0;
+        const requiredRes = amount + resourceCost;
+
+        if (currentRes < requiredRes) {
+          toast.warn(
+            `Not enough ${getResourceName(sendResourceType)}. Need ${requiredRes}, you have ${currentRes}.`
+          );
+          return;
+        }
 
 
         const approveTx = await tokenContract.increaseAllowance(signerMarket.target, lopFee);
