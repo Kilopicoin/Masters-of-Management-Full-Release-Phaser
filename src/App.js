@@ -235,9 +235,11 @@ const fetchMyWarLogsInRange = async () => {
 
     const wars = await market.getTileWarsInRange(x, y, fromTs, toTs);
 
-    // Same shape you expect elsewhere
-    const normalized = wars.map(normalizeWar);
-    setWarLogsData(normalized.slice().reverse());
+const normalized = wars.map(normalizeWar);
+const reversed = normalized.toReversed ? normalized.toReversed() : [...normalized].reverse();
+
+setWarLogsData(reversed);
+
 
     setinteractionMenuTypeA("warlogsRangeResultMine");
   } catch (err) {
@@ -252,7 +254,6 @@ const fetchMyWarLogsInRange = async () => {
 
 
 
-// NEW — load world war logs for a specific date range (inclusive by day)
 const fetchWarLogsInRange = async () => {
   try {
     setLoading(true);
@@ -260,32 +261,33 @@ const fetchWarLogsInRange = async () => {
 
     // Default: last 7 days if user left fields empty
     const now = new Date();
-    const defaultTo = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // today at 00:00 local
+    const defaultTo = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const defaultFrom = new Date(defaultTo);
     defaultFrom.setDate(defaultFrom.getDate() - 7);
 
-    // Parse "YYYY-MM-DD" safely
     const parseYMD = (s) => {
       if (!s) return null;
       const [y, m, d] = s.split("-").map(Number);
       if (!y || !m || !d) return null;
-      // Construct local date at 00:00
       return new Date(y, m - 1, d);
     };
 
     const fromDate = parseYMD(rangeFrom) || defaultFrom;
     const toDateStart = parseYMD(rangeTo) || defaultTo;
 
-    // We want full “to” day inclusive → end of that day:
     const toDateEnd = new Date(toDateStart);
-    toDateEnd.setDate(toDateEnd.getDate() + 1);          // move to next day 00:00
-    toDateEnd.setSeconds(toDateEnd.getSeconds() - 1);    // back 1 second → 23:59:59
+    toDateEnd.setDate(toDateEnd.getDate() + 1);
+    toDateEnd.setSeconds(toDateEnd.getSeconds() - 1);
 
     const fromTs = Math.floor(fromDate.getTime() / 1000);
     const toTs   = Math.floor(toDateEnd.getTime() / 1000);
 
     const market = await getMarketplaceSignerContract();
-    const [wars, clans] = await market.getWarHistoryWithClansInRange(fromTs, toTs);
+    const [warsRaw, clansRaw] = await market.getWarHistoryWithClansInRange(fromTs, toTs);
+
+    // Ensure plain, writable arrays
+    const wars  = Array.from(warsRaw || []);
+    const clans = Array.from(clansRaw || []);
 
     const combined = wars.map((w, i) => {
       const ww = normalizeWar(w);
@@ -297,7 +299,8 @@ const fetchWarLogsInRange = async () => {
       };
     });
 
-    setWarLogsData(combined.slice().reverse());
+    const reversed = combined.toReversed ? combined.toReversed() : [...combined].reverse();
+    setWarLogsData(reversed);
     setinteractionMenuTypeA("warlogsRangeResult");
   } catch (err) {
     console.error("Error fetching war logs in range:", err);
@@ -306,6 +309,7 @@ const fetchWarLogsInRange = async () => {
     setLoading(false);
   }
 };
+
 
 
 
@@ -1085,8 +1089,14 @@ const fetchMyRecentWarLogs = async () => {
     // If your contract uses a different name, adapt the call accordingly.
     const data = await market.getRecentTileWars(x, y);
 
+// normalize into plain objects first
+const normalized = data.map(normalizeWar);
 
-    setWarLogsData(data.slice().reverse());
+// safe reverse (no mutation of a frozen/readonly array)
+const reversed = normalized.toReversed ? normalized.toReversed() : [...normalized].reverse();
+
+setWarLogsData(reversed);
+
   } catch (err) {
     console.error("Error fetching my recent war logs:", err);
     toast.error("Failed to fetch your recent war logs.");
@@ -1126,19 +1136,19 @@ const fetchRecentWarLogs = async () => {
     // NEW: get wars + clans in parallel arrays
     const [wars, clans] = await marketContract.getRecentWarHistoryWithClans();
 
-    // Zip arrays and attach clan ids onto each war record
-    const combined = wars.map((w, i) => {
-      const ww = normalizeWar(w);
-      const c = clans[i] || {};
-      return {
-        ...ww,
-        attackerClanName: c.attackerClanNam === "" ? "None" : `${c.attackerClanNam}`,
-        defenderClanName: c.defenderClanNam === "" ? "None" : `${c.defenderClanNam}`,
-      };
-    });
+const combined = wars.map((w, i) => {
+  const ww = normalizeWar(w);
+  const c = clans[i] || {};
+  return {
+    ...ww,
+    attackerClanName: c.attackerClanNam === "" ? "None" : `${c.attackerClanNam}`,
+    defenderClanName: c.defenderClanNam === "" ? "None" : `${c.defenderClanNam}`,
+  };
+});
 
+const reversed = combined.toReversed ? combined.toReversed() : [...combined].reverse();
+setWarLogsData(reversed);
 
-    setWarLogsData(combined.slice().reverse());
   } catch (err) {
     console.error("Error fetching recent war logs:", err);
     toast.error("Failed to fetch recent war logs.");
