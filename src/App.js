@@ -154,50 +154,6 @@ const urlToKeyMap = useMemo(() => ({
 }), []);
 
 
-function attachLongPress(target, {
-  onLongPress,   // required
-  onTap = null,  // optional
-  holdMs = 500,  // long-press threshold
-  moveTolerance = 12 // px, cancel if finger moves too far
-}) {
-  let timer = null;
-  let moved = false;
-  let downX = 0, downY = 0;
-
-  target.on('pointerdown', (pointer) => {
-    // Only care about touch (mobile). Mouse right-click will still work separately.
-    if (pointer.pointerType !== 'touch') return;
-    moved = false;
-    downX = pointer.x; downY = pointer.y;
-    timer = target.scene.time.delayedCall(holdMs, () => {
-      timer = null;
-      // Mark this pointer as “consumed” so global handlers skip it
-      pointer.flagClicked = true;
-      onLongPress(pointer);
-    });
-  });
-
-  target.on('pointermove', (pointer) => {
-    if (!timer) return;
-    const dist = Phaser.Math.Distance.Between(downX, downY, pointer.x, pointer.y);
-    if (dist > moveTolerance) {
-      timer.remove(); timer = null; moved = true;
-    }
-  });
-
-  const cancel = (pointer, fireTapIfAny = false) => {
-    if (timer) {
-      timer.remove(); timer = null;
-      if (!moved && fireTapIfAny && typeof onTap === 'function') onTap(pointer);
-    }
-  };
-
-  target.on('pointerup', (pointer) => cancel(pointer, true));
-  target.on('pointerupoutside', (pointer) => cancel(pointer, false));
-  target.on('pointerout', (pointer) => cancel(pointer, false));
-}
-
-
 
 const ClanPill = ({ name }) => (
   <span className="clan-pill">{name || "None"}</span>
@@ -1871,7 +1827,8 @@ const flag = scene.add.image(worldX, worldY, textureKey).setDepth(worldY + 1);
 
             // Add right-click event listener to the white flag
             flag.on('pointerdown', async (pointer) => {
-              if (pointer.rightButtonDown()) {
+              const isMobileLongPress = pointer.pointerType === 'touch' && this.scene.longPressFired;
+              if (pointer.rightButtonDown() || isMobileLongPress ) {
                 pointer.flagClicked = true;
                 const contract = await getContract();
                 const occupant = await contract.getTileOccupant(x, y); // Fetch the occupant address
@@ -2005,63 +1962,6 @@ const twitterHandle = await clanContract.getTwitterHandle(occupant);
 
               }
             });
-
-
-
-attachLongPress(flag, {
-  holdMs: 500, // tweak if you want faster/slower
-  onLongPress: async (pointer) => {
-    // mirror the same logic from the right-click branch above
-    const contract = await getContract();
-    const occupant = await contract.getTileOccupant(x, y);
-    const clanContract = await getclanContract();
-    const tileName = await clanContract.getTileName(x, y);
-    const clanId = await clanContract.getTileClan(x, y);
-    const landContract = await getTheLandContract();
-    const tileData = await landContract.getTilePublic(x, y);
-    const totalPoints = Number(tileData.points);
-    const tileLevel = Number(tileData.level);
-    const resourceReceiveFlag = await landContract.resourceMessage(x, y);
-
-    let clanInfo = null;
-    if (clanId > 0) {
-      const info = await clanContract.getClanInfo(clanId);
-      clanInfo = {
-        clanId: parseInt(clanId),
-        name: info.name,
-        leader: info.leader,
-        memberCount: Number(info.memberCount)
-      };
-    }
-
-    // If you also compute cooldowns/extra info on right-click, reuse that here too
-
-    // Finally set the card
-    setTileCoords((prev) => ({
-      ...prev,
-      x: x + 1,
-      y: y + 1,
-      occupied: true,
-      occupant,
-      tileName: tileName && tileName.trim().length > 0 ? tileName : null,
-      points: totalPoints,
-      level: tileLevel,
-      clan: clanInfo,
-      resourceReceiveFlag
-    }));
-
-    // Optional: open any menus you normally open after right-click
-    // setinteractionMenuTypeA("...") if needed
-  },
-  onTap: null // keep taps as-is (drag/pan etc.)
-});
-
-
-
-
-
-
-
           }
         }
       }
@@ -2578,47 +2478,6 @@ setallclansX(clanInfoMap);
 };
 
 
-
-// Global long-press to act like right-click on empty tiles
-(() => {
-  let lpTimer = null;
-  let downX = 0, downY = 0;
-  const HOLD_MS = 500;
-  const MOVE_TOL = 12;
-
-  this.input.on('pointerdown', (pointer) => {
-    // Skip mouse; desktop right-click already handled
-    if (pointer.pointerType !== 'touch') return;
-
-    // If a flag consumed this press, skip
-    if (pointer.flagClicked) return;
-
-    downX = pointer.x; downY = pointer.y;
-
-    lpTimer = this.time.delayedCall(HOLD_MS, () => {
-      lpTimer = null;
-      // Treat as right-click
-      const worldX = pointer.worldX;
-      const worldY = pointer.worldY;
-      const { x, y } = worldToTilePosition(worldX, worldY);
-      handleRightClick(x, y);
-    });
-  });
-
-  this.input.on('pointermove', (pointer) => {
-    if (!lpTimer) return;
-    const dist = Phaser.Math.Distance.Between(downX, downY, pointer.x, pointer.y);
-    if (dist > MOVE_TOL) { lpTimer.remove(); lpTimer = null; }
-  });
-
-  const cancelLP = () => { if (lpTimer) { lpTimer.remove(); lpTimer = null; } };
-  this.input.on('pointerup', cancelLP);
-  this.input.on('pointerupoutside', cancelLP);
-})();
-
-
-
-
 const tileWidth = 386;
       const visibleTileHeight = 193;
       const overlap = visibleTileHeight / 2;
@@ -2752,6 +2611,12 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
       let cameraStartX = 0;
       let cameraStartY = 0;
 
+      const LONG_PRESS_MS = 500;          // feel free to tweak (400–700ms works well)
+const MOVE_TOLERANCE_PX = 10;       // how much finger can move before cancel
+let longPressTimer = null;
+let longPressStart = { x: 0, y: 0 };
+this.longPressFired = false;
+
       this.input.on('pointerdown', function (pointer) {
         pointer.event.preventDefault();
 
@@ -2826,6 +2691,123 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
         }
         this.cameras.main.setZoom(zoomLevel);
       });
+
+
+
+
+
+
+
+// helper to clear the timer
+function clearLongPressTimer() {
+  if (longPressTimer) {
+    longPressTimer.remove(false);
+    longPressTimer = null;
+  }
+  this.longPressFired = false;
+}
+
+// --- Hook into existing input events ---
+
+this.input.on('pointerdown', (pointer) => {
+  pointer.event.preventDefault();
+
+  // your current left/right handling still runs below—this only adds touch support
+  if (pointer.pointerType === 'touch') {
+    longPressStart.x = pointer.x;
+    longPressStart.y = pointer.y;
+    this.longPressFired = false;
+
+    // arm the long-press
+    clearLongPressTimer();
+    longPressTimer = this.time.delayedCall(LONG_PRESS_MS, () => {
+      // if user started dragging, skip
+      if (isDragging) return;
+
+      this.longPressFired = true;
+
+      // mimic right-click path: compute tile under finger and call your handler
+      const worldX = pointer.worldX;
+      const worldY = pointer.worldY;
+      const { x, y } = worldToTilePosition(worldX, worldY);
+
+      // this matches your desktop right-click behavior
+      setinteractionMenuTypeA("");
+      handleRightClick(x, y);
+    });
+  }
+
+  // existing logic you already have:
+  if (pointer.button === 0) {
+    isDragging = true;
+    dragStartX = pointer.x;
+    dragStartY = pointer.y;
+    cameraStartX = this.cameras.main.scrollX;
+    cameraStartY = this.cameras.main.scrollY;
+  } else if (pointer.button === 2) {
+    setinteractionMenuTypeA("");
+    if (pointer.flagClicked) {
+      pointer.flagClicked = false;
+      return;
+    }
+    const worldX = pointer.worldX;
+    const worldY = pointer.worldY;
+    const { x, y } = worldToTilePosition(worldX, worldY);
+    handleRightClick(x, y);
+  }
+}, this);
+
+this.input.on('pointermove', (pointer) => {
+  // cancel long-press if the finger moves too much (user is likely panning)
+  if (pointer.pointerType === 'touch') {
+    const dx = pointer.x - longPressStart.x;
+    const dy = pointer.y - longPressStart.y;
+    if (Math.hypot(dx, dy) > MOVE_TOLERANCE_PX) {
+      clearLongPressTimer();
+    }
+  }
+
+  // your existing drag logic…
+  if (isDragging) {
+    const zoom = this.cameras.main.zoom;
+    const dragX = (dragStartX - pointer.x) / zoom;
+    const dragY = (dragStartY - pointer.y) / zoom;
+    let newScrollX = cameraStartX + dragX;
+    let newScrollY = cameraStartY + dragY;
+    const mapWidth = 8000;
+    const mapHeight = 4600;
+    const viewWidth = this.scale.width / zoom;
+    const viewHeight = this.scale.height / zoom;
+    const minScrollX = (-mapWidth - viewWidth) / 2;
+    const maxScrollX = (mapWidth + viewWidth) / 2;
+    const minScrollY = (-mapHeight - viewHeight) / 2;
+    const maxScrollY = (mapHeight + viewHeight);
+
+    this.cameras.main.scrollX = Phaser.Math.Clamp(newScrollX, minScrollX, maxScrollX);
+    this.cameras.main.scrollY = Phaser.Math.Clamp(newScrollY, minScrollY, maxScrollY);
+  }
+}, this);
+
+this.input.on('pointerup', (pointer) => {
+  // if long-press already fired, consume the tap-up (prevents accidental extra actions)
+  if (pointer.pointerType === 'touch' && this.longPressFired) {
+    clearLongPressTimer();
+    return;
+  }
+  clearLongPressTimer();
+
+  // your existing pointerup
+  if (pointer.button === 0) {
+    isDragging = false;
+  }
+}, this);
+
+// also cancel if pointer goes out of canvas (optional safety)
+this.input.on('gameout', clearLongPressTimer, this);
+
+
+
+
     }
 
     function update() {}
