@@ -1826,8 +1826,8 @@ const flag = scene.add.image(worldX, worldY, textureKey).setDepth(worldY + 1);
             });
 
             // Add right-click event listener to the white flag
-            flag.on('pointerdown', async (pointer) => {
-              const doubleLeft = (pointer.button === 0) && this.scene.isDoubleLeft(pointer);
+flag.on('pointerdown', async function (pointer) {
+  const doubleLeft = (pointer.button === 0) && this.scene.isDoubleLeft(pointer);
   if (pointer.rightButtonDown() || doubleLeft) {
                 pointer.flagClicked = true;
                 const contract = await getContract();
@@ -2469,6 +2469,36 @@ setallclansX(clanInfoMap);
 
     async function create() {
 
+
+
+            // --- Double-click/double-tap detection ---
+const DOUBLE_MS = 300;          // max time between taps
+const DOUBLE_PX = 14;           // max move between taps (screen px)
+
+this._lastTapTime = 0;
+this._lastTapPos = { x: 0, y: 0 };
+
+// helper: was this a double left-click/tap?
+this.isDoubleLeft = (pointer) => {
+  if (pointer.button !== 0) return false;        // only left click / primary tap
+  const now = performance.now();
+  const dt = now - this._lastTapTime;
+  const dx = pointer.x - this._lastTapPos.x;
+  const dy = pointer.y - this._lastTapPos.y;
+  const closeInTime = dt > 0 && dt <= DOUBLE_MS;
+  const closeInSpace = (dx*dx + dy*dy) <= (DOUBLE_PX*DOUBLE_PX);
+
+  // update memory for the next click
+  this._lastTapTime = now;
+  this._lastTapPos.x = pointer.x;
+  this._lastTapPos.y = pointer.y;
+
+  return closeInTime && closeInSpace;
+};
+
+
+
+
        gameRef.current.sounds = {
    leaderboard: this.sound.add('leaderboardSound', { volume: 0.6 }),
    paper: this.sound.add('paperSound', { volume: 0.6 }),
@@ -2612,30 +2642,6 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
       let cameraStartY = 0;
 
 
-      // --- Double-click/double-tap detection ---
-const DOUBLE_MS = 300;          // max time between taps
-const DOUBLE_PX = 14;           // max move between taps (screen px)
-
-this._lastTapTime = 0;
-this._lastTapPos = { x: 0, y: 0 };
-
-// helper: was this a double left-click/tap?
-this.isDoubleLeft = (pointer) => {
-  if (pointer.button !== 0) return false;        // only left click / primary tap
-  const now = performance.now();
-  const dt = now - this._lastTapTime;
-  const dx = pointer.x - this._lastTapPos.x;
-  const dy = pointer.y - this._lastTapPos.y;
-  const closeInTime = dt > 0 && dt <= DOUBLE_MS;
-  const closeInSpace = (dx*dx + dy*dy) <= (DOUBLE_PX*DOUBLE_PX);
-
-  // update memory for the next click
-  this._lastTapTime = now;
-  this._lastTapPos.x = pointer.x;
-  this._lastTapPos.y = pointer.y;
-
-  return closeInTime && closeInSpace;
-};
 
 
 
@@ -2643,9 +2649,9 @@ this.isDoubleLeft = (pointer) => {
       this.input.on('pointerdown', function (pointer) {
         pointer.event.preventDefault();
 
-        if (pointer.button === 0) {
+       if (pointer.button === 0) {
     // check double-left first (don’t fire while dragging)
-    if (!isDragging && this.scene.isDoubleLeft(pointer)) {
+    if (!isDragging && this.isDoubleLeft(pointer)) {
       setinteractionMenuTypeA("");
 
       // if a flag handler already consumed this click, skip
