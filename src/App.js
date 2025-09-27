@@ -1827,8 +1827,8 @@ const flag = scene.add.image(worldX, worldY, textureKey).setDepth(worldY + 1);
 
             // Add right-click event listener to the white flag
             flag.on('pointerdown', async (pointer) => {
-              const isMobileLongPress = pointer.pointerType === 'touch' && this.scene.longPressFired;
-              if (pointer.rightButtonDown() || isMobileLongPress ) {
+              const doubleLeft = (pointer.button === 0) && this.scene.isDoubleLeft(pointer);
+  if (pointer.rightButtonDown() || doubleLeft) {
                 pointer.flagClicked = true;
                 const contract = await getContract();
                 const occupant = await contract.getTileOccupant(x, y); // Fetch the occupant address
@@ -2611,22 +2611,61 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
       let cameraStartX = 0;
       let cameraStartY = 0;
 
-      const LONG_PRESS_MS = 500;          // feel free to tweak (400–700ms works well)
-const MOVE_TOLERANCE_PX = 10;       // how much finger can move before cancel
-let longPressTimer = null;
-let longPressStart = { x: 0, y: 0 };
-this.longPressFired = false;
+
+      // --- Double-click/double-tap detection ---
+const DOUBLE_MS = 300;          // max time between taps
+const DOUBLE_PX = 14;           // max move between taps (screen px)
+
+this._lastTapTime = 0;
+this._lastTapPos = { x: 0, y: 0 };
+
+// helper: was this a double left-click/tap?
+this.isDoubleLeft = (pointer) => {
+  if (pointer.button !== 0) return false;        // only left click / primary tap
+  const now = performance.now();
+  const dt = now - this._lastTapTime;
+  const dx = pointer.x - this._lastTapPos.x;
+  const dy = pointer.y - this._lastTapPos.y;
+  const closeInTime = dt > 0 && dt <= DOUBLE_MS;
+  const closeInSpace = (dx*dx + dy*dy) <= (DOUBLE_PX*DOUBLE_PX);
+
+  // update memory for the next click
+  this._lastTapTime = now;
+  this._lastTapPos.x = pointer.x;
+  this._lastTapPos.y = pointer.y;
+
+  return closeInTime && closeInSpace;
+};
+
+
+
 
       this.input.on('pointerdown', function (pointer) {
         pointer.event.preventDefault();
 
         if (pointer.button === 0) {
-          isDragging = true;
-          dragStartX = pointer.x;
-          dragStartY = pointer.y;
-          cameraStartX = this.cameras.main.scrollX;
-          cameraStartY = this.cameras.main.scrollY;
-        } else if (pointer.button === 2) {
+    // check double-left first (don’t fire while dragging)
+    if (!isDragging && this.scene.isDoubleLeft(pointer)) {
+      setinteractionMenuTypeA("");
+
+      // if a flag handler already consumed this click, skip
+      if (pointer.flagClicked) { pointer.flagClicked = false; return; }
+
+      const worldX = pointer.worldX;
+      const worldY = pointer.worldY;
+      const { x, y } = worldToTilePosition(worldX, worldY);
+      handleRightClick(x, y);              // ← same as your right-click path
+      return;                               // don’t start drag on a double action
+    }
+
+    // normal left-press → potentially start drag
+    isDragging = true;
+    dragStartX = pointer.x;
+    dragStartY = pointer.y;
+    cameraStartX = this.cameras.main.scrollX;
+    cameraStartY = this.cameras.main.scrollY;
+
+  } else if (pointer.button === 2) {
 
                         setinteractionMenuTypeA("");
 
@@ -2691,123 +2730,6 @@ this.longPressFired = false;
         }
         this.cameras.main.setZoom(zoomLevel);
       });
-
-
-
-
-
-
-
-// helper to clear the timer
-function clearLongPressTimer() {
-  if (longPressTimer) {
-    longPressTimer.remove(false);
-    longPressTimer = null;
-  }
-  this.longPressFired = false;
-}
-
-// --- Hook into existing input events ---
-
-this.input.on('pointerdown', (pointer) => {
-  pointer.event.preventDefault();
-
-  // your current left/right handling still runs below—this only adds touch support
-  if (pointer.pointerType === 'touch') {
-    longPressStart.x = pointer.x;
-    longPressStart.y = pointer.y;
-    this.longPressFired = false;
-
-    // arm the long-press
-    clearLongPressTimer();
-    longPressTimer = this.time.delayedCall(LONG_PRESS_MS, () => {
-      // if user started dragging, skip
-      if (isDragging) return;
-
-      this.longPressFired = true;
-
-      // mimic right-click path: compute tile under finger and call your handler
-      const worldX = pointer.worldX;
-      const worldY = pointer.worldY;
-      const { x, y } = worldToTilePosition(worldX, worldY);
-
-      // this matches your desktop right-click behavior
-      setinteractionMenuTypeA("");
-      handleRightClick(x, y);
-    });
-  }
-
-  // existing logic you already have:
-  if (pointer.button === 0) {
-    isDragging = true;
-    dragStartX = pointer.x;
-    dragStartY = pointer.y;
-    cameraStartX = this.cameras.main.scrollX;
-    cameraStartY = this.cameras.main.scrollY;
-  } else if (pointer.button === 2) {
-    setinteractionMenuTypeA("");
-    if (pointer.flagClicked) {
-      pointer.flagClicked = false;
-      return;
-    }
-    const worldX = pointer.worldX;
-    const worldY = pointer.worldY;
-    const { x, y } = worldToTilePosition(worldX, worldY);
-    handleRightClick(x, y);
-  }
-}, this);
-
-this.input.on('pointermove', (pointer) => {
-  // cancel long-press if the finger moves too much (user is likely panning)
-  if (pointer.pointerType === 'touch') {
-    const dx = pointer.x - longPressStart.x;
-    const dy = pointer.y - longPressStart.y;
-    if (Math.hypot(dx, dy) > MOVE_TOLERANCE_PX) {
-      clearLongPressTimer();
-    }
-  }
-
-  // your existing drag logic…
-  if (isDragging) {
-    const zoom = this.cameras.main.zoom;
-    const dragX = (dragStartX - pointer.x) / zoom;
-    const dragY = (dragStartY - pointer.y) / zoom;
-    let newScrollX = cameraStartX + dragX;
-    let newScrollY = cameraStartY + dragY;
-    const mapWidth = 8000;
-    const mapHeight = 4600;
-    const viewWidth = this.scale.width / zoom;
-    const viewHeight = this.scale.height / zoom;
-    const minScrollX = (-mapWidth - viewWidth) / 2;
-    const maxScrollX = (mapWidth + viewWidth) / 2;
-    const minScrollY = (-mapHeight - viewHeight) / 2;
-    const maxScrollY = (mapHeight + viewHeight);
-
-    this.cameras.main.scrollX = Phaser.Math.Clamp(newScrollX, minScrollX, maxScrollX);
-    this.cameras.main.scrollY = Phaser.Math.Clamp(newScrollY, minScrollY, maxScrollY);
-  }
-}, this);
-
-this.input.on('pointerup', (pointer) => {
-  // if long-press already fired, consume the tap-up (prevents accidental extra actions)
-  if (pointer.pointerType === 'touch' && this.longPressFired) {
-    clearLongPressTimer();
-    return;
-  }
-  clearLongPressTimer();
-
-  // your existing pointerup
-  if (pointer.button === 0) {
-    isDragging = false;
-  }
-}, this);
-
-// also cancel if pointer goes out of canvas (optional safety)
-this.input.on('gameout', clearLongPressTimer, this);
-
-
-
-
     }
 
     function update() {}

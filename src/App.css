@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=EB+Garamond&family=MedievalSharp&family=Uncial+Antiqua&display=swap');
 
+#phaser-container, canvas { touch-action: none; }
 
 body {
   background-color: #1e1e1e;
