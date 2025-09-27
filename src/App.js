@@ -2358,6 +2358,12 @@ setallclansX(clanInfoMap);
 
     gameRef.current = new Phaser.Game(config);
 
+    const canvas = gameRef.current.canvas || gameRef.current.renderer?.canvas;
+if (canvas) {
+  canvas.style.touchAction = 'none';
+  canvas.style.msTouchAction = 'none';
+}
+
     let zoomLevel = 0.24;
 
     function preload() {
@@ -2894,7 +2900,8 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
 
       <div
         id="phaser-container"
-        style={{ width: '100%', height: '100%', position: 'relative', zIndex: 0 }}
+        style={{ width: '100%', touchAction: 'none',   
+    WebkitUserSelect: 'none', height: '100%', position: 'relative', zIndex: 0 }}
       >
       
       <button
