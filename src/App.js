@@ -154,6 +154,50 @@ const urlToKeyMap = useMemo(() => ({
 }), []);
 
 
+function attachLongPress(target, {
+  onLongPress,   // required
+  onTap = null,  // optional
+  holdMs = 500,  // long-press threshold
+  moveTolerance = 12 // px, cancel if finger moves too far
+}) {
+  let timer = null;
+  let moved = false;
+  let downX = 0, downY = 0;
+
+  target.on('pointerdown', (pointer) => {
+    // Only care about touch (mobile). Mouse right-click will still work separately.
+    if (pointer.pointerType !== 'touch') return;
+    moved = false;
+    downX = pointer.x; downY = pointer.y;
+    timer = target.scene.time.delayedCall(holdMs, () => {
+      timer = null;
+      // Mark this pointer as “consumed” so global handlers skip it
+      pointer.flagClicked = true;
+      onLongPress(pointer);
+    });
+  });
+
+  target.on('pointermove', (pointer) => {
+    if (!timer) return;
+    const dist = Phaser.Math.Distance.Between(downX, downY, pointer.x, pointer.y);
+    if (dist > moveTolerance) {
+      timer.remove(); timer = null; moved = true;
+    }
+  });
+
+  const cancel = (pointer, fireTapIfAny = false) => {
+    if (timer) {
+      timer.remove(); timer = null;
+      if (!moved && fireTapIfAny && typeof onTap === 'function') onTap(pointer);
+    }
+  };
+
+  target.on('pointerup', (pointer) => cancel(pointer, true));
+  target.on('pointerupoutside', (pointer) => cancel(pointer, false));
+  target.on('pointerout', (pointer) => cancel(pointer, false));
+}
+
+
 
 const ClanPill = ({ name }) => (
   <span className="clan-pill">{name || "None"}</span>
@@ -1961,6 +2005,63 @@ const twitterHandle = await clanContract.getTwitterHandle(occupant);
 
               }
             });
+
+
+
+attachLongPress(flag, {
+  holdMs: 500, // tweak if you want faster/slower
+  onLongPress: async (pointer) => {
+    // mirror the same logic from the right-click branch above
+    const contract = await getContract();
+    const occupant = await contract.getTileOccupant(x, y);
+    const clanContract = await getclanContract();
+    const tileName = await clanContract.getTileName(x, y);
+    const clanId = await clanContract.getTileClan(x, y);
+    const landContract = await getTheLandContract();
+    const tileData = await landContract.getTilePublic(x, y);
+    const totalPoints = Number(tileData.points);
+    const tileLevel = Number(tileData.level);
+    const resourceReceiveFlag = await landContract.resourceMessage(x, y);
+
+    let clanInfo = null;
+    if (clanId > 0) {
+      const info = await clanContract.getClanInfo(clanId);
+      clanInfo = {
+        clanId: parseInt(clanId),
+        name: info.name,
+        leader: info.leader,
+        memberCount: Number(info.memberCount)
+      };
+    }
+
+    // If you also compute cooldowns/extra info on right-click, reuse that here too
+
+    // Finally set the card
+    setTileCoords((prev) => ({
+      ...prev,
+      x: x + 1,
+      y: y + 1,
+      occupied: true,
+      occupant,
+      tileName: tileName && tileName.trim().length > 0 ? tileName : null,
+      points: totalPoints,
+      level: tileLevel,
+      clan: clanInfo,
+      resourceReceiveFlag
+    }));
+
+    // Optional: open any menus you normally open after right-click
+    // setinteractionMenuTypeA("...") if needed
+  },
+  onTap: null // keep taps as-is (drag/pan etc.)
+});
+
+
+
+
+
+
+
           }
         }
       }
@@ -2475,6 +2576,47 @@ setallclansX(clanInfoMap);
    battle: this.sound.add('battleSound', { volume: 0.6 }),
 
 };
+
+
+
+// Global long-press to act like right-click on empty tiles
+(() => {
+  let lpTimer = null;
+  let downX = 0, downY = 0;
+  const HOLD_MS = 500;
+  const MOVE_TOL = 12;
+
+  this.input.on('pointerdown', (pointer) => {
+    // Skip mouse; desktop right-click already handled
+    if (pointer.pointerType !== 'touch') return;
+
+    // If a flag consumed this press, skip
+    if (pointer.flagClicked) return;
+
+    downX = pointer.x; downY = pointer.y;
+
+    lpTimer = this.time.delayedCall(HOLD_MS, () => {
+      lpTimer = null;
+      // Treat as right-click
+      const worldX = pointer.worldX;
+      const worldY = pointer.worldY;
+      const { x, y } = worldToTilePosition(worldX, worldY);
+      handleRightClick(x, y);
+    });
+  });
+
+  this.input.on('pointermove', (pointer) => {
+    if (!lpTimer) return;
+    const dist = Phaser.Math.Distance.Between(downX, downY, pointer.x, pointer.y);
+    if (dist > MOVE_TOL) { lpTimer.remove(); lpTimer = null; }
+  });
+
+  const cancelLP = () => { if (lpTimer) { lpTimer.remove(); lpTimer = null; } };
+  this.input.on('pointerup', cancelLP);
+  this.input.on('pointerupoutside', cancelLP);
+})();
+
+
 
 
 const tileWidth = 386;

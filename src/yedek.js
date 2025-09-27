@@ -20,6 +20,8 @@ import horsecartSound from './assets/horsecart.mp3';
 import battleSound from './assets/battle.mp3';
 
 
+
+
 import playIcon from './assets/play-icon.png';
 import stopIcon from './assets/stop-icon.png';
 import { getAddress } from 'ethers';
@@ -87,7 +89,7 @@ const [warLogsData, setWarLogsData] = useState([]);
 
 const [defenderHandle, setdefenderHandle] = useState("");
 
-const [sendResourceAmount, setSendResourceAmount] = useState("");
+const [sendResourceAmount, setSendResourceAmount] = useState(30);
 const [sendResourceType, setSendResourceType] = useState("1"); // 1 = Food, default
 const [sendResourceLOPCost, setSendResourceLOPCost] = useState(null);
 
@@ -106,6 +108,17 @@ const battleGifRef = useRef(null);
 const [txCounter, setTxCounter] = useState(0);
 
 const flagSpritesRef = useRef({});
+
+const [rangeFrom, setRangeFrom] = useState(""); // "YYYY-MM-DD"
+const [rangeTo, setRangeTo] = useState("");     // "YYYY-MM-DD"
+
+
+// NEW — date range state for *my* war logs
+const [myRangeFrom, setMyRangeFrom] = useState(""); // "YYYY-MM-DD"
+const [myRangeTo, setMyRangeTo] = useState("");     // "YYYY-MM-DD"
+
+
+
 
 const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/1.png": "nftflag_1",
@@ -139,6 +152,165 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/29.png": "nftflag_29",
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
+
+
+
+const ClanPill = ({ name }) => (
+  <span className="clan-pill">{name || "None"}</span>
+);
+
+
+useEffect(() => {
+  if (interactionMenuTypeA !== "sendResources") return;
+
+  const amount = parseInt(sendResourceAmount || "0", 10);
+  if (!attackDistance || !amount || amount < 30) {
+    setSendResourceLOPCost(null);
+    setSendResourceCost(null);
+    return;
+  }
+
+  const distance = attackDistance;
+  const lopCost = 100 * 10 ** 6 * distance;           // fee depends only on distance
+  const resourceCost = Math.floor((distance * amount) / 30);
+
+  setSendResourceLOPCost(lopCost);
+  setSendResourceCost(resourceCost);
+}, [interactionMenuTypeA, attackDistance, sendResourceAmount]);
+
+
+
+
+
+// NEW — load *my* war logs for a specific date range (inclusive by day)
+const fetchMyWarLogsInRange = async () => {
+  try {
+    setLoading(true);
+    gameRef.current?.sounds?.paper?.play?.();
+
+    const market = await getMarketplaceSignerContract();
+    const tileMap = await getContract();
+
+    // Connected account
+    const accounts = await window.ethereum.request({ method: "eth_accounts" });
+    const account = accounts && accounts[0] ? accounts[0] : null;
+    if (!account) {
+      toast.error("Connect your wallet first.");
+      return;
+    }
+
+    // Use the currently selected tile (like your other “my” loaders)
+    const x = tileCoords.x - 1;
+    const y = tileCoords.y - 1;
+
+    // Verify ownership (required by ownsTile(x,y))
+    const occupant = await tileMap.getTileOccupant(x, y);
+    if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
+      toast.error("You must own the selected tile to load your war logs.");
+      return;
+    }
+
+    // Parse "YYYY-MM-DD" → local midnight
+    const parseYMD = (s) => {
+      if (!s) return null;
+      const [yy, mm, dd] = s.split("-").map(Number);
+      if (!yy || !mm || !dd) return null;
+      return new Date(yy, mm - 1, dd); // local 00:00
+    };
+
+    // Defaults if empty: last 30 days
+    const now = new Date();
+    const defaultTo = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const defaultFrom = new Date(defaultTo);
+    defaultFrom.setDate(defaultFrom.getDate() - 30);
+
+    const fromDate = parseYMD(myRangeFrom) || defaultFrom;
+    const toDateStart = parseYMD(myRangeTo) || defaultTo;
+    const toDateEnd = new Date(toDateStart);
+    toDateEnd.setDate(toDateEnd.getDate() + 1);       // next day 00:00
+    toDateEnd.setSeconds(toDateEnd.getSeconds() - 1); // 23:59:59 of chosen day
+
+    const fromTs = Math.floor(fromDate.getTime() / 1000);
+    const toTs   = Math.floor(toDateEnd.getTime() / 1000);
+
+    const wars = await market.getTileWarsInRange(x, y, fromTs, toTs);
+
+const normalized = wars.map(normalizeWar);
+const reversed = normalized.toReversed ? normalized.toReversed() : [...normalized].reverse();
+
+setWarLogsData(reversed);
+
+
+    setinteractionMenuTypeA("warlogsRangeResultMine");
+  } catch (err) {
+    console.error("Error fetching my war logs in range:", err);
+    toast.error("Failed to load your war logs for the selected range.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+
+
+const fetchWarLogsInRange = async () => {
+  try {
+    setLoading(true);
+    gameRef.current?.sounds?.paper?.play?.();
+
+    // Default: last 7 days if user left fields empty
+    const now = new Date();
+    const defaultTo = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const defaultFrom = new Date(defaultTo);
+    defaultFrom.setDate(defaultFrom.getDate() - 7);
+
+    const parseYMD = (s) => {
+      if (!s) return null;
+      const [y, m, d] = s.split("-").map(Number);
+      if (!y || !m || !d) return null;
+      return new Date(y, m - 1, d);
+    };
+
+    const fromDate = parseYMD(rangeFrom) || defaultFrom;
+    const toDateStart = parseYMD(rangeTo) || defaultTo;
+
+    const toDateEnd = new Date(toDateStart);
+    toDateEnd.setDate(toDateEnd.getDate() + 1);
+    toDateEnd.setSeconds(toDateEnd.getSeconds() - 1);
+
+    const fromTs = Math.floor(fromDate.getTime() / 1000);
+    const toTs   = Math.floor(toDateEnd.getTime() / 1000);
+
+    const market = await getMarketplaceSignerContract();
+    const [warsRaw, clansRaw] = await market.getWarHistoryWithClansInRange(fromTs, toTs);
+
+    // Ensure plain, writable arrays
+    const wars  = Array.from(warsRaw || []);
+    const clans = Array.from(clansRaw || []);
+
+    const combined = wars.map((w, i) => {
+      const ww = normalizeWar(w);
+      const c = clans[i] || {};
+      return {
+        ...ww,
+        attackerClanName: c.attackerClanNam === "" ? "None" : `${c.attackerClanNam}`,
+        defenderClanName: c.defenderClanNam === "" ? "None" : `${c.defenderClanNam}`,
+      };
+    });
+
+    const reversed = combined.toReversed ? combined.toReversed() : [...combined].reverse();
+    setWarLogsData(reversed);
+    setinteractionMenuTypeA("warlogsRangeResult");
+  } catch (err) {
+    console.error("Error fetching war logs in range:", err);
+    toast.error("Failed to load war logs for the selected range.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
 
 
 
@@ -796,7 +968,8 @@ const handleTwitterConnect = async () => {
     const address = await signer.getAddress();
     const signature = await signer.signMessage(`Linking wallet ${address}`);
 
-    window.location.href = `http://localhost:4000/twitter/login?wallet=${address}&signature=${signature}`;
+    window.location.href = `https://kilopi.net/twitter/login?wallet=${address}&signature=${signature}`;
+
   } catch (err) {
     console.error("Twitter connection failed", err);
     toast.error("Failed to connect Twitter");
@@ -861,9 +1034,15 @@ async function sendToSmartContract(twitterHandle) {
     
 
     const clanContract = await getclanSignerContract();
+    const tokenContractSigner = await getTokenSignerContract();
+
+
+    const allowanceTx = await tokenContractSigner.increaseAllowance(clancontractAddress, 1_000_000_000);
+    setLoading(true); // show loader
+    await allowanceTx.wait();
     
     const tx = await clanContract.setTwitterHandle(twitterHandle);
-    setLoading(true); // show loader
+    
     await tx.wait();
 
   
@@ -910,7 +1089,14 @@ const fetchMyRecentWarLogs = async () => {
     // If your contract uses a different name, adapt the call accordingly.
     const data = await market.getRecentTileWars(x, y);
 
-    setWarLogsData(data);
+// normalize into plain objects first
+const normalized = data.map(normalizeWar);
+
+// safe reverse (no mutation of a frozen/readonly array)
+const reversed = normalized.toReversed ? normalized.toReversed() : [...normalized].reverse();
+
+setWarLogsData(reversed);
+
   } catch (err) {
     console.error("Error fetching my recent war logs:", err);
     toast.error("Failed to fetch your recent war logs.");
@@ -920,43 +1106,7 @@ const fetchMyRecentWarLogs = async () => {
 };
 
 
-const fetchMyAllWarLogs = async () => {
 
-  try {
-    setLoading(true);
-    gameRef.current?.sounds?.paper?.play?.();
-
-    const market = await getMarketplaceSignerContract();
-    const tileMap = await getContract();
-
-    // Connected account
-    const accounts = await window.ethereum.request({ method: "eth_accounts" });
-    const account = accounts && accounts[0] ? accounts[0] : null;
-    if (!account) {
-      toast.error("Connect your wallet first.");
-      return;
-    }
-
-    // Resolve user's tile and verify ownership
-    const x = tileCoords.x - 1;
-    const y = tileCoords.y - 1;
-
-    const occupant = await tileMap.getTileOccupant(x, y);
-    if (!occupant || occupant.toLowerCase() !== account.toLowerCase()) {
-      toast.error("You must own your tile to fetch war logs.");
-      return;
-    }
-
-    // Tile-based API
-    const data = await market.getAllTileWars(x, y);
-    setWarLogsData(data);
-  } catch (err) {
-    console.error("Error fetching all my war logs:", err);
-    toast.error("Failed to fetch your all war logs.");
-  } finally {
-    setLoading(false);
-  }
-};
 
 
 const normalizeWar = (w) => ({
@@ -986,18 +1136,19 @@ const fetchRecentWarLogs = async () => {
     // NEW: get wars + clans in parallel arrays
     const [wars, clans] = await marketContract.getRecentWarHistoryWithClans();
 
-    // Zip arrays and attach clan ids onto each war record
-    const combined = wars.map((w, i) => {
-      const ww = normalizeWar(w);
-      const c = clans[i] || {};
-      return {
-        ...ww,
-        attackerClanName: c.attackerClanNam === "" ? "None" : `${c.attackerClanNam}`,
-        defenderClanName: c.defenderClanNam === "" ? "None" : `${c.defenderClanNam}`,
-      };
-    });
+const combined = wars.map((w, i) => {
+  const ww = normalizeWar(w);
+  const c = clans[i] || {};
+  return {
+    ...ww,
+    attackerClanName: c.attackerClanNam === "" ? "None" : `${c.attackerClanNam}`,
+    defenderClanName: c.defenderClanNam === "" ? "None" : `${c.defenderClanNam}`,
+  };
+});
 
-    setWarLogsData(combined);
+const reversed = combined.toReversed ? combined.toReversed() : [...combined].reverse();
+setWarLogsData(reversed);
+
   } catch (err) {
     console.error("Error fetching recent war logs:", err);
     toast.error("Failed to fetch recent war logs.");
@@ -1005,32 +1156,6 @@ const fetchRecentWarLogs = async () => {
     setLoading(false);
   }
 };
-
-
-
-const fetchAllWarLogs = async () => {
-  try {
-    setLoading(true);
-    const marketContract = await getMarketplaceSignerContract();
-    const [wars, clans] = await marketContract.getAllWarHistoryWithClans();
-    const combined = wars.map((w, i) => {
-      const ww = normalizeWar(w);
-      const c = clans[i] || {};
-      return {
-        ...ww,
-        attackerClanName: c.attackerClanNam === "" ? "None" : `${c.attackerClanNam}`,
-        defenderClanName: c.defenderClanNam === "" ? "None" : `${c.defenderClanNam}`,
-      };
-    });
-    setWarLogsData(combined);
-  } catch (err) {
-    console.error("Error fetching all war logs:", err);
-    toast.error("Failed to fetch all war logs.");
-  } finally {
-    setLoading(false);
-  }
-};
-
 
 
 
@@ -1218,52 +1343,95 @@ useEffect(() => {
 
 
 
-  const fetchLeaderboardData = async () => {
-      try {
-          setLoading(true);
-          gameRef.current.sounds.leaderboard.play();
-          const Land = await getTheLandSignerContract();
-          const Clan = await getclanSignerContract();
-  
-          const tiles = [];
-  
-          for (let x = 0; x < 20; x++) {
-              for (let y = 0; y < 20; y++) {
-                  const tilePoints = await Land.pointsByCoords(x, y);
-                  const points = parseInt(tilePoints.toString());
-                  if (points > 0) {
-                      const name = await Clan.getTileName(x, y);
-                      const clan = await Clan.getTileClan(x, y);
-                      const clanNo = parseInt(clan) - 1;
-                      let clanName = "None";
+  // put this at component scope
+const tileNameCacheRef = useRef(new Map()); // key: "x,y" (0-based), value: string
 
-                      if (allclansX[clanNo]) {
-                        clanName = allclansX[clanNo][0];
-                      }
+// small helper to limit concurrency
+async function mapWithConcurrency(items, limit, mapper) {
+  const results = new Array(items.length);
+  let idx = 0;
+  const workers = Array(Math.min(limit, items.length)).fill(0).map(async () => {
+    while (idx < items.length) {
+      const cur = idx++;
+      results[cur] = await mapper(items[cur], cur);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
-                      
-                      
-                      tiles.push({
-                          x: x + 1,
-                          y: y + 1,
-                          name,
-                          clanName,
-                          points,
-                      });
-                  }
-              }
-          }
+const fetchLeaderboardData = async () => {
+  try {
+    setLoading(true);
+    gameRef.current?.sounds?.leaderboard?.play?.();
 
-  
-          tiles.sort((a, b) => b.points - a.points); // sort descending
-          setLeaderboardData(tiles);
-      } catch (error) {
-          console.error("Error fetching leaderboard:", error);
-          toast.error("Failed to load leaderboard.");
-      } finally {
-          setLoading(false);
+    const Land = await getTheLandSignerContract();
+    // read-only is fine; use non-signer to avoid wallet latency
+    const Clan = await getclanContract();
+
+    // 1) occupied coords from memory (0-based)
+    const occupied = [];
+    for (let x = 0; x < 20; x++) {
+      for (let y = 0; y < 20; y++) {
+        const cell = tilesRef.current?.[x]?.[y];
+        if (cell && cell.occupied) {
+          occupied.push({ x, y, clanId: cell.clanId || 0 });
+        }
       }
-  };
+    }
+    if (occupied.length === 0) {
+      setLeaderboardData([]);
+      return;
+    }
+
+    // 2) get points for all occupied tiles in parallel
+    const pointsArr = await Promise.all(
+      occupied.map(({ x, y }) => Land.pointsByCoords(x, y))
+    );
+
+    // 3) build rows (1-based coords), filter zeros, sort desc
+    let rows = occupied.map((c, i) => ({
+      x: c.x + 1,
+      y: c.y + 1,
+      clanId: c.clanId,
+      points: Number(pointsArr[i]),
+    })).filter(r => r.points > 0);
+
+    rows.sort((a, b) => b.points - a.points);
+
+    // 4) fetch ALL names with concurrency + cache
+    const nameInputs = rows.map(r => ({ x0: r.x - 1, y0: r.y - 1 }));
+    const names = await mapWithConcurrency(nameInputs, 10, async ({ x0, y0 }) => {
+      const key = `${x0},${y0}`;
+      const cached = tileNameCacheRef.current.get(key);
+      if (cached !== undefined) return cached;
+
+      // on-chain call
+      const name = await Clan.getTileName(x0, y0);
+      const trimmed = name && name.trim().length > 0 ? name : "Unnamed";
+      tileNameCacheRef.current.set(key, trimmed);
+      return trimmed;
+    });
+
+    // 5) decorate clan names from allclansX (already populated earlier)
+    const finalRows = rows.map((row, i) => {
+      const clanInfo = allclansX?.[row.clanId] || null;
+      return {
+        ...row,
+        name: names[i],
+        clanName: clanInfo?.name || "None",
+      };
+    });
+
+    setLeaderboardData(finalRows);
+  } catch (err) {
+    console.error("Error fetching leaderboard:", err);
+    toast.error("Failed to load leaderboard.");
+  } finally {
+    setLoading(false);
+  }
+};
+
 
 
 
@@ -1665,11 +1833,11 @@ const flag = scene.add.image(worldX, worldY, textureKey).setDepth(worldY + 1);
                 const occupant = await contract.getTileOccupant(x, y); // Fetch the occupant address
 
 
-                const clanContract = await getclanSignerContract();
+                const clanContract = await getclanContract();
                 const tileName = await clanContract.getTileName(x, y);
 const clanId = await clanContract.getTileClan(x, y);
 
-const landContract = await getTheLandSignerContract();
+const landContract = await getTheLandContract();
 const tileData = await landContract.getTilePublic(x, y);
 
 const totalPoints = Number(tileData.points);
@@ -1702,7 +1870,17 @@ if (occupantPendingClanId > 0) {
 
 
 
+const lastActiveBN = await landContract.getTileLastActiveAt(x, y);
+const timeStampBN = await landContract.getCurrentTimestamp();
+let lastActiveAt = parseInt(lastActiveBN);
+const timeStampAt = parseInt(timeStampBN);
 
+if (lastActiveAt === 0) {
+        lastActiveAt = 1756166400; // 26 August 2025 00:00:00 UTC
+    }
+
+const THREE_MONTHS = 90 * 24 * 60 * 60; // 3 ay ===== 90 * 24 * 60 * 60
+const isInactive = ((timeStampAt - lastActiveAt) >= THREE_MONTHS);
  
 
 
@@ -1753,11 +1931,12 @@ const twitterHandle = await clanContract.getTwitterHandle(occupant);
                   points: totalPoints,
                   twitterHandle: twitterHandle || null,
                   level: tileLevel,
-                  resourceReceiveFlag: resourceReceiveFlag
+                  resourceReceiveFlag: resourceReceiveFlag,
+                  isInactive: isInactive
                 });
 
 
-    const marketContract = await getMarketplaceSignerContract();
+    const marketContract = await getMarketplaceContract();
 
     const defTurnsUsedRaw = await landContract.getTotalTurnsUsedByTile(x, y);
     const defTurnsUsed = parseInt(defTurnsUsedRaw.toString());
@@ -3164,6 +3343,15 @@ Resource Receive Cooldown
 )}
 
 
+
+
+
+
+
+
+
+
+
 {tileCoords.occupied &&
   hasTileG &&
   metaMaskAccount &&
@@ -3189,7 +3377,61 @@ Resource Receive Cooldown
 
 
 
+{tileCoords.occupied && hasTileG &&
+ metaMaskAccount && (
+  <>
+    {tileCoords.isInactive ? (
 
+<div style={{ fontSize: '16px', color: 'red' }}>
+Land is Inactive
+
+{!tileCoords.isOnSale && (
+  <>
+<br />
+    <button
+      style={{ backgroundColor: "black" , fontSize: "14px"}}
+      onClick={async () => {
+        try {
+          setLoading(true);
+          const contractSigner = await getMarketplaceSignerContract();
+          console.log(attackerTileCoords.x,
+            attackerTileCoords.y,
+            tileCoords.x - 1,
+            tileCoords.y - 1)
+          const tx = await contractSigner.maybeAutoListIfInactive(
+            attackerTileCoords.x,
+            attackerTileCoords.y,
+            tileCoords.x - 1,
+            tileCoords.y - 1
+          );
+          await tx.wait();
+          toast.success("Tile has been force-listed on sale!");
+        } catch (err) {
+          console.error("ForceToSetOnSale failed:", err);
+          toast.error("Failed to set tile on sale.");
+        } finally {
+          setLoading(false);
+        }
+      }}
+    >
+      Force To Set On Sale
+    </button>
+    </>
+)}
+
+</div>
+
+    ) : (
+
+<div style={{ fontSize: '16px', color: 'green' }}>
+Land is Active
+</div>
+
+    )
+    }
+    
+  </>
+)}
   
 
 
@@ -3459,6 +3701,7 @@ style={{
   min={30}
   placeholder="Min: 30"
 />
+<p style={{ color: '#e07c7cff' }}>Min:30, Max:100,000</p>
 
 
     </div>
@@ -3479,6 +3722,51 @@ style={{
         const amount = parseInt(sendResourceAmount);
         const distance = Math.abs(fromX - toX) + Math.abs(fromY - toY);
         const lopFee = 100 * 10 ** 6 * distance;
+
+
+         if (!amount || amount < 30) {
+          toast.warn("Minimum amount is 30.");
+          return;
+        }
+        if (amount > 100000) {
+          toast.warn("Maximum amount is 100,000.");
+          return;
+        }
+
+
+        const lopBal = Number(await getLOPBalance(metaMaskAccount));
+        if (lopBal < lopFee) {
+          const shortfall = (lopFee - lopBal) / 1e6;
+          toast.warn(`Not enough LOP tokens. Short by ~${shortfall.toFixed(2)} LOP.`);
+          return;
+        }
+
+
+        const resourceCost = Math.floor((distance * amount) / 30);
+
+
+
+        // map sendResourceType → key in attackerResources
+        const resKeyByType = {
+          1: "food",
+          2: "wood",
+          3: "stone",
+          4: "iron",
+          5: "offensiveArmor",
+          6: "defensiveArmor",
+          7: "offensiveWeapon",
+          8: "defensiveWeapon",
+        };
+        const resKey = resKeyByType[sendResourceType];
+        const currentRes = attackerResources?.[resKey] ?? 0;
+        const requiredRes = amount + resourceCost;
+
+        if (currentRes < requiredRes) {
+          toast.warn(
+            `Not enough ${getResourceName(sendResourceType)}. Need ${requiredRes}, you have ${currentRes}.`
+          );
+          return;
+        }
 
 
         const approveTx = await tokenContract.increaseAllowance(signerMarket.target, lopFee);
@@ -3619,241 +3907,431 @@ style={{
 
 
 
+{/* ************ MY WAR LOGS – ENTRY MENU ************ */}
 {interactionMenuTypeA === "warlogsMine" && (
-    <div className="interaction-menuA">
-        <p style={{ marginBottom: '15px', fontWeight: '400' }}>
-            Loading My War Logs require waiting time, please choose your preference
-        </p>
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("warlogsWeekMine");
-                fetchMyRecentWarLogs();
-
-            }}
-        >
-            Last Week's Logs (Loading Approx. 30 Seconds)
-        </button>
-
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("warlogsAllMine");
-                fetchMyAllWarLogs();
-
-            }}
-        >
-            All Time Logs (Loading Up To 3 Minutes)
-        </button>
-
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("");
-            }}
-        >
-            Cancel
-        </button>
-
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">⚔️</span>
+      <h3 className="leaderboard-card__title">My War Logs</h3>
+      <span className="leaderboard-card__icon">📜</span>
     </div>
+
+    <p style={{ marginBottom: 12, fontWeight: 400, textAlign: "center" }}>
+      Load your war logs:
+    </p>
+
+    <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+      <button
+        className="card-button"
+        onClick={() => { setinteractionMenuTypeA("warlogsWeekMine"); fetchMyRecentWarLogs(); }}
+      >
+        Last Week's Logs (Fast)
+      </button>
+
+      <button
+        className="card-button"
+        onClick={() => setinteractionMenuTypeA("warlogsRangeMine")}
+      >
+        War Logs for Specific Date Range
+      </button>
+
+      <button
+        className="card-button"
+        onClick={() => setinteractionMenuTypeA("")}
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
 )}
 
 
 
 
 
+{/* ************ MY WAR LOGS – DATE RANGE INPUT ************ */}
+{interactionMenuTypeA === "warlogsRangeMine" && (
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">🗓️</span>
+      <h3 className="leaderboard-card__title">My War Logs — Specific Date Range</h3>
+      <span className="leaderboard-card__icon">📜</span>
+    </div>
+
+    <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+      <div>
+        <label style={{ display: 'block', marginBottom: 4 }}>From (inclusive)</label>
+        <input type="date" className="fancy-input" value={myRangeFrom} onChange={(e) => setMyRangeFrom(e.target.value)} style={{ minWidth: 180 }} />
+      </div>
+      <div>
+        <label style={{ display: 'block', marginBottom: 4 }}>To (inclusive)</label>
+        <input type="date" className="fancy-input" value={myRangeTo} onChange={(e) => setMyRangeTo(e.target.value)} style={{ minWidth: 180 }} />
+      </div>
+    </div>
+
+    <div style={{ marginTop: 10, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+      <button className="card-button" onClick={fetchMyWarLogsInRange}>Load Logs</button>
+      <button className="card-button" onClick={() => setinteractionMenuTypeA("")}>Cancel</button>
+    </div>
+
+    <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8, textAlign: "center" }}>
+      Tip: Leaving dates empty loads the last 30 days.
+    </div>
+  </div>
+)}
+
+
+
+
+
+{/* ************ MY WAR LOGS – RANGE RESULTS ************ */}
+{interactionMenuTypeA === "warlogsRangeResultMine" && (
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">⚔️</span>
+      <h3 className="leaderboard-card__title">My War Logs (Selected Range)</h3>
+      <span className="leaderboard-card__icon">📜</span>
+    </div>
+
+    <button className="card-button leaderboard-card__close" onClick={() => setinteractionMenuTypeA("")}>
+      Close
+    </button>
+
+    {warLogsData.length > 0 ? (
+      <div className="leaderboard-scroll">
+        <table className="fancy-table leaderboard-table">
+          <thead>
+            <tr>
+              <th>Attacker</th>
+              <th>Attacker Power</th>
+              <th>Attacker Soldiers</th>
+              <th>Defender</th>
+              <th>Defender Power</th>
+              <th>Defender Soldiers</th>
+              <th>Date</th>
+              <th>Result</th>
+              <th>Resources Stolen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {warLogsData.map((item, i) => (
+              <tr key={i}>
+                <td> 
+                  <span className="coord-badge">
+                  {item.attackerName
+                    ? `${item.attackerName} (${Number(item.attackerX)+1},${Number(item.attackerY)+1})`
+                    : `${Number(item.attackerX)+1},${Number(item.attackerY)+1}`}
+                    </span>
+                </td>
+                <td>{item.attackerPower?.toString()}</td>
+                <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()}</td>
+                <td>
+                  <span className="coord-badge">
+                  {item.defenderName
+                    ? `${item.defenderName} (${Number(item.defenderX)+1},${Number(item.defenderY)+1})`
+                    : `${Number(item.defenderX)+1},${Number(item.defenderY)+1}`}
+                    </span>
+                </td>
+                <td>{item.defenderPower?.toString()}</td>
+                <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()}</td>
+                <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+                <td
+  style={{
+    color: item.attackerWon ? "#e57373" : "#81c784", // red vs green
+    fontWeight: "600"
+  }}
+>
+  {item.attackerWon ? "Attacker Won" : "Defender Won"}
+</td>
+
+                <td>{item.resourcesStolen?.toString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      <p className="leaderboard-empty">No war logs for that range.</p>
+    )}
+  </div>
+)}
+
+
+
+
+
+
+{/* ************ WORLD WAR LOGS – ENTRY MENU ************ */}
 {interactionMenuTypeA === "warlogsX" && (
-    <div className="interaction-menuA">
-        <p style={{ marginBottom: '15px', fontWeight: '400' }}>
-            Loading War Logs (World) require waiting time, please choose your preference
-        </p>
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("warlogsWeek");
-                fetchRecentWarLogs();
-            }}
-        >
-            Last Week's Logs (Loading Approx. 1 Minute)
-        </button>
-
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("warlogsAll");
-                fetchAllWarLogs();
-            }}
-        >
-            All Time Logs (Loading Up To 10 Minutes)
-        </button>
-
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("");
-            }}
-        >
-            Cancel
-        </button>
-
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">🌍</span>
+      <h3 className="leaderboard-card__title">War Logs (World)</h3>
+      <span className="leaderboard-card__icon">⏳</span>
     </div>
+
+    <p style={{ marginBottom: 12, fontWeight: 400, textAlign: "center" }}>
+      Loading War Logs (World) requires time, choose an option:
+    </p>
+
+    <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+      <button className="card-button" onClick={() => { setinteractionMenuTypeA("warlogsWeek"); fetchRecentWarLogs(); }}>
+        Last Week's Logs (Fast)
+      </button>
+
+      <button className="card-button" onClick={() => setinteractionMenuTypeA("warlogsRange")}>
+        War Logs for Specific Date Range
+      </button>
+
+      <button className="card-button" onClick={() => setinteractionMenuTypeA("")}>
+        Cancel
+      </button>
+    </div>
+  </div>
 )}
 
 
+
+
+
+{/* ************ WORLD WAR LOGS – DATE RANGE INPUT ************ */}
+{interactionMenuTypeA === "warlogsRange" && (
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">🗓️</span>
+      <h3 className="leaderboard-card__title">War Logs — Specific Date Range</h3>
+      <span className="leaderboard-card__icon">📜</span>
+    </div>
+
+    <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
+      <div>
+        <label style={{ display: 'block', marginBottom: 4 }}>From (inclusive)</label>
+        <input type="date" className="fancy-input" value={rangeFrom} onChange={(e) => setRangeFrom(e.target.value)} style={{ minWidth: 180 }} />
+      </div>
+      <div>
+        <label style={{ display: 'block', marginBottom: 4 }}>To (inclusive)</label>
+        <input type="date" className="fancy-input" value={rangeTo} onChange={(e) => setRangeTo(e.target.value)} style={{ minWidth: 180 }} />
+      </div>
+    </div>
+
+    <div style={{ marginTop: 10, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+      <button className="card-button" onClick={fetchWarLogsInRange}>Load Logs</button>
+      <button className="card-button" onClick={() => setinteractionMenuTypeA("")}>Cancel</button>
+    </div>
+
+    <div style={{ marginTop: 10, fontSize: 12, opacity: 0.8, textAlign: "center" }}>
+      Tip: Leaving dates empty loads the last 7 days.
+    </div>
+  </div>
+)}
+
+
+
+
+
+
+{/* ************ WORLD WAR LOGS – RANGE RESULTS ************ */}
+{interactionMenuTypeA === "warlogsRangeResult" && (
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">⚔️</span>
+      <h3 className="leaderboard-card__title">War Logs (Selected Range)</h3>
+      <span className="leaderboard-card__icon">🌍</span>
+    </div>
+
+    <button className="card-button leaderboard-card__close" onClick={() => setinteractionMenuTypeA("")}>
+      Close
+    </button>
+
+    {warLogsData.length > 0 ? (
+      <div className="leaderboard-scroll">
+        <table className="fancy-table leaderboard-table">
+          <thead>
+            <tr>
+              <th>Attacker</th>
+              <th>Attacker Clan</th>
+              <th>Defender</th>
+              <th>Defender Clan</th>
+              <th>Date</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            {warLogsData.map((item, i) => (
+              <tr key={i}>
+                <td>
+                  <span className="coord-badge">
+                  {item.attackerName
+                    ? `${item.attackerName} (${Number(item.attackerX)+1},${Number(item.attackerY)+1})`
+                    : `${Number(item.attackerX)+1},${Number(item.attackerY)+1}`}
+                    </span>
+                </td>
+                <td><ClanPill name={item.attackerClanName} /></td>
+                <td>
+                  <span className="coord-badge">
+                  {item.defenderName
+                    ? `${item.defenderName} (${Number(item.defenderX)+1},${Number(item.defenderY)+1})`
+                    : `${Number(item.defenderX)+1},${Number(item.defenderY)+1}`}
+                    </span>
+                </td>
+                <td><ClanPill name={item.defenderClanName} /></td>
+                <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+                <td
+  style={{
+    color: item.attackerWon ? "#e57373" : "#81c784", // red vs green
+    fontWeight: "600"
+  }}
+>
+  {item.attackerWon ? "Attacker Won" : "Defender Won"}
+</td>
+
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      <p className="leaderboard-empty">No war logs for that range.</p>
+    )}
+  </div>
+)}
+
+
+
+
+
+
+{/* ************ WORLD WAR LOGS – LAST WEEK ************ */}
 {interactionMenuTypeA === "warlogsWeek" && (
-  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-    <h3 style={{ marginBottom: '10px' }}>⚔️ Last Week's War Logs (World) ⚔️</h3>
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">⏱️</span>
+      <h3 className="leaderboard-card__title">Last Week's War Logs (World)</h3>
+      <span className="leaderboard-card__icon">🌍</span>
+    </div>
 
-    <button
-      onClick={() => setinteractionMenuTypeA("")}
-      style={{
-        padding: '8px 12px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        marginBottom: '10px',
-        cursor: 'pointer'
-      }}
-    >
+    <button className="card-button leaderboard-card__close" onClick={() => setinteractionMenuTypeA("")}>
       Close
     </button>
 
     {warLogsData.length > 0 ? (
-      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ backgroundColor: '#6c757d' }}>
-            <th>Attacker</th>
-            <th>Attacker Clan</th>
-            <th>Defender</th>
-            <th>Defender Clan</th>
-            <th>Date</th>
-            <th>Result</th>
-          </tr>
-        </thead>
-        <tbody>
-          {warLogsData.map((item, index) => (
-            <tr key={index}>
-              <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-              <td>{item.attackerClanName}</td>
-<td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-<td>{item.defenderClanName}</td>
-<td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
-
-              <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      <div className="leaderboard-scroll">
+        <table className="fancy-table leaderboard-table">
+          <thead>
+            <tr>
+              <th>Attacker</th>
+              <th>Attacker Clan</th>
+              <th>Defender</th>
+              <th>Defender Clan</th>
+              <th>Date</th>
+              <th>Result</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {warLogsData.map((item, i) => (
+              <tr key={i}>
+                <td>
+                  <span className="coord-badge">
+                  {item.attackerName
+                    ? `${item.attackerName} (${Number(item.attackerX)+1},${Number(item.attackerY)+1})`
+                    : `${Number(item.attackerX)+1},${Number(item.attackerY)+1}`}
+                    </span>
+                </td>
+                <td><ClanPill name={item.attackerClanName} /></td>
+                <td>
+                  <span className="coord-badge">
+                  {item.defenderName
+                    ? `${item.defenderName} (${Number(item.defenderX)+1},${Number(item.defenderY)+1})`
+                    : `${Number(item.defenderX)+1},${Number(item.defenderY)+1}`}
+                    </span>
+                </td>
+                <td><ClanPill name={item.defenderClanName} /></td>
+                <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+                <td
+  style={{
+    color: item.attackerWon ? "#e57373" : "#81c784", // red vs green
+    fontWeight: "600"
+  }}
+>
+  {item.attackerWon ? "Attacker Won" : "Defender Won"}
+</td>
+
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     ) : (
-      <p>No war logs available.</p>
+      <p className="leaderboard-empty">No war logs available.</p>
     )}
   </div>
 )}
 
 
 
+
+{/* ************ WORLD WAR LOGS – ALL ************ */}
 {interactionMenuTypeA === "warlogsAll" && (
-  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-    <h3 style={{ marginBottom: '10px' }}>⚔️ All War Logs (World) ⚔️</h3>
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">∞</span>
+      <h3 className="leaderboard-card__title">All War Logs (World)</h3>
+      <span className="leaderboard-card__icon">🌍</span>
+    </div>
 
-    <button
-      onClick={() => setinteractionMenuTypeA("")}
-      style={{
-        padding: '8px 12px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        marginBottom: '10px',
-        cursor: 'pointer'
-      }}
-    >
+    <button className="card-button leaderboard-card__close" onClick={() => setinteractionMenuTypeA("")}>
       Close
     </button>
 
     {warLogsData.length > 0 ? (
-      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ backgroundColor: '#6c757d' }}>
-            <th>Attacker</th>
-            <th>Attacker Clan</th>
-            <th>Defender</th>
-            <th>Defender Clan</th>
-            <th>Date</th>
-            <th>Result</th>
-          </tr>
-        </thead>
-        <tbody>
-          {warLogsData.map((item, index) => (
-            <tr key={index}>
-              <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-              <td>{item.attackerClanName}</td>
-<td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-<td>{item.defenderClanName}</td>
-<td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
-
-              <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
+      <div className="leaderboard-scroll">
+        <table className="fancy-table leaderboard-table">
+          <thead>
+            <tr>
+              <th>Attacker</th>
+              <th>Attacker Clan</th>
+              <th>Defender</th>
+              <th>Defender Clan</th>
+              <th>Date</th>
+              <th>Result</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {warLogsData.map((item, i) => (
+              <tr key={i}>
+                <td>
+                  <span className="coord-badge">
+                  {item.attackerName
+                    ? `${item.attackerName} (${Number(item.attackerX)+1},${Number(item.attackerY)+1})`
+                    : `${Number(item.attackerX)+1},${Number(item.attackerY)+1}`}
+                    </span>
+                </td>
+                <td><ClanPill name={item.attackerClanName} /></td>
+                <td>
+                  <span className="coord-badge">
+                  {item.defenderName
+                    ? `${item.defenderName} (${Number(item.defenderX)+1},${Number(item.defenderY)+1})`
+                    : `${Number(item.defenderX)+1},${Number(item.defenderY)+1}`}
+                    </span>
+                </td>
+                <td><ClanPill name={item.defenderClanName} /></td>
+                <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+                <td
+  style={{
+    color: item.attackerWon ? "#e57373" : "#81c784", // red vs green
+    fontWeight: "600"
+  }}
+>
+  {item.attackerWon ? "Attacker Won" : "Defender Won"}
+</td>
+
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     ) : (
-      <p>No war logs available.</p>
+      <p className="leaderboard-empty">No war logs available.</p>
     )}
   </div>
 )}
@@ -3861,62 +4339,75 @@ style={{
 
 
 
+
+{/* ************ MY WAR LOGS – LAST WEEK ************ */}
 {interactionMenuTypeA === "warlogsWeekMine" && (
-  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-    <h3 style={{ marginBottom: '10px' }}>⚔️ My Last Week's War Logs ⚔️</h3>
-    <button
-      onClick={() => setinteractionMenuTypeA("")}
-      style={{
-        padding: '8px 12px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        marginBottom: '10px',
-        cursor: 'pointer'
-      }}
-    >
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">⏱️</span>
+      <h3 className="leaderboard-card__title">My Last Week's War Logs</h3>
+      <span className="leaderboard-card__icon">⚔️</span>
+    </div>
+
+    <button className="card-button leaderboard-card__close" onClick={() => setinteractionMenuTypeA("")}>
       Close
     </button>
 
     {warLogsData.length > 0 ? (
-      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
-        <thead>
-  <tr style={{ backgroundColor: '#6c757d' }}>
-    <th>Attacker</th>
-    <th>Attacker Power</th>
-    <th>Attacker Soldiers</th>
-    <th>Defender</th>
-    <th>Defender Power</th>
-    <th>Defender Soldiers</th>
-    <th>Date</th>
-    <th>Result</th>
-    <th>Resources Stolen</th>
-    
-    
-  </tr>
-</thead>
-<tbody>
-  {warLogsData.map((item, index) => (
-    <tr key={index}>
-      <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-      <td>{item.attackerPower?.toString()}</td>
-      <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()} </td>
-      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-      <td>{item.defenderPower?.toString()}</td>
-      <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()} </td>
-      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
-      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
-      <td>{item.resourcesStolen?.toString()}</td>
-      
-      
-    </tr>
-  ))}
-</tbody>
+      <div className="leaderboard-scroll">
+        <table className="fancy-table leaderboard-table">
+          <thead>
+            <tr>
+              <th>Attacker</th>
+              <th>Attacker Power</th>
+              <th>Attacker Soldiers</th>
+              <th>Defender</th>
+              <th>Defender Power</th>
+              <th>Defender Soldiers</th>
+              <th>Date</th>
+              <th>Result</th>
+              <th>Resources Stolen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {warLogsData.map((item, i) => (
+              <tr key={i}>
+                <td>
+                  <span className="coord-badge">
+                  {item.attackerName
+                    ? `${item.attackerName} (${Number(item.attackerX)+1},${Number(item.attackerY)+1})`
+                    : `${Number(item.attackerX)+1},${Number(item.attackerY)+1}`}
+                    </span>
+                </td>
+                <td>{item.attackerPower?.toString()}</td>
+                <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()}</td>
+                <td>
+                  <span className="coord-badge">
+                  {item.defenderName
+                    ? `${item.defenderName} (${Number(item.defenderX)+1},${Number(item.defenderY)+1})`
+                    : `${Number(item.defenderX)+1},${Number(item.defenderY)+1}`}
+                    </span>
+                </td>
+                <td>{item.defenderPower?.toString()}</td>
+                <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()}</td>
+                <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+                <td
+  style={{
+    color: item.attackerWon ? "#e57373" : "#81c784", // red vs green
+    fontWeight: "600"
+  }}
+>
+  {item.attackerWon ? "Attacker Won" : "Defender Won"}
+</td>
 
-      </table>
+                <td>{item.resourcesStolen?.toString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     ) : (
-      <p>No war logs available.</p>
+      <p className="leaderboard-empty">No war logs available.</p>
     )}
   </div>
 )}
@@ -3924,63 +4415,75 @@ style={{
 
 
 
+
+{/* ************ MY WAR LOGS – ALL TIME ************ */}
 {interactionMenuTypeA === "warlogsAllMine" && (
-  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-    <h3 style={{ marginBottom: '10px' }}>⚔️ My All-Time War Logs ⚔️</h3>
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">∞</span>
+      <h3 className="leaderboard-card__title">My All-Time War Logs</h3>
+      <span className="leaderboard-card__icon">⚔️</span>
+    </div>
 
-    <button
-      onClick={() => setinteractionMenuTypeA("")}
-      style={{
-        padding: '8px 12px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        marginBottom: '10px',
-        cursor: 'pointer'
-      }}
-    >
+    <button className="card-button leaderboard-card__close" onClick={() => setinteractionMenuTypeA("")}>
       Close
     </button>
 
     {warLogsData.length > 0 ? (
-      <table className="fancy-table" style={{ width: '100%', fontSize: '18px', borderCollapse: 'collapse' }}>
-        <thead>
-  <tr style={{ backgroundColor: '#6c757d' }}>
-    <th>Attacker</th>
-    <th>Attacker Power</th>
-    <th>Attacker Soldiers</th>
-    <th>Defender</th>
-    <th>Defender Power</th>
-    <th>Defender Soldiers</th>
-    <th>Date</th>
-    <th>Result</th>
-    <th>Resources Stolen</th>
-    
-    
-  </tr>
-</thead>
-<tbody>
-  {warLogsData.map((item, index) => (
-    <tr key={index}>
-      <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-      <td>{item.attackerPower?.toString()}</td>
-      <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()} </td>
-      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-      <td>{item.defenderPower?.toString()}</td>
-      <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()} </td>
-      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
-      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
-      <td>{item.resourcesStolen?.toString()}</td>
-      
-      
-    </tr>
-  ))}
-</tbody>
+      <div className="leaderboard-scroll">
+        <table className="fancy-table leaderboard-table">
+          <thead>
+            <tr>
+              <th>Attacker</th>
+              <th>Attacker Power</th>
+              <th>Attacker Soldiers</th>
+              <th>Defender</th>
+              <th>Defender Power</th>
+              <th>Defender Soldiers</th>
+              <th>Date</th>
+              <th>Result</th>
+              <th>Resources Stolen</th>
+            </tr>
+          </thead>
+          <tbody>
+            {warLogsData.map((item, i) => (
+              <tr key={i}>
+                <td>
+                  <span className="coord-badge">
+                  {item.attackerName
+                    ? `${item.attackerName} (${Number(item.attackerX)+1},${Number(item.attackerY)+1})`
+                    : `${Number(item.attackerX)+1},${Number(item.attackerY)+1}`}
+                    </span>
+                </td>
+                <td>{item.attackerPower?.toString()}</td>
+                <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()}</td>
+                <td>
+                  <span className="coord-badge">
+                  {item.defenderName
+                    ? `${item.defenderName} (${Number(item.defenderX)+1},${Number(item.defenderY)+1})`
+                    : `${Number(item.defenderX)+1},${Number(item.defenderY)+1}`}
+                    </span>
+                </td>
+                <td>{item.defenderPower?.toString()}</td>
+                <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()}</td>
+                <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+                <td
+  style={{
+    color: item.attackerWon ? "#e57373" : "#81c784", // red vs green
+    fontWeight: "600"
+  }}
+>
+  {item.attackerWon ? "Attacker Won" : "Defender Won"}
+</td>
 
-      </table>
+                <td>{item.resourcesStolen?.toString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     ) : (
-      <p>No war logs available.</p>
+      <p className="leaderboard-empty">No war logs available.</p>
     )}
   </div>
 )}
@@ -3988,202 +4491,230 @@ style={{
 
 
 
-{interactionMenuTypeA === "warlogsAllMineX" && (
-  <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-    <h3 style={{ marginBottom: '10px' }}>⚔️ Result of the Recent War ⚔️</h3>
 
-    <button
-      onClick={() => setinteractionMenuTypeA("")}
-      style={{
-        padding: '8px 12px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '5px',
-        marginBottom: '10px',
-        cursor: 'pointer'
-      }}
-    >
+{/* ************ MY WAR LOGS – MOST RECENT RESULT (SINGLE) ************ */}
+{interactionMenuTypeA === "warlogsAllMineX" && (
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">🏁</span>
+      <h3 className="leaderboard-card__title">Result of the Recent War</h3>
+      <span className="leaderboard-card__icon">⚔️</span>
+    </div>
+
+    <button className="card-button leaderboard-card__close" onClick={() => setinteractionMenuTypeA("")}>
       Close
     </button>
 
     {warLogsData.length > 0 ? (
       <>
-      <table className="fancy-table" style={{ width: '100%', fontSize: '16px', borderCollapse: 'collapse' }}>
-        <thead>
-  <tr style={{ backgroundColor: '#6c757d' }}>
-    <th>Attacker</th>
-    <th>Attacker Power</th>
-    <th>Attacker Soldiers</th>
-    <th>Defender</th>
-    <th>Defender Power</th>
-    <th>Defender Soldiers</th>
-    <th>Date</th>
-    <th>Result</th>
-    <th>Resources Stolen</th>
-    
-    
-  </tr>
-</thead>
-<tbody>
-  {warLogsData.map((item, index) => (
-    <tr key={index}>
-      <td>{Number(item.attackerX) + 1},{Number(item.attackerY) + 1}</td>
-      <td>{item.attackerPower?.toString()}</td>
-      <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()} </td>
-      <td>{Number(item.defenderX) + 1},{Number(item.defenderY) + 1}</td>
-      <td>{item.defenderPower?.toString()}</td>
-      <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()} </td>
-      <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
-      <td>{item.attackerWon ? "Attacker Won" : "Defender Won"}</td>
-      <td>{item.resourcesStolen?.toString()}</td>
-      
-      
-    </tr>
-  ))}
-</tbody>
-
-      </table>
-
-<a
-  href={createTwitterStoryShareLink(warLogsData[0], defenderHandle)}
-  target="_blank"
-  rel="noopener noreferrer"
+        <div className="leaderboard-scroll">
+          <table className="fancy-table leaderboard-table" style={{ fontSize: '16px' }}>
+            <thead>
+              <tr>
+                <th>Attacker</th>
+                <th>Attacker Power</th>
+                <th>Attacker Soldiers</th>
+                <th>Defender</th>
+                <th>Defender Power</th>
+                <th>Defender Soldiers</th>
+                <th>Date</th>
+                <th>Result</th>
+                <th>Resources Stolen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {warLogsData.map((item, i) => (
+                <tr key={i}>
+                  <td>
+                    <span className="coord-badge">
+                    {item.attackerName
+                      ? `${item.attackerName} (${Number(item.attackerX)+1},${Number(item.attackerY)+1})`
+                      : `${Number(item.attackerX)+1},${Number(item.attackerY)+1}`}
+                      </span>
+                  </td>
+                  <td>{item.attackerPower?.toString()}</td>
+                  <td>{item.attackerSoldiers?.toString()} - {item.attackerCasualties?.toString()}</td>
+                  <td>
+                    <span className="coord-badge">
+                    {item.defenderName
+                      ? `${item.defenderName} (${Number(item.defenderX)+1},${Number(item.defenderY)+1})`
+                      : `${Number(item.defenderX)+1},${Number(item.defenderY)+1}`}
+                      </span>
+                  </td>
+                  <td>{item.defenderPower?.toString()}</td>
+                  <td>{item.defenderSoldiers?.toString()} - {item.defenderCasualties?.toString()}</td>
+                  <td>{new Date(Number(item.timestamp) * 1000).toLocaleString()}</td>
+                  <td
   style={{
-    display: 'inline-block',
-    marginTop: '15px',
-    padding: '10px 20px',
-    backgroundColor: '#1DA1F2',
-    color: '#fff',
-    borderRadius: '5px',
-    textDecoration: 'none',
-    fontWeight: 'bold'
+    color: item.attackerWon ? "#e57373" : "#81c784", // red vs green
+    fontWeight: "600"
   }}
 >
-  🐦 Share on Twitter
-</a>
+  {item.attackerWon ? "Attacker Won" : "Defender Won"}
+</td>
 
+                  <td>{item.resourcesStolen?.toString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-</>
+        <a
+          href={createTwitterStoryShareLink(warLogsData[0], defenderHandle)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="card-button"
+          style={{ display: 'inline-block', marginTop: 12, textDecoration: 'none' }}
+        >
+          🐦 Share on Twitter
+        </a>
+      </>
     ) : (
-      <p>No war logs available.</p>
+      <p className="leaderboard-empty">No war logs available.</p>
     )}
   </div>
 )}
+
 
 
 
 
 
 {interactionMenuTypeA === "leaderboardX" && (
-    <div className="interaction-menuA">
-        <p style={{ marginBottom: '15px', fontWeight: '400' }}>
-            Loading Leaderboard requires around 1 minute, do you want to load the Leaderboard?
-        </p>
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("leaderboard");
-                fetchLeaderboardData();
-            }}
-        >
-            Yes, load the Leaderboard
-        </button>
-
-        <button
-            style={{
-                padding: '10px 20px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                fontWeight: 'bold',
-                margin: '5px'
-            }}
-            onClick={() => {
-                setinteractionMenuTypeA("");
-            }}
-        >
-            Cancel
-        </button>
-
-<div>
-        <a
-            href={`https://twitter.com`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '16px' }}
-          >
-            Leaderboard Docs
-          </a>
-
-</div>
-
+  <div className="leaderboard-card">
+    <div className="leaderboard-card__header">
+      <span className="leaderboard-card__icon">📜</span>
+      <h3 className="leaderboard-card__title">Load Leaderboard?</h3>
+      <span className="leaderboard-card__icon">⚔️</span>
     </div>
+
+    <p style={{ marginBottom: "15px", fontWeight: 400, textAlign: "center" }}>
+      Loading the Leaderboard may take around <strong>20 seconds</strong>.<br />
+      Do you wish to proceed?
+    </p>
+
+    <div style={{ textAlign: "center", marginBottom: "10px" }}>
+      <button
+        className="card-button"
+        style={{ margin: "6px" }}
+        onClick={() => {
+          setinteractionMenuTypeA("leaderboard");
+          fetchLeaderboardData();
+        }}
+      >
+        ✅ Yes, load the Leaderboard
+      </button>
+
+      <button
+        className="card-button"
+        style={{ margin: "6px" }}
+        onClick={() => setinteractionMenuTypeA("")}
+      >
+        ❌ Cancel
+      </button>
+    </div>
+
+    <div style={{ textAlign: "center", marginTop: "10px" }}>
+      <a
+        href="https://twitter.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          color: "#1DA1F2",
+          textDecoration: "underline",
+          fontSize: "16px",
+          fontWeight: "bold"
+        }}
+      >
+        📖 Leaderboard Docs
+      </a>
+    </div>
+  </div>
 )}
+
 
 
 
 
 {interactionMenuTypeA === "leaderboard" && (
-    <div className="interaction-menuA" style={{ maxHeight: '500px', overflowY: 'auto', textAlign: 'center' }}>
-        <h3 style={{ marginBottom: '10px' }}>🏆 Leaderboard 🏆</h3>
-
-        <button
-            style={{
-                padding: '8px 12px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                marginBottom: '10px',
-                cursor: 'pointer'
-            }}
-            onClick={() => {
-              setinteractionMenuTypeA("");
-          }}
-        >
-            Close Leaderboard
-        </button>
-
-        {leaderboardData.length > 0 ? (
-            <table style={{ width: '100%', fontSize: '20px', borderCollapse: 'collapse' }}>
-                <thead>
-                    <tr style={{ backgroundColor: '#6c757d' }}>
-                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>#</th>
-                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Realm</th>
-                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Clan</th>
-                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Coords</th>
-                        <th style={{ padding: '8px', borderBottom: '1px solid #ccc' }}>Points</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {leaderboardData.map((item, index) => (
-                        <tr key={index}>
-                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{index + 1}</td>
-                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.name || "Unnamed"}</td>
-                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.clanName || "None"}</td>
-                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.x},{item.y}</td>
-                            <td style={{ padding: '6px', borderBottom: '1px solid #eee' }}>{item.points}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        ) : (
-            <p style={{ marginTop: '10px' }}>Leaderboard is empty or not loaded.</p>
-        )}
+  <div className="leaderboard-card">
+    <button
+      className="card-button leaderboard-card__close"
+      onClick={() => setinteractionMenuTypeA("")}
+    >
+      Close
+    </button>
+    <div className="leaderboard-card__header">
+      
+      <span className="leaderboard-card__icon"></span>
+      <h3 className="leaderboard-card__title">⚔️ The Leaderboard 👑</h3>
+      <span className="leaderboard-card__icon"></span>
     </div>
+
+    
+
+    {leaderboardData.length > 0 ? (
+      <div className="leaderboard-scroll">
+        <table className="fancy-table leaderboard-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Realm</th>
+              <th>Clan</th>
+              <th>Coords</th>
+              <th>Points</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leaderboardData.map((item, index) => {
+              const isMe = (item.x === attackerTileCoords.x + 1 && item.y === attackerTileCoords.y + 1); // keep your logic
+              const rank = index + 1;
+
+              return (
+                <tr key={index} className={`${isMe ? "row-me" : ""} ${rank <= 3 ? `rank-${rank}` : ""}`}>
+                  <td>
+                    <span className={`rank-badge ${rank <= 3 ? `badge-${rank}` : "badge-rest"}`}>
+                      {rank <= 3 ? (rank === 1 ? "👑" : rank === 2 ? "⚜️" : "🏵️") : rank}
+                    </span>
+                  </td>
+
+                  <td 
+  className="name-cell" 
+  style={{ padding: '6px', borderBottom: '1px solid #eee' }}
+>
+  {item.name || "Unnamed"}
+</td>
+
+
+                  <td>
+                    {item.clanName && item.clanName !== "None" ? (
+                      <span className="chip chip-clan">{item.clanName}</span>
+                    ) : (
+                      <span className="chip chip-none">None</span>
+                    )}
+                  </td>
+
+                  <td>
+                    <span className="chip chip-coord">{item.x},{item.y}</span>
+                  </td>
+
+                  <td className="points-cell">
+                    <span className="points">{item.points}</span>
+                    <span className="points-bar" style={{ width: `${Math.min(100, (item.points / (leaderboardData[0]?.points || 1)) * 100)}%` }} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      <p className="leaderboard-empty">Leaderboard is empty or not loaded.</p>
+    )}
+  </div>
 )}
+
 
 <ChatBox
   account={metaMaskAccount}
@@ -4208,7 +4739,7 @@ style={{
         fontFamily: "monospace"
       }}
     >
-      Total UseTurn TXs: {txCounter === 0 ? "Counting on-chain" : txCounter}
+      Total UseTurn TXs (Live): {txCounter === 0 ? "Counting on-chain" : txCounter}
     </div>
 
 
