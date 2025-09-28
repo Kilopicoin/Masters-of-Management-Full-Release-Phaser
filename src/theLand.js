@@ -60,6 +60,8 @@ import { Circles } from 'react-loader-spinner';
 import './App.css';
 import getContract from './contract';
 
+import { BrowserProvider } from 'ethers';
+
 const TheLand = ({ tileCoords, goBackToApp }) => {
     const gameRef = useRef(null);
     const selectedBuildingRef = useRef(null);
@@ -189,6 +191,73 @@ const [calculatedResources, setCalculatedResources] = useState({
 // --- context open helper: right-click OR double-tap ---
 const DOUBLE_TAP_MS = 320;
 const DOUBLE_TAP_MOVE_PX = 24;
+
+
+
+
+
+function pickProviderV6(x) {
+  // v6 Contract keeps runner/provider at .runner.provider
+  if (x?.runner?.provider) return x.runner.provider;
+  // v6 Signer has .provider
+  if (x?.provider) return x.provider;
+  return null;
+}
+
+/**
+ * Build tx overrides that work on Harmony + v6.
+ * - Prefer EIP-1559 if both maxFeePerGas & maxPriorityFeePerGas are present
+ * - Otherwise use legacy gasPrice (Harmony typical)
+ * - If no provider is resolvable, return only `extra` and let wallet fill
+ */
+async function getTxOpts(contractOrSigner, extra = {}) {
+  let provider = pickProviderV6(contractOrSigner);
+
+  // Last resort: use the injected wallet to create a provider
+  if (!provider && typeof window !== 'undefined' && window.ethereum) {
+    try {
+      provider = new BrowserProvider(window.ethereum);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // If still no provider, let the wallet populate gas
+  if (!provider) return { ...extra };
+
+  // Try fee data; Harmony often returns only gasPrice (legacy)
+  let feeData = {};
+  try {
+    feeData = await provider.getFeeData(); // v6
+  } catch {
+    // ignore
+  }
+
+  // EIP-1559 path if BOTH are present
+  if (feeData?.maxFeePerGas != null && feeData?.maxPriorityFeePerGas != null) {
+    return {
+      ...extra,
+      type: 2,
+      maxFeePerGas: feeData.maxFeePerGas,
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+    };
+  }
+
+  // Legacy path (most compatible on Harmony)
+  let gasPrice = feeData?.gasPrice;
+  if (!gasPrice) {
+    try { gasPrice = await provider.getGasPrice(); } catch { /* ignore */ }
+  }
+
+  // If we can’t even get gas, return `extra` and let wallet fill
+  if (!gasPrice) return { ...extra };
+
+  return { ...extra, type: 0, gasPrice };
+}
+
+
+
+
 
 function makeContextOpener(displayObj, onOpen) {
   let lastTapTime = 0;
@@ -2540,12 +2609,12 @@ useEffect(() => {
     try {
         const contract = await getTheLandSignerContract(); // Replace with your function to get a signer instance
         const feeWei = await contract.turnFeeWei();
-        const tx = await contract.useTurns(
-      turns,
-      tileCoords.x - 1,
-      tileCoords.y - 1,
-      { value: feeWei } // 👈 sends the native coin (e.g., 0.1 ETH) with the tx
-    );
+const tx = await contract.useTurns(
+  turns,
+  tileCoords.x - 1,
+  tileCoords.y - 1,
+  await getTxOpts(contract, { value: feeWei })
+);
         await tx.wait();
 
         // Fetch updated tile data after the transaction

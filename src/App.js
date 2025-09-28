@@ -165,6 +165,72 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
 
+
+
+
+
+function pickProviderV6(x) {
+  // v6 Contract keeps runner/provider at .runner.provider
+  if (x?.runner?.provider) return x.runner.provider;
+  // v6 Signer has .provider
+  if (x?.provider) return x.provider;
+  return null;
+}
+
+/**
+ * Build tx overrides that work on Harmony + v6.
+ * - Prefer EIP-1559 if both maxFeePerGas & maxPriorityFeePerGas are present
+ * - Otherwise use legacy gasPrice (Harmony typical)
+ * - If no provider is resolvable, return only `extra` and let wallet fill
+ */
+async function getTxOpts(contractOrSigner, extra = {}) {
+  let provider = pickProviderV6(contractOrSigner);
+
+  // Last resort: use the injected wallet to create a provider
+  if (!provider && typeof window !== 'undefined' && window.ethereum) {
+    try {
+      provider = new BrowserProvider(window.ethereum);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // If still no provider, let the wallet populate gas
+  if (!provider) return { ...extra };
+
+  // Try fee data; Harmony often returns only gasPrice (legacy)
+  let feeData = {};
+  try {
+    feeData = await provider.getFeeData(); // v6
+  } catch {
+    // ignore
+  }
+
+  // EIP-1559 path if BOTH are present
+  if (feeData?.maxFeePerGas != null && feeData?.maxPriorityFeePerGas != null) {
+    return {
+      ...extra,
+      type: 2,
+      maxFeePerGas: feeData.maxFeePerGas,
+      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
+    };
+  }
+
+  // Legacy path (most compatible on Harmony)
+  let gasPrice = feeData?.gasPrice;
+  if (!gasPrice) {
+    try { gasPrice = await provider.getGasPrice(); } catch { /* ignore */ }
+  }
+
+  // If we can’t even get gas, return `extra` and let wallet fill
+  if (!gasPrice) return { ...extra };
+
+  return { ...extra, type: 0, gasPrice };
+}
+
+
+
+
 async function ensureHarmonyMainnet() {
   if (!window.ethereum) throw new Error('Ethereum wallet is not installed');
 
@@ -2409,9 +2475,10 @@ setallclansX(clanInfoMap);
         const TokencontractSigner = await getTokenSignerContract();
 
         const Allowancetx = await TokencontractSigner.increaseAllowance(
-          contractAddress,
-          occupationCost
-        );
+  contractAddress,
+  occupationCost,
+  await getTxOpts(TokencontractSigner)
+);
         await Allowancetx.wait();
 
 
@@ -2419,7 +2486,12 @@ setallclansX(clanInfoMap);
 
         // Pass the referrer to the occupyTile function in the smart contract
         const referrerAddress = referrer || '0x0000000000000000000000000000000000000000';
-        const tx = await contractSigner.occupyTile(x - 1, y - 1, referrerAddress);
+        const tx = await contractSigner.occupyTile(
+  x - 1,
+  y - 1,
+  referrerAddress,
+  await getTxOpts(contractSigner)
+);
         await tx.wait();
 
         await updateSingleTileWithFlag(x - 1, y - 1);
