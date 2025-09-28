@@ -50,6 +50,18 @@ import arrowRedIconImage from './assets/arrowRightRed.png';
 
 import battleGifImage from './assets/battle.gif';
 
+
+
+const HARMONY_MAINNET = {
+  chainId: '0x63564c40', // 1666600000
+  chainName: 'Harmony Mainnet',
+  nativeCurrency: { name: 'ONE', symbol: 'ONE', decimals: 18 },
+  rpcUrls: ['https://api.harmony.one'],           // shard-0
+  blockExplorerUrls: ['https://explorer.harmony.one'],
+};
+
+
+
 function App() {
   const gameRef = useRef(null);
   const [tileCoords, setTileCoords] = useState({ x: null, y: null, occupied: null, occupant: null });
@@ -153,7 +165,33 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
 
+async function ensureHarmonyMainnet() {
+  if (!window.ethereum) throw new Error('Ethereum wallet is not installed');
 
+  const target = HARMONY_MAINNET.chainId;
+  const current = await window.ethereum.request({ method: 'eth_chainId' });
+
+  if (current === target) return; // already on Harmony
+
+  try {
+    // Try to switch first
+    await window.ethereum.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: target }],
+    });
+  } catch (switchErr) {
+    // If the chain is not added yet, add it, then it auto-switches
+    const errCode = switchErr?.code ?? switchErr?.data?.originalError?.code;
+    if (errCode === 4902) {
+      await window.ethereum.request({
+        method: 'wallet_addEthereumChain',
+        params: [HARMONY_MAINNET],
+      });
+    } else {
+      throw switchErr;
+    }
+  }
+}
 
 const ClanPill = ({ name }) => (
   <span className="clan-pill">{name || "None"}</span>
@@ -1745,6 +1783,7 @@ useEffect(() => {
   const loginMetaMask = async () => {
     if (window.ethereum) {
       try {
+        await ensureHarmonyMainnet();
         const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
         if (accounts.length > 0) {
           setIsMetaMaskConnected(true); // Update state when MetaMask is connected
@@ -1827,8 +1866,7 @@ const flag = scene.add.image(worldX, worldY, textureKey).setDepth(worldY + 1);
 
             // Add right-click event listener to the white flag
 flag.on('pointerdown', async function (pointer) {
-  const doubleLeft = (pointer.button === 0) && this.scene.isDoubleLeft(pointer);
-  if (pointer.rightButtonDown() || doubleLeft) {
+  if (pointer.rightButtonDown()) {
                 pointer.flagClicked = true;
                 const contract = await getContract();
                 const occupant = await contract.getTileOccupant(x, y); // Fetch the occupant address
@@ -1962,6 +2000,159 @@ const twitterHandle = await clanContract.getTwitterHandle(occupant);
 
               }
             });
+
+
+
+
+
+
+
+
+
+
+
+
+
+flag.on('pointerup', async function (pointer) {
+  if (pointer.button !== 0) return; // only left/primary
+  if (!this.scene.isDoubleTapRelease(pointer)) return;
+                pointer.flagClicked = true;
+                const contract = await getContract();
+                const occupant = await contract.getTileOccupant(x, y); // Fetch the occupant address
+
+
+                const clanContract = await getclanContract();
+                const tileName = await clanContract.getTileName(x, y);
+const clanId = await clanContract.getTileClan(x, y);
+
+const landContract = await getTheLandContract();
+const tileData = await landContract.getTilePublic(x, y);
+
+const totalPoints = Number(tileData.points);
+const tileLevel = Number(tileData.level);
+
+const resourceReceiveFlag = await landContract.resourceMessage(x, y);
+
+let clanInfo = null;
+if (clanId > 0) {
+  const info = await clanContract.getClanInfo(clanId);
+  clanInfo = {
+    clanId: parseInt(clanId),
+    name: info.name,
+    leader: info.leader,
+    memberCount: Number(info.memberCount)
+  };
+}
+
+
+const tileKey = x * 256 + y;   
+
+const clanIdBN = await clanContract.pendingInvitesByTile(tileKey);
+
+const occupantPendingClanId = parseInt(clanIdBN);
+let hasPendingInvite = false;
+if (occupantPendingClanId > 0) {
+  hasPendingInvite = true;
+}
+
+
+
+
+const lastActiveBN = await landContract.getTileLastActiveAt(x, y);
+const timeStampBN = await landContract.getCurrentTimestamp();
+let lastActiveAt = parseInt(lastActiveBN);
+const timeStampAt = parseInt(timeStampBN);
+
+if (lastActiveAt === 0) {
+        lastActiveAt = 1756166400; // 26 August 2025 00:00:00 UTC
+    }
+
+const THREE_MONTHS = 90 * 24 * 60 * 60; // 3 ay ===== 90 * 24 * 60 * 60
+const isInactive = ((timeStampAt - lastActiveAt) >= THREE_MONTHS);
+ 
+
+
+
+
+
+
+
+
+
+
+      const tile = await contract.tiles(x, y);
+
+      const bonusX = await contract.bonuses(x, y);
+      const bonus = parseInt(bonusX);
+      
+      let bonusTypeX = '';
+      switch (bonus) {
+        case 1:
+          bonusTypeX = 'Food';
+          break;
+        case 2:
+          bonusTypeX = 'Wood';
+          break;
+        case 3:
+          bonusTypeX = 'Stone';
+          break;
+        case 4:
+          bonusTypeX = 'Iron';
+          break;
+        default:
+          bonusTypeX = 'None';
+      }
+
+const twitterHandle = await clanContract.getTwitterHandle(occupant);
+
+                setTileCoords({
+                  x: x + 1,
+                  y: y + 1,
+                  occupied: true,
+                  occupant,
+                  isOnSale: tile.isOnSale,
+                  salePrice: Number(tile.salePrice + tile.saleBurnAmount),
+                  bonusType: bonusTypeX,
+                  clan: clanInfo, // Add clan info here
+                  hasPendingInviteToClan: hasPendingInvite,
+                  tileName: tileName && tileName.trim().length > 0 ? tileName : null,
+                  points: totalPoints,
+                  twitterHandle: twitterHandle || null,
+                  level: tileLevel,
+                  resourceReceiveFlag: resourceReceiveFlag,
+                  isInactive: isInactive
+                });
+
+
+    const marketContract = await getMarketplaceContract();
+
+    const defTurnsUsedRaw = await landContract.getTotalTurnsUsedByTile(x, y);
+    const defTurnsUsed = parseInt(defTurnsUsedRaw.toString());
+
+
+    const lastDefRaw = await marketContract.lastDefenseTurn(x, y);
+    const lastDef = parseInt(lastDefRaw.toString());
+
+
+    const cooldown = 300;
+
+    if (defTurnsUsed < lastDef + cooldown) {
+      setAttackCooldownMessage("Defender Cooldown");
+    } else {
+      setAttackCooldownMessage("");
+    }
+
+
+
+
+
+
+}, this);
+
+
+
+
+
           }
         }
       }
@@ -2477,31 +2668,42 @@ if (canvas) {
 
 
 
-            // --- Double-click/double-tap detection ---
-const DOUBLE_MS = 300;          // max time between taps
-const DOUBLE_PX = 14;           // max move between taps (screen px)
+const DOUBLE_MS = 300;      // max gap between taps
+const TAP_MAX_MS = 220;     // down->up must be quick to be a tap
+const TAP_MOVE_PX = 10;     // max movement during a tap
+const DRAG_MOVE_PX = 10;    // when exceeded, it's a drag (cancel taps)
 
-this._lastTapTime = 0;
-this._lastTapPos = { x: 0, y: 0 };
+let lastTapTime = 0;
+let lastTapPos = { x: 0, y: 0 };
 
-// helper: was this a double left-click/tap?
-this.isDoubleLeft = (pointer) => {
-  if (pointer.button !== 0) return false;        // only left click / primary tap
+let pressStartTime = 0;
+let pressStartPos = { x: 0, y: 0 };
+let pressMoved = false;
+
+
+// Reusable helper: was this release a double tap/click?
+this.isDoubleTapRelease = (pointer) => {
+  // Only consider quick, stationary taps (use the same thresholds you track in create)
+  const dur = performance.now() - pressStartTime;
+  const dx = pointer.x - pressStartPos.x;
+  const dy = pointer.y - pressStartPos.y;
+  const moved = pressMoved || (dx*dx + dy*dy) > (TAP_MOVE_PX * TAP_MOVE_PX);
+  const isTap = dur <= TAP_MAX_MS && !moved;
+  if (!isTap) return false;
+
   const now = performance.now();
-  const dt = now - this._lastTapTime;
-  const dx = pointer.x - this._lastTapPos.x;
-  const dy = pointer.y - this._lastTapPos.y;
-  const closeInTime = dt > 0 && dt <= DOUBLE_MS;
-  const closeInSpace = (dx*dx + dy*dy) <= (DOUBLE_PX*DOUBLE_PX);
+  const dt = now - lastTapTime;
+  const ddx = pointer.x - lastTapPos.x;
+  const ddy = pointer.y - lastTapPos.y;
+  const closeInTime  = dt > 0 && dt <= DOUBLE_MS;
+  const closeInSpace = (ddx*ddx + ddy*ddy) <= (TAP_MOVE_PX * TAP_MOVE_PX);
 
-  // update memory for the next click
-  this._lastTapTime = now;
-  this._lastTapPos.x = pointer.x;
-  this._lastTapPos.y = pointer.y;
+  lastTapTime = now;
+  lastTapPos.x = pointer.x;
+  lastTapPos.y = pointer.y;
 
   return closeInTime && closeInSpace;
 };
-
 
 
 
@@ -2653,86 +2855,102 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
 
 
       this.input.on('pointerdown', function (pointer) {
-        pointer.event.preventDefault();
+  pointer.event.preventDefault();
 
-       if (pointer.button === 0) {
-    // check double-left first (don’t fire while dragging)
-    if (!isDragging && this.isDoubleLeft(pointer)) {
-      setinteractionMenuTypeA("");
+  // start drag / tap tracking
+  pressStartTime = performance.now();
+  pressStartPos.x = pointer.x;
+  pressStartPos.y = pointer.y;
+  pressMoved = false;
 
-      // if a flag handler already consumed this click, skip
-      if (pointer.flagClicked) { pointer.flagClicked = false; return; }
-
-      const worldX = pointer.worldX;
-      const worldY = pointer.worldY;
-      const { x, y } = worldToTilePosition(worldX, worldY);
-      handleRightClick(x, y);              // ← same as your right-click path
-      return;                               // don’t start drag on a double action
-    }
-
-    // normal left-press → potentially start drag
+  if (pointer.button === 0) {
+    // start potential drag
     isDragging = true;
     dragStartX = pointer.x;
     dragStartY = pointer.y;
     cameraStartX = this.cameras.main.scrollX;
     cameraStartY = this.cameras.main.scrollY;
-
   } else if (pointer.button === 2) {
+    // right click -> open tile immediately (desktop)
+    setinteractionMenuTypeA("");
 
-                        setinteractionMenuTypeA("");
+    if (pointer.flagClicked) { pointer.flagClicked = false; return; }
 
-
-          if (pointer.flagClicked) {
-            // Reset the flag and skip global handling since it was already handled by the flag
-            pointer.flagClicked = false;
-            return;
-          }
-
-
-          const worldX = pointer.worldX;
-          const worldY = pointer.worldY;
-          const { x, y } = worldToTilePosition(worldX, worldY);
-      
-          handleRightClick(x, y);  // Call the async function to fetch the bonus
-        }
-      }, this);
-      
-
-      this.input.on('pointermove', function (pointer) {
-  if (isDragging) {
-    const zoom = this.cameras.main.zoom;
-    const dragX = (dragStartX - pointer.x) / zoom;
-    const dragY = (dragStartY - pointer.y) / zoom;
-
-    let newScrollX = cameraStartX + dragX;
-    let newScrollY = cameraStartY + dragY;
-
-    // Get dimensions of the full map (after scaling)
-    const mapWidth = 8000; // your large map image width
-    const mapHeight = 4600; // your large map image height
-
-    const viewWidth = this.scale.width / zoom;
-    const viewHeight = this.scale.height / zoom;
-
-    // Calculate scroll limits
-    const minScrollX = (- mapWidth - viewWidth) / 2;
-    const maxScrollX = (mapWidth + viewWidth) / 2;
-
-    const minScrollY = (- mapHeight - viewHeight) / 2;
-    const maxScrollY = (mapHeight + viewHeight);
-
-    // Clamp camera position
-    this.cameras.main.scrollX = Phaser.Math.Clamp(newScrollX, minScrollX, maxScrollX);
-    this.cameras.main.scrollY = Phaser.Math.Clamp(newScrollY, minScrollY, maxScrollY);
+    const { x, y } = worldToTilePosition(pointer.worldX, pointer.worldY);
+    handleRightClick(x, y);
   }
+}, this);
+      
+
+     this.input.on('pointermove', function (pointer) {
+  if (!isDragging) return;
+
+  const dx = pointer.x - pressStartPos.x;
+  const dy = pointer.y - pressStartPos.y;
+  const dist2 = dx * dx + dy * dy;
+  if (dist2 > DRAG_MOVE_PX * DRAG_MOVE_PX) {
+    pressMoved = true; // cancel tap detection
+  }
+
+  const zoom = this.cameras.main.zoom;
+  const dragX = (dragStartX - pointer.x) / zoom;
+  const dragY = (dragStartY - pointer.y) / zoom;
+
+  let newScrollX = cameraStartX + dragX;
+  let newScrollY = cameraStartY + dragY;
+
+  const mapWidth = 8000;
+  const mapHeight = 4600;
+  const viewWidth = this.scale.width / zoom;
+  const viewHeight = this.scale.height / zoom;
+
+  const minScrollX = (-mapWidth - viewWidth) / 2;
+  const maxScrollX = (mapWidth + viewWidth) / 2;
+  const minScrollY = (-mapHeight - viewHeight) / 2;
+  const maxScrollY = (mapHeight + viewHeight);
+
+  this.cameras.main.scrollX = Phaser.Math.Clamp(newScrollX, minScrollX, maxScrollX);
+  this.cameras.main.scrollY = Phaser.Math.Clamp(newScrollY, minScrollY, maxScrollY);
 }, this);
 
 
-      this.input.on('pointerup', function (pointer) {
-        if (pointer.button === 0) {
-          isDragging = false;
-        }
-      }, this);
+     this.input.on('pointerup', function (pointer) {
+  if (pointer.button === 0) {
+    // end drag
+    isDragging = false;
+
+    // classify as a TAP only if quick + not moved
+    const dur = performance.now() - pressStartTime;
+    const dx = pointer.x - pressStartPos.x;
+    const dy = pointer.y - pressStartPos.y;
+    const moved = pressMoved || (dx * dx + dy * dy) > (TAP_MOVE_PX * TAP_MOVE_PX);
+    const isTap = dur <= TAP_MAX_MS && !moved;
+
+    if (isTap) {
+      const now = performance.now();
+      const dt = now - lastTapTime;
+      const ddx = pointer.x - lastTapPos.x;
+      const ddy = pointer.y - lastTapPos.y;
+      const closeInTime = dt > 0 && dt <= DOUBLE_MS;
+      const closeInSpace = (ddx * ddx + ddy * ddy) <= (TAP_MOVE_PX * TAP_MOVE_PX);
+
+      if (closeInTime && closeInSpace) {
+        // DOUBLE-TAP detected (treat as your "double left" -> open info)
+        setinteractionMenuTypeA("");
+        if (pointer.flagClicked) { pointer.flagClicked = false; return; }
+
+        const { x, y } = worldToTilePosition(pointer.worldX, pointer.worldY);
+        handleRightClick(x, y);
+        lastTapTime = 0; // consume the pair
+      } else {
+        // remember this tap as the first of a possible double
+        lastTapTime = now;
+        lastTapPos.x = pointer.x;
+        lastTapPos.y = pointer.y;
+      }
+    }
+  }
+}, this);
 
       this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
         if (deltaY > 0) {

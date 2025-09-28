@@ -1826,8 +1826,9 @@ const flag = scene.add.image(worldX, worldY, textureKey).setDepth(worldY + 1);
             });
 
             // Add right-click event listener to the white flag
-            flag.on('pointerdown', async (pointer) => {
-              if (pointer.rightButtonDown()) {
+flag.on('pointerdown', async function (pointer) {
+  const doubleLeft = (pointer.button === 0) && this.scene.isDoubleLeft(pointer);
+  if (pointer.rightButtonDown() || doubleLeft) {
                 pointer.flagClicked = true;
                 const contract = await getContract();
                 const occupant = await contract.getTileOccupant(x, y); // Fetch the occupant address
@@ -2357,6 +2358,12 @@ setallclansX(clanInfoMap);
 
     gameRef.current = new Phaser.Game(config);
 
+    const canvas = gameRef.current.canvas || gameRef.current.renderer?.canvas;
+if (canvas) {
+  canvas.style.touchAction = 'none';
+  canvas.style.msTouchAction = 'none';
+}
+
     let zoomLevel = 0.24;
 
     function preload() {
@@ -2467,6 +2474,36 @@ setallclansX(clanInfoMap);
     
 
     async function create() {
+
+
+
+            // --- Double-click/double-tap detection ---
+const DOUBLE_MS = 300;          // max time between taps
+const DOUBLE_PX = 14;           // max move between taps (screen px)
+
+this._lastTapTime = 0;
+this._lastTapPos = { x: 0, y: 0 };
+
+// helper: was this a double left-click/tap?
+this.isDoubleLeft = (pointer) => {
+  if (pointer.button !== 0) return false;        // only left click / primary tap
+  const now = performance.now();
+  const dt = now - this._lastTapTime;
+  const dx = pointer.x - this._lastTapPos.x;
+  const dy = pointer.y - this._lastTapPos.y;
+  const closeInTime = dt > 0 && dt <= DOUBLE_MS;
+  const closeInSpace = (dx*dx + dy*dy) <= (DOUBLE_PX*DOUBLE_PX);
+
+  // update memory for the next click
+  this._lastTapTime = now;
+  this._lastTapPos.x = pointer.x;
+  this._lastTapPos.y = pointer.y;
+
+  return closeInTime && closeInSpace;
+};
+
+
+
 
        gameRef.current.sounds = {
    leaderboard: this.sound.add('leaderboardSound', { volume: 0.6 }),
@@ -2610,16 +2647,37 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
       let cameraStartX = 0;
       let cameraStartY = 0;
 
+
+
+
+
+
       this.input.on('pointerdown', function (pointer) {
         pointer.event.preventDefault();
 
-        if (pointer.button === 0) {
-          isDragging = true;
-          dragStartX = pointer.x;
-          dragStartY = pointer.y;
-          cameraStartX = this.cameras.main.scrollX;
-          cameraStartY = this.cameras.main.scrollY;
-        } else if (pointer.button === 2) {
+       if (pointer.button === 0) {
+    // check double-left first (don’t fire while dragging)
+    if (!isDragging && this.isDoubleLeft(pointer)) {
+      setinteractionMenuTypeA("");
+
+      // if a flag handler already consumed this click, skip
+      if (pointer.flagClicked) { pointer.flagClicked = false; return; }
+
+      const worldX = pointer.worldX;
+      const worldY = pointer.worldY;
+      const { x, y } = worldToTilePosition(worldX, worldY);
+      handleRightClick(x, y);              // ← same as your right-click path
+      return;                               // don’t start drag on a double action
+    }
+
+    // normal left-press → potentially start drag
+    isDragging = true;
+    dragStartX = pointer.x;
+    dragStartY = pointer.y;
+    cameraStartX = this.cameras.main.scrollX;
+    cameraStartY = this.cameras.main.scrollY;
+
+  } else if (pointer.button === 2) {
 
                         setinteractionMenuTypeA("");
 
@@ -2842,7 +2900,8 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
 
       <div
         id="phaser-container"
-        style={{ width: '100%', height: '100%', position: 'relative', zIndex: 0 }}
+        style={{ width: '100%', touchAction: 'none',   
+    WebkitUserSelect: 'none', height: '100%', position: 'relative', zIndex: 0 }}
       >
       
       <button
