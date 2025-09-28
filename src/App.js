@@ -6,7 +6,7 @@ import oceanImage from './assets/ocean.png';
 import whiteflagImage from './assets/whiteFlag.png';
 import skyflagImage from './assets/skyFlag.png';
 import largemapImage from './assets/file.png';
-import getContract, { getSignerContract, contractAddress, RPC, sendHarmonyLegacyTx } from './contract';
+import getContract, { getSignerContract, contractAddress, RPC } from './contract';
 import getTokenContract, { getTokenSignerContract } from './Tokencontract';
 import { Circles } from 'react-loader-spinner';
 import './App.css';
@@ -27,7 +27,7 @@ import stopIcon from './assets/stop-icon.png';
 import { getAddress } from 'ethers';
 import TheLand from './theLand';
 import getclanContract, { getclanSignerContract, clancontractAddress } from './clancontract';
-import { getTheLandSignerContract, getTheLandContract } from './TheLandContract';
+import getTheLandContract, { getTheLandSignerContract  } from './TheLandContract';
 import getNFTContract, { getNFTSignerContract } from './nftContract';
 import getMarketplaceContract, { getMarketplaceSignerContract } from './MarketplaceContract';
 import defensiveSoldierImage from './assets/soldiers/defensive.png';
@@ -2410,27 +2410,21 @@ setallclansX(clanInfoMap);
           return;
         }
 
-        const tokenSigner = await getTokenSignerContract();
+        const TokencontractSigner = await getTokenSignerContract();
 
-        await sendHarmonyLegacyTx(
-      tokenSigner,
-      "increaseAllowance", // keep as-is per your contract
-      [contractAddress, occupationCost]
-    );
+        const Allowancetx = await TokencontractSigner.increaseAllowance(
+          contractAddress,
+          occupationCost
+        );
+        await Allowancetx.wait();
 
 
-        const landSigner = await getSignerContract();
+        const contractSigner = await getSignerContract();
 
         // Pass the referrer to the occupyTile function in the smart contract
         const referrerAddress = referrer || '0x0000000000000000000000000000000000000000';
-        await sendHarmonyLegacyTx(
-      landSigner,
-      // if your method is overloaded, you can pass the full signature instead:
-      // "occupyTile(uint256,uint256,address)",
-      "occupyTile",
-      [x - 1, y - 1, referrerAddress]
-      // no extra overrides — Harmony is legacy (type:0 + gasPrice handled inside)
-    );
+        const tx = await contractSigner.occupyTile(x - 1, y - 1, referrerAddress);
+        await tx.wait();
 
         await updateSingleTileWithFlag(x - 1, y - 1);
         await checkIfAccountOccupiedTile();

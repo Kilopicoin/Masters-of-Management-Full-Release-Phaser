@@ -50,7 +50,7 @@ import offensiveWeaponImage from './assets/weapons/offensive.png';
 import defensiveSoldierImage from './assets/soldiers/defensive.png';
 import offensiveSoldierImage from './assets/soldiers/offensive.png';
 
-import { getTheLandSignerContract, getTheLandContract, sendHarmonyLegacyTx  } from './TheLandContract';
+import getTheLandContract, { getTheLandSignerContract  } from './TheLandContract';
 import { getMarketplaceSignerContract, MarketplacecontractAddress } from './MarketplaceContract';
 import { getclanSignerContract, clancontractAddress } from './clancontract';
 import { getTokenSignerContract } from './Tokencontract';
@@ -2547,13 +2547,13 @@ useEffect(() => {
     try {
         const contract = await getTheLandSignerContract(); // Replace with your function to get a signer instance
         const feeWei = await contract.turnFeeWei();
-        const landSign = await getTheLandSignerContract();
-await sendHarmonyLegacyTx(
-  landSign,
-  "useTurns", // or "useTurns(uint256,uint256,uint256)"
-  [turns, tileCoords.x - 1, tileCoords.y - 1],
-  { value: feeWei } // bigint; include only if function is payable
-);
+        const tx = await contract.useTurns(
+      turns,
+      tileCoords.x - 1,
+      tileCoords.y - 1,
+      { value: feeWei } // 👈 sends the native coin (e.g., 0.1 ETH) with the tx
+    );
+        await tx.wait();
 
         // Fetch updated tile data after the transaction
         await fetchTileData(tileCoords.x, tileCoords.y);
