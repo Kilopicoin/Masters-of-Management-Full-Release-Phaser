@@ -193,45 +193,54 @@ const DOUBLE_TAP_MOVE_PX = 24;
 
 
 
-
-
 // txOpts.js (ethers v6)
 async function getTxOptsLegacy(signer, overrides = {}) {
-  // signer: a Contract signer (contract.runner) or a Signer
   const provider = signer.provider ?? signer.runner?.provider ?? signer.runner;
-
   if (!provider) throw new Error("No provider on signer/contract");
 
-  // Always compute a legacy gasPrice
+  // Prefer legacy gasPrice when available
   let gasPrice = (await provider.getFeeData())?.gasPrice;
-  if (!gasPrice) {
-    // some RPCs only expose getGasPrice
-    gasPrice = await provider.getGasPrice?.();
+  if (!gasPrice && provider.getGasPrice) {
+    gasPrice = await provider.getGasPrice();
   }
-  if (!gasPrice) throw new Error("RPC did not return gasPrice");
+  if (!gasPrice) {
+    // Fallback: if gasPrice isn't available, return empty and let caller pick EIP-1559 path
+    return { ...overrides };
+  }
 
-  // Force legacy/type-0 and DO NOT include EIP-1559 fields
+  // NOTE: do NOT set `type`. Let ethers infer legacy from gasPrice.
   return {
-    type: 0,
-    gasPrice,          // BigInt (ethers v6)
-    // You may still pass value, nonce, etc. in overrides
+    gasPrice,    // bigint in ethers v6
     ...overrides,
   };
 }
 
-// Convenience sender that also estimates gas (recommended)
 async function sendLegacyTx(contractWithSigner, method, args = [], extraOverrides = {}) {
-  // Build base overrides first (type:0 + gasPrice)
-  const base = await getTxOptsLegacy(contractWithSigner, extraOverrides);
+  // Build base overrides (gasPrice but no `type`)
+  let base = await getTxOptsLegacy(contractWithSigner, extraOverrides);
 
-  // Estimate gas with the SAME overrides (important)
+  // If gasPrice wasn't available (EIP-1559-only chain), build EIP-1559 fees instead
+  if (!base.gasPrice) {
+    const provider = contractWithSigner.runner?.provider ?? contractWithSigner.provider;
+    const fee = await provider.getFeeData();
+    if (!fee?.maxFeePerGas || !fee?.maxPriorityFeePerGas) {
+      throw new Error("RPC did not return fee data");
+    }
+    base = {
+      // don't set `type` here either; ethers will infer type-2 from these fields
+      maxFeePerGas: fee.maxFeePerGas,
+      maxPriorityFeePerGas: fee.maxPriorityFeePerGas,
+      ...extraOverrides,
+    };
+  }
+
+  // Estimate gas with the SAME overrides
   const gas = await contractWithSigner[method].estimateGas(...args, base);
   const overrides = { ...base, gasLimit: gas };
 
   const tx = await contractWithSigner[method](...args, overrides);
   return tx.wait();
 }
-
 
 
 
