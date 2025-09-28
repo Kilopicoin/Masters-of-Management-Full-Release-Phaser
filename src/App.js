@@ -54,7 +54,7 @@ import battleGifImage from './assets/battle.gif';
 
 const HARMONY_MAINNET = {
   chainId: '0x63564c40', // 1666600000
-  chainName: 'Harmony Mainnet',
+  chainName: 'Harmony Mainnet Shard 0',
   nativeCurrency: { name: 'ONE', symbol: 'ONE', decimals: 18 },
   rpcUrls: ['https://api.harmony.one'],           // shard-0
   blockExplorerUrls: ['https://explorer.harmony.one'],
@@ -2365,6 +2365,8 @@ setallclansX(clanInfoMap);
   const occupyTile = async (x, y) => {
     setLoading(true);
     try {
+
+      await ensureHarmonyMainnet();
 
       const paused = await isContractPaused(); // Check the paused state
     if (paused) {
