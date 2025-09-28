@@ -186,6 +186,48 @@ const [calculatedResources, setCalculatedResources] = useState({
 });
 
 
+// --- context open helper: right-click OR double-tap ---
+const DOUBLE_TAP_MS = 320;
+const DOUBLE_TAP_MOVE_PX = 24;
+
+function makeContextOpener(displayObj, onOpen) {
+  let lastTapTime = 0;
+  let lastTapX = 0;
+  let lastTapY = 0;
+
+  displayObj.setInteractive({ pixelPerfect: true });
+
+  displayObj.on('pointerdown', (pointer) => {
+    // Desktop right-click -> open immediately
+    if (pointer.button === 2) {
+      onOpen();
+      return;
+    }
+
+    // Touch / left-click: detect double-tap
+    // (Phaser sets pointer.primaryDown for primary button/finger)
+    const now = performance.now();
+    const dx = pointer.x - lastTapX;
+    const dy = pointer.y - lastTapY;
+    const dist2 = dx * dx + dy * dy;
+
+    if (now - lastTapTime <= DOUBLE_TAP_MS && dist2 <= DOUBLE_TAP_MOVE_PX * DOUBLE_TAP_MOVE_PX) {
+      // second tap within window and close to first tap -> act like right-click
+      onOpen();
+      // reset so triple taps don't chain
+      lastTapTime = 0;
+    } else {
+      // record this tap
+      lastTapTime = now;
+      lastTapX = pointer.x;
+      lastTapY = pointer.y;
+    }
+  });
+}
+
+
+
+
 
 const cancelListing = async (item, index) => {
   try {
@@ -1744,12 +1786,10 @@ musicRef2.current = this.sound.add('backgroundMusic2', {
                         // Add interactivity specifically for the armory
                         if (buildingImage === 'armory') {
                             building.setInteractive({ pixelPerfect: true });
-                            building.on('pointerdown', (pointer) => {
-                                if (pointer.button === 2) { // Right-click
-                                    setSelectedInteriorCoords({ x, y });
-                                    setinteractionMenuType('armory'); // Set the menu type to armory
-                                }
-                            });
+                            makeContextOpener(building, () => {
+  setSelectedInteriorCoords({ x, y });
+  setinteractionMenuType('armory');
+});
 
 
                             const forgeOverlay = this.add.dom(worldX, worldY).createFromHTML(`
@@ -1774,12 +1814,10 @@ gameRef.current.armoryForgeOverlays.push({
 
                         } else if (buildingImage === 'blacksmith') {
                             building.setInteractive({ pixelPerfect: true });
-                            building.on('pointerdown', (pointer) => {
-                                if (pointer.button === 2) { // Right-click
-                                    setSelectedInteriorCoords({ x, y });
-                                    setinteractionMenuType('blacksmith'); // Set the menu type to blacksmith
-                                }
-                            });
+                            makeContextOpener(building, () => {
+  setSelectedInteriorCoords({ x, y });
+  setinteractionMenuType('blacksmith');
+});
 
 
 
@@ -1805,12 +1843,10 @@ gameRef.current.blacksmithForgeOverlays.push({
 
                         } else if (buildingImage === 'fightingpit') {
                             building.setInteractive({ pixelPerfect: true });
-                            building.on('pointerdown', (pointer) => {
-                                if (pointer.button === 2) { // Right-click
-                                    setSelectedInteriorCoords({ x, y });
-                                    setinteractionMenuType('train-soldier'); // Set the menu type to train soldiers
-                                }
-                            });
+                            makeContextOpener(building, () => {
+  setSelectedInteriorCoords({ x, y });
+  setinteractionMenuType('train-soldier');
+});
 
 
 
@@ -1860,12 +1896,10 @@ gameRef.current.trainingDefensiveOverlays.push({
 
                         } else if (buildingImage === 'house') {
                             building.setInteractive({ pixelPerfect: true });
-                            building.on('pointerdown', (pointer) => {
-                                if (pointer.button === 2) { // Right-click
-                                    setSelectedInteriorCoords({ x, y });
-                                    setinteractionMenuType('house-info'); // Set the menu type to train soldiers
-                                }
-                            });
+                            makeContextOpener(building, () => {
+  setSelectedInteriorCoords({ x, y });
+  setinteractionMenuType('house-info');
+});
 
 
                             const houseClockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
@@ -1890,20 +1924,16 @@ gameRef.current.trainingDefensiveOverlays.push({
 
                         } else if (buildingImage === 'tower') {
                             building.setInteractive({ pixelPerfect: true });
-                            building.on('pointerdown', (pointer) => {
-                                if (pointer.button === 2) { // Right-click
-                                    setSelectedInteriorCoords({ x, y });
-                                    setinteractionMenuType('tower-info'); // Set the menu type to train soldiers
-                                }
-                            });
+                            makeContextOpener(building, () => {
+  setSelectedInteriorCoords({ x, y });
+  setinteractionMenuType('tower-info');
+});
                         } else if (buildingImage === 'workshop') {
                             building.setInteractive({ pixelPerfect: true });
-                            building.on('pointerdown', (pointer) => {
-                                if (pointer.button === 2) { // Right-click
-                                    setSelectedInteriorCoords({ x, y });
-                                    setinteractionMenuType('workshop'); // Set the menu type to train soldiers
-                                }
-                            });
+                            makeContextOpener(building, () => {
+  setSelectedInteriorCoords({ x, y });
+  setinteractionMenuType('workshop');
+});
 
 
 
@@ -1954,20 +1984,16 @@ gameRef.current.offensiveTechOverlays.push({
 
                         } else if (buildingImage === 'market') {
                             building.setInteractive({ pixelPerfect: true });
-                            building.on('pointerdown', (pointer) => {
-                                if (pointer.button === 2) { // Right-click
-                                    setSelectedInteriorCoords({ x, y });
-                                    setinteractionMenuType('marketplace'); // Set the menu type to train soldiers
-                                }
-                            });
+                            makeContextOpener(building, () => {
+  setSelectedInteriorCoords({ x, y });
+  setinteractionMenuType('marketplace');
+});
                         } else if (buildingImage === 'clanhall') {
                             building.setInteractive({ pixelPerfect: true });
-                            building.on('pointerdown', (pointer) => {
-                                if (pointer.button === 2) { // Right-click
-                                    setSelectedInteriorCoords({ x, y });
-                                    setinteractionMenuType('clanhall'); // Set the menu type to train soldiers
-                                }
-                            });
+                            makeContextOpener(building, () => {
+  setSelectedInteriorCoords({ x, y });
+  setinteractionMenuType('clanhall');
+});
 
 
 
@@ -2003,12 +2029,9 @@ gameRef.current.flagOverlays.push({
                       elders.setInteractive({
                         pixelPerfect: true
                       });
-                      elders.on('pointerdown', (pointer) => {
-                          if (pointer.button === 2) {
-                              // Show the "Select Building Type" menu
-                              setinteractionMenuType("buildings");
-                          }
-                      });
+                      makeContextOpener(elders, () => {
+  setinteractionMenuType("buildings");
+});
 
                       // Add the DOM element for loading spinner
   const clockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
@@ -2039,14 +2062,33 @@ gameRef.current.flagOverlays.push({
             let cameraStartY = 0;
 
 
-            this.input.on('pointerdown', (pointer, gameObjects) => {
-                if (pointer.button === 2) {
-                    // If the click is not on a building, show the "home" menu
-                    if (!gameObjects.length) {
-                        setinteractionMenuType("home");
-                    }
-                }
-            });
+            let lastEmptyTap = 0, lastEmptyX = 0, lastEmptyY = 0;
+
+this.input.on('pointerdown', (pointer, gameObjects) => {
+  // Right-click still works
+  if (pointer.button === 2 && !gameObjects.length) {
+    setinteractionMenuType("home");
+    return;
+  }
+
+  // Double-tap empty area -> home
+  if (!gameObjects.length) {
+    const now = performance.now();
+    const dx = pointer.x - lastEmptyX;
+    const dy = pointer.y - lastEmptyY;
+    const dist2 = dx*dx + dy*dy;
+
+    if (now - lastEmptyTap <= DOUBLE_TAP_MS && dist2 <= DOUBLE_TAP_MOVE_PX * DOUBLE_TAP_MOVE_PX) {
+      setinteractionMenuType("home");
+      lastEmptyTap = 0; // reset
+    } else {
+      lastEmptyTap = now;
+      lastEmptyX = pointer.x;
+      lastEmptyY = pointer.y;
+    }
+  }
+});
+
 
 
             const previewImage = this.add
@@ -2121,263 +2163,150 @@ gameRef.current.flagOverlays.push({
                             };
             
                             const onTransactionEnd = (success) => {
-    if (success) {
-        tempImage.setAlpha(1); // Make the image permanent
-
-        // Add interactivity after placement
-        tempImage.setInteractive({ pixelPerfect: true });
-
-        const imageKey = selectedBuildingRef.current;
-        if (imageKey === 'armory') {
-            tempImage.on('pointerdown', (pointer) => {
-                if (pointer.button === 2) {
-                    setSelectedInteriorCoords({ x, y });
-                    setinteractionMenuType('armory');
-                }
-            });
-
-
-
-
-             const forgeOverlay = this.add.dom(worldX, worldY).createFromHTML(`
-    <img 
-      src="${forgekLoadingImage}" 
-      style="width: 150px; height: 150px; display: none; filter: brightness(1.9); transform: translate(-120px, -80px);" 
-    />
-  `);
-  forgeOverlay.setDepth(worldY + 2);
-
-  // Save references so you can toggle them later
-  if (!gameRef.current.armoryForgeOverlays) {
-    gameRef.current.armoryForgeOverlays = [];
+  if (!success) {
+    tempImage.destroy(); // remove if placement fails
+    return;
   }
 
+  tempImage.setAlpha(1);            // make the image permanent
+  tempImage.setInteractive({ pixelPerfect: true });
 
-gameRef.current.armoryForgeOverlays.push({ 
-  x, 
-  y, 
-  overlay: forgeOverlay 
-});
+  const imageKey = selectedBuildingRef.current;
+  const openMenu = (menu) => {
+    setSelectedInteriorCoords({ x, y });
+    setinteractionMenuType(menu);
+  };
 
+  // use our helper so right-click *and* double-tap open the menu
+  // NOTE: makeContextOpener(...) must be defined earlier in create()
+  switch (imageKey) {
+    case 'armory': {
+      makeContextOpener(tempImage, () => openMenu('armory'));
 
-        } else if (imageKey === 'blacksmith') {
-            tempImage.on('pointerdown', (pointer) => {
-                if (pointer.button === 2) {
-                    setSelectedInteriorCoords({ x, y });
-                    setinteractionMenuType('blacksmith');
-                }
-            });
-
-
-
-            const forgeOverlay = this.add.dom(worldX, worldY).createFromHTML(`
-    <img 
-      src="${forgekLoadingImage}" 
-      style="width: 150px; height: 150px; display: none; filter: brightness(1.9); transform: translate(-120px, -80px);" 
-    />
-  `);
-  forgeOverlay.setDepth(worldY + 2);
-
-  // Save references so you can toggle them later
-  if (!gameRef.current.blacksmithForgeOverlays) {
-    gameRef.current.blacksmithForgeOverlays = [];
-  }
-  gameRef.current.blacksmithForgeOverlays.push({ 
-  x, 
-  y, 
-  overlay: forgeOverlay 
-});
-
-
-
-
-        } else if (imageKey === 'fightingpit') {
-            tempImage.on('pointerdown', (pointer) => {
-                if (pointer.button === 2) {
-                    setSelectedInteriorCoords({ x, y });
-                    setinteractionMenuType('train-soldier');
-                }
-            });
-
-
-
-            const trainingOffensiveOverlay = this.add.dom(worldX, worldY).createFromHTML(`
-    <img 
-      src="${offensiveLoadingImage}" 
-      style="width: 120px; height: 120px; display: none; filter: brightness(1.9); transform: translate(-60px, -40px);" 
-    />
-  `);
-  trainingOffensiveOverlay.setDepth(worldY + 2);
-
-  // Save references so you can toggle them later
-  if (!gameRef.current.trainingOffensiveOverlays) {
-    gameRef.current.trainingOffensiveOverlays = [];
-  }
-  gameRef.current.trainingOffensiveOverlays.push({ 
-  x, 
-  y, 
-  overlay: trainingOffensiveOverlay
-});
-
-
-
-
-
-
-   const trainingDefensiveOverlay = this.add.dom(worldX, worldY).createFromHTML(`
-    <img 
-      src="${defensiveLoadingImage}" 
-      style="width: 120px; height: 120px; display: none; filter: brightness(1.9); transform: translate(-60px, -40px);" 
-    />
-  `);
-  trainingDefensiveOverlay.setDepth(worldY + 2);
-
-  // Save references so you can toggle them later
-  if (!gameRef.current.trainingDefensiveOverlays) {
-    gameRef.current.trainingDefensiveOverlays = [];
-  }
-
-gameRef.current.trainingDefensiveOverlays.push({ 
-  x, 
-  y, 
-  overlay: trainingDefensiveOverlay 
-});
-
-
-        } else if (imageKey === 'house') {
-            tempImage.on('pointerdown', (pointer) => {
-                if (pointer.button === 2) {
-                    setSelectedInteriorCoords({ x, y });
-                    setinteractionMenuType('house-info');
-                }
-            });
-
-
-const houseClockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
-    <img 
-      src="${clockLoadingImage}" 
-      style="width: 96px; height: 96px; display: none; filter: brightness(2.1); transform: translate(-40px, -10px);" 
-    />
-  `);
-  houseClockOverlay.setDepth(worldY + 2);
-
-  // Save references so you can toggle them later
-  if (!gameRef.current.houseClockOverlays) {
-    gameRef.current.houseClockOverlays = [];
-  }
-  gameRef.current.houseClockOverlays.push({ 
-  x, 
-  y, 
-  overlay: houseClockOverlay
-});
-
-
-
-
-        } else if (imageKey === 'tower') {
-            tempImage.on('pointerdown', (pointer) => {
-                if (pointer.button === 2) {
-                    setSelectedInteriorCoords({ x, y });
-                    setinteractionMenuType('tower-info');
-                }
-            });
-        } else if (imageKey === 'workshop') {
-            tempImage.on('pointerdown', (pointer) => {
-                if (pointer.button === 2) {
-                    setSelectedInteriorCoords({ x, y });
-                    setinteractionMenuType('workshop');
-                }
-            });
-
-
-
-            const offensiveTechOverlay = this.add.dom(worldX, worldY).createFromHTML(`
-    <img 
-      src="${offensiveTechLoadingImage}" 
-      style="width: 96px; height: 96px; display: none; filter: brightness(1.3); transform: translate(-60px, -20px);" 
-    />
-  `);
-  offensiveTechOverlay.setDepth(worldY + 2);
-
-  // Save references so you can toggle them later
-  if (!gameRef.current.offensiveTechOverlays) {
-    gameRef.current.offensiveTechOverlays = [];
-  }
-  gameRef.current.offensiveTechOverlays.push({ 
-  x, 
-  y, 
-  overlay: offensiveTechOverlay 
-});
-
-
-
-
-
-
-
-  const defensiveTechOverlay = this.add.dom(worldX, worldY).createFromHTML(`
-    <img 
-      src="${defensiveTechLoadingImage}" 
-      style="width: 96px; height: 96px; display: none; filter: brightness(1.3); transform: translate(-60px, -20px);" 
-    />
-  `);
-  defensiveTechOverlay.setDepth(worldY + 2);
-
-  // Save references so you can toggle them later
-  if (!gameRef.current.defensiveTechOverlays) {
-    gameRef.current.defensiveTechOverlays = [];
-  }
-  gameRef.current.defensiveTechOverlays.push({ 
-  x, 
-  y, 
-  overlay: defensiveTechOverlay 
-});
-
-
-
-        } else if (imageKey === 'market') {
-            tempImage.on('pointerdown', (pointer) => {
-                if (pointer.button === 2) {
-                    setSelectedInteriorCoords({ x, y });
-                    setinteractionMenuType('marketplace');
-                }
-            });
-        } else if (imageKey === 'clanhall') {
-            tempImage.on('pointerdown', (pointer) => {
-                if (pointer.button === 2) {
-                    setSelectedInteriorCoords({ x, y });
-                    setinteractionMenuType('clanhall');
-                }
-            });
-
-
-
-            const flagOverlay = this.add.dom(worldX, worldY).createFromHTML(`
-    <img 
-      src="${clancreateLoadingImage}" 
-      style="width: 150px; height: 150px; display: none; filter: brightness(2.1); transform: translate(-120px, -90px);" 
-    />
-  `);
-  flagOverlay.setDepth(worldY + 2);
-
-  // Save references so you can toggle them later
-  if (!gameRef.current.flagOverlays) {
-    gameRef.current.flagOverlays = [];
-  }
-gameRef.current.flagOverlays.push({ 
-  x, 
-  y, 
-  overlay: flagOverlay 
-});
-
-
-  
-        }
-
-    } else {
-        tempImage.destroy(); // Remove if placement fails
+      // ---- overlay (unchanged) ----
+      const forgeOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+        <img 
+          src="${forgekLoadingImage}" 
+          style="width: 150px; height: 150px; display: none; filter: brightness(1.9); transform: translate(-120px, -80px);" 
+        />
+      `);
+      forgeOverlay.setDepth(worldY + 2);
+      if (!gameRef.current.armoryForgeOverlays) gameRef.current.armoryForgeOverlays = [];
+      gameRef.current.armoryForgeOverlays.push({ x, y, overlay: forgeOverlay });
+      break;
     }
+
+    case 'blacksmith': {
+      makeContextOpener(tempImage, () => openMenu('blacksmith'));
+
+      const forgeOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+        <img 
+          src="${forgekLoadingImage}" 
+          style="width: 150px; height: 150px; display: none; filter: brightness(1.9); transform: translate(-120px, -80px);" 
+        />
+      `);
+      forgeOverlay.setDepth(worldY + 2);
+      if (!gameRef.current.blacksmithForgeOverlays) gameRef.current.blacksmithForgeOverlays = [];
+      gameRef.current.blacksmithForgeOverlays.push({ x, y, overlay: forgeOverlay });
+      break;
+    }
+
+    case 'fightingpit': {
+      makeContextOpener(tempImage, () => openMenu('train-soldier'));
+
+      const trainingOffensiveOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+        <img 
+          src="${offensiveLoadingImage}" 
+          style="width: 120px; height: 120px; display: none; filter: brightness(1.9); transform: translate(-60px, -40px);" 
+        />
+      `);
+      trainingOffensiveOverlay.setDepth(worldY + 2);
+      if (!gameRef.current.trainingOffensiveOverlays) gameRef.current.trainingOffensiveOverlays = [];
+      gameRef.current.trainingOffensiveOverlays.push({ x, y, overlay: trainingOffensiveOverlay });
+
+      const trainingDefensiveOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+        <img 
+          src="${defensiveLoadingImage}" 
+          style="width: 120px; height: 120px; display: none; filter: brightness(1.9); transform: translate(-60px, -40px);" 
+        />
+      `);
+      trainingDefensiveOverlay.setDepth(worldY + 2);
+      if (!gameRef.current.trainingDefensiveOverlays) gameRef.current.trainingDefensiveOverlays = [];
+      gameRef.current.trainingDefensiveOverlays.push({ x, y, overlay: trainingDefensiveOverlay });
+      break;
+    }
+
+    case 'house': {
+      makeContextOpener(tempImage, () => openMenu('house-info'));
+
+      const houseClockOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+        <img 
+          src="${clockLoadingImage}" 
+          style="width: 96px; height: 96px; display: none; filter: brightness(2.1); transform: translate(-40px, -10px);" 
+        />
+      `);
+      houseClockOverlay.setDepth(worldY + 2);
+      if (!gameRef.current.houseClockOverlays) gameRef.current.houseClockOverlays = [];
+      gameRef.current.houseClockOverlays.push({ x, y, overlay: houseClockOverlay });
+      break;
+    }
+
+    case 'tower': {
+      makeContextOpener(tempImage, () => openMenu('tower-info'));
+      break;
+    }
+
+    case 'workshop': {
+      makeContextOpener(tempImage, () => openMenu('workshop'));
+
+      const offensiveTechOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+        <img 
+          src="${offensiveTechLoadingImage}" 
+          style="width: 96px; height: 96px; display: none; filter: brightness(1.3); transform: translate(-60px, -20px);" 
+        />
+      `);
+      offensiveTechOverlay.setDepth(worldY + 2);
+      if (!gameRef.current.offensiveTechOverlays) gameRef.current.offensiveTechOverlays = [];
+      gameRef.current.offensiveTechOverlays.push({ x, y, overlay: offensiveTechOverlay });
+
+      const defensiveTechOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+        <img 
+          src="${defensiveTechLoadingImage}" 
+          style="width: 96px; height: 96px; display: none; filter: brightness(1.3); transform: translate(-60px, -20px);" 
+        />
+      `);
+      defensiveTechOverlay.setDepth(worldY + 2);
+      if (!gameRef.current.defensiveTechOverlays) gameRef.current.defensiveTechOverlays = [];
+      gameRef.current.defensiveTechOverlays.push({ x, y, overlay: defensiveTechOverlay });
+      break;
+    }
+
+    case 'market': {
+      makeContextOpener(tempImage, () => openMenu('marketplace'));
+      break;
+    }
+
+    case 'clanhall': {
+      makeContextOpener(tempImage, () => openMenu('clanhall'));
+
+      const flagOverlay = this.add.dom(worldX, worldY).createFromHTML(`
+        <img 
+          src="${clancreateLoadingImage}" 
+          style="width: 150px; height: 150px; display: none; filter: brightness(2.1); transform: translate(-120px, -90px);" 
+        />
+      `);
+      flagOverlay.setDepth(worldY + 2);
+      if (!gameRef.current.flagOverlays) gameRef.current.flagOverlays = [];
+      gameRef.current.flagOverlays.push({ x, y, overlay: flagOverlay });
+      break;
+    }
+
+    default:
+      // no-op
+      break;
+  }
 };
+
 
 
                             
