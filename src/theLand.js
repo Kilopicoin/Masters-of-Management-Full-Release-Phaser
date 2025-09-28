@@ -60,8 +60,6 @@ import { Circles } from 'react-loader-spinner';
 import './App.css';
 import getContract from './contract';
 
-import { BrowserProvider } from 'ethers';
-
 const TheLand = ({ tileCoords, goBackToApp }) => {
     const gameRef = useRef(null);
     const selectedBuildingRef = useRef(null);
@@ -196,64 +194,44 @@ const DOUBLE_TAP_MOVE_PX = 24;
 
 
 
-function pickProviderV6(x) {
-  // v6 Contract keeps runner/provider at .runner.provider
-  if (x?.runner?.provider) return x.runner.provider;
-  // v6 Signer has .provider
-  if (x?.provider) return x.provider;
-  return null;
-}
 
-/**
- * Build tx overrides that work on Harmony + v6.
- * - Prefer EIP-1559 if both maxFeePerGas & maxPriorityFeePerGas are present
- * - Otherwise use legacy gasPrice (Harmony typical)
- * - If no provider is resolvable, return only `extra` and let wallet fill
- */
-async function getTxOpts(contractOrSigner, extra = {}) {
-  let provider = pickProviderV6(contractOrSigner);
+// txOpts.js (ethers v6)
+async function getTxOptsLegacy(signer, overrides = {}) {
+  // signer: a Contract signer (contract.runner) or a Signer
+  const provider = signer.provider ?? signer.runner?.provider ?? signer.runner;
 
-  // Last resort: use the injected wallet to create a provider
-  if (!provider && typeof window !== 'undefined' && window.ethereum) {
-    try {
-      provider = new BrowserProvider(window.ethereum);
-    } catch {
-      /* ignore */
-    }
-  }
+  if (!provider) throw new Error("No provider on signer/contract");
 
-  // If still no provider, let the wallet populate gas
-  if (!provider) return { ...extra };
-
-  // Try fee data; Harmony often returns only gasPrice (legacy)
-  let feeData = {};
-  try {
-    feeData = await provider.getFeeData(); // v6
-  } catch {
-    // ignore
-  }
-
-  // EIP-1559 path if BOTH are present
-  if (feeData?.maxFeePerGas != null && feeData?.maxPriorityFeePerGas != null) {
-    return {
-      ...extra,
-      type: 2,
-      maxFeePerGas: feeData.maxFeePerGas,
-      maxPriorityFeePerGas: feeData.maxPriorityFeePerGas,
-    };
-  }
-
-  // Legacy path (most compatible on Harmony)
-  let gasPrice = feeData?.gasPrice;
+  // Always compute a legacy gasPrice
+  let gasPrice = (await provider.getFeeData())?.gasPrice;
   if (!gasPrice) {
-    try { gasPrice = await provider.getGasPrice(); } catch { /* ignore */ }
+    // some RPCs only expose getGasPrice
+    gasPrice = await provider.getGasPrice?.();
   }
+  if (!gasPrice) throw new Error("RPC did not return gasPrice");
 
-  // If we can’t even get gas, return `extra` and let wallet fill
-  if (!gasPrice) return { ...extra };
-
-  return { ...extra, type: 0, gasPrice };
+  // Force legacy/type-0 and DO NOT include EIP-1559 fields
+  return {
+    type: 0,
+    gasPrice,          // BigInt (ethers v6)
+    // You may still pass value, nonce, etc. in overrides
+    ...overrides,
+  };
 }
+
+// Convenience sender that also estimates gas (recommended)
+async function sendLegacyTx(contractWithSigner, method, args = [], extraOverrides = {}) {
+  // Build base overrides first (type:0 + gasPrice)
+  const base = await getTxOptsLegacy(contractWithSigner, extraOverrides);
+
+  // Estimate gas with the SAME overrides (important)
+  const gas = await contractWithSigner[method].estimateGas(...args, base);
+  const overrides = { ...base, gasLimit: gas };
+
+  const tx = await contractWithSigner[method](...args, overrides);
+  return tx.wait();
+}
+
 
 
 
@@ -2609,13 +2587,12 @@ useEffect(() => {
     try {
         const contract = await getTheLandSignerContract(); // Replace with your function to get a signer instance
         const feeWei = await contract.turnFeeWei();
-const tx = await contract.useTurns(
-  turns,
-  tileCoords.x - 1,
-  tileCoords.y - 1,
-  await getTxOpts(contract, { value: feeWei })
+await sendLegacyTx(
+  contract,                 // signer-connected contract
+  "useTurns",               // method name
+  [turns, tileCoords.x - 1, tileCoords.y - 1], // args
+  { value: feeWei }         // extra overrides
 );
-        await tx.wait();
 
         // Fetch updated tile data after the transaction
         await fetchTileData(tileCoords.x, tileCoords.y);
