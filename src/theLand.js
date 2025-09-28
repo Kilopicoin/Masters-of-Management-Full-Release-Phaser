@@ -50,7 +50,7 @@ import offensiveWeaponImage from './assets/weapons/offensive.png';
 import defensiveSoldierImage from './assets/soldiers/defensive.png';
 import offensiveSoldierImage from './assets/soldiers/offensive.png';
 
-import getTheLandContract, { getTheLandSignerContract } from './TheLandContract';
+import { getTheLandSignerContract, getTheLandContract, sendHarmonyLegacyTx  } from './TheLandContract';
 import { getMarketplaceSignerContract, MarketplacecontractAddress } from './MarketplaceContract';
 import { getclanSignerContract, clancontractAddress } from './clancontract';
 import { getTokenSignerContract } from './Tokencontract';
@@ -192,55 +192,6 @@ const DOUBLE_TAP_MOVE_PX = 24;
 
 
 
-
-// txOpts.js (ethers v6)
-async function getTxOptsLegacy(signer, overrides = {}) {
-  const provider = signer.provider ?? signer.runner?.provider ?? signer.runner;
-  if (!provider) throw new Error("No provider on signer/contract");
-
-  // Prefer legacy gasPrice when available
-  let gasPrice = (await provider.getFeeData())?.gasPrice;
-  if (!gasPrice && provider.getGasPrice) {
-    gasPrice = await provider.getGasPrice();
-  }
-  if (!gasPrice) {
-    // Fallback: if gasPrice isn't available, return empty and let caller pick EIP-1559 path
-    return { ...overrides };
-  }
-
-  // NOTE: do NOT set `type`. Let ethers infer legacy from gasPrice.
-  return {
-    gasPrice,    // bigint in ethers v6
-    ...overrides,
-  };
-}
-
-async function sendLegacyTx(contractWithSigner, method, args = [], extraOverrides = {}) {
-  // Build base overrides (gasPrice but no `type`)
-  let base = await getTxOptsLegacy(contractWithSigner, extraOverrides);
-
-  // If gasPrice wasn't available (EIP-1559-only chain), build EIP-1559 fees instead
-  if (!base.gasPrice) {
-    const provider = contractWithSigner.runner?.provider ?? contractWithSigner.provider;
-    const fee = await provider.getFeeData();
-    if (!fee?.maxFeePerGas || !fee?.maxPriorityFeePerGas) {
-      throw new Error("RPC did not return fee data");
-    }
-    base = {
-      // don't set `type` here either; ethers will infer type-2 from these fields
-      maxFeePerGas: fee.maxFeePerGas,
-      maxPriorityFeePerGas: fee.maxPriorityFeePerGas,
-      ...extraOverrides,
-    };
-  }
-
-  // Estimate gas with the SAME overrides
-  const gas = await contractWithSigner[method].estimateGas(...args, base);
-  const overrides = { ...base, gasLimit: gas };
-
-  const tx = await contractWithSigner[method](...args, overrides);
-  return tx.wait();
-}
 
 
 
@@ -2596,11 +2547,12 @@ useEffect(() => {
     try {
         const contract = await getTheLandSignerContract(); // Replace with your function to get a signer instance
         const feeWei = await contract.turnFeeWei();
-await sendLegacyTx(
-  contract,                 // signer-connected contract
-  "useTurns",               // method name
-  [turns, tileCoords.x - 1, tileCoords.y - 1], // args
-  { value: feeWei }         // extra overrides
+        const landSign = await getTheLandSignerContract();
+await sendHarmonyLegacyTx(
+  landSign,
+  "useTurns", // or "useTurns(uint256,uint256,uint256)"
+  [turns, tileCoords.x - 1, tileCoords.y - 1],
+  { value: feeWei } // bigint; include only if function is payable
 );
 
         // Fetch updated tile data after the transaction

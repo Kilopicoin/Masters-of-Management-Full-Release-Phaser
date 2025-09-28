@@ -6,7 +6,7 @@ import oceanImage from './assets/ocean.png';
 import whiteflagImage from './assets/whiteFlag.png';
 import skyflagImage from './assets/skyFlag.png';
 import largemapImage from './assets/file.png';
-import getContract, { getSignerContract, contractAddress, RPC } from './contract';
+import getContract, { getSignerContract, contractAddress, RPC, sendHarmonyLegacyTx } from './contract';
 import getTokenContract, { getTokenSignerContract } from './Tokencontract';
 import { Circles } from 'react-loader-spinner';
 import './App.css';
@@ -27,7 +27,7 @@ import stopIcon from './assets/stop-icon.png';
 import { getAddress } from 'ethers';
 import TheLand from './theLand';
 import getclanContract, { getclanSignerContract, clancontractAddress } from './clancontract';
-import getTheLandContract, { getTheLandSignerContract } from './TheLandContract';
+import { getTheLandSignerContract, getTheLandContract } from './TheLandContract';
 import getNFTContract, { getNFTSignerContract } from './nftContract';
 import getMarketplaceContract, { getMarketplaceSignerContract } from './MarketplaceContract';
 import defensiveSoldierImage from './assets/soldiers/defensive.png';
@@ -164,56 +164,6 @@ const urlToKeyMap = useMemo(() => ({
   "https://kilopi.net/mom/nfts/29.png": "nftflag_29",
   "https://kilopi.net/mom/nfts/30.png": "nftflag_30"
 }), []);
-
-
-// txOpts.js (ethers v6)
-async function getTxOptsLegacy(signer, overrides = {}) {
-  const provider = signer.provider ?? signer.runner?.provider ?? signer.runner;
-  if (!provider) throw new Error("No provider on signer/contract");
-
-  // Prefer legacy gasPrice when available
-  let gasPrice = (await provider.getFeeData())?.gasPrice;
-  if (!gasPrice && provider.getGasPrice) {
-    gasPrice = await provider.getGasPrice();
-  }
-  if (!gasPrice) {
-    // Fallback: if gasPrice isn't available, return empty and let caller pick EIP-1559 path
-    return { ...overrides };
-  }
-
-  // NOTE: do NOT set `type`. Let ethers infer legacy from gasPrice.
-  return {
-    gasPrice,    // bigint in ethers v6
-    ...overrides,
-  };
-}
-
-async function sendLegacyTx(contractWithSigner, method, args = [], extraOverrides = {}) {
-  // Build base overrides (gasPrice but no `type`)
-  let base = await getTxOptsLegacy(contractWithSigner, extraOverrides);
-
-  // If gasPrice wasn't available (EIP-1559-only chain), build EIP-1559 fees instead
-  if (!base.gasPrice) {
-    const provider = contractWithSigner.runner?.provider ?? contractWithSigner.provider;
-    const fee = await provider.getFeeData();
-    if (!fee?.maxFeePerGas || !fee?.maxPriorityFeePerGas) {
-      throw new Error("RPC did not return fee data");
-    }
-    base = {
-      // don't set `type` here either; ethers will infer type-2 from these fields
-      maxFeePerGas: fee.maxFeePerGas,
-      maxPriorityFeePerGas: fee.maxPriorityFeePerGas,
-      ...extraOverrides,
-    };
-  }
-
-  // Estimate gas with the SAME overrides
-  const gas = await contractWithSigner[method].estimateGas(...args, base);
-  const overrides = { ...base, gasLimit: gas };
-
-  const tx = await contractWithSigner[method](...args, overrides);
-  return tx.wait();
-}
 
 
 
@@ -2460,16 +2410,27 @@ setallclansX(clanInfoMap);
           return;
         }
 
-        const TokencontractSigner = await getTokenSignerContract();
+        const tokenSigner = await getTokenSignerContract();
 
-        await sendLegacyTx(TokencontractSigner, "increaseAllowance", [contractAddress, occupationCost]);
+        await sendHarmonyLegacyTx(
+      tokenSigner,
+      "increaseAllowance", // keep as-is per your contract
+      [contractAddress, occupationCost]
+    );
 
 
-        const contractSigner = await getSignerContract();
+        const landSigner = await getSignerContract();
 
         // Pass the referrer to the occupyTile function in the smart contract
         const referrerAddress = referrer || '0x0000000000000000000000000000000000000000';
-        await sendLegacyTx(contractSigner, "occupyTile", [x - 1, y - 1, referrerAddress]);
+        await sendHarmonyLegacyTx(
+      landSigner,
+      // if your method is overloaded, you can pass the full signature instead:
+      // "occupyTile(uint256,uint256,address)",
+      "occupyTile",
+      [x - 1, y - 1, referrerAddress]
+      // no extra overrides — Harmony is legacy (type:0 + gasPrice handled inside)
+    );
 
         await updateSingleTileWithFlag(x - 1, y - 1);
         await checkIfAccountOccupiedTile();
