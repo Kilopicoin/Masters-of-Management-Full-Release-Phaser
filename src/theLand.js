@@ -415,6 +415,20 @@ useEffect(() => {
 
 
 
+// helper: keep your existing checks here
+const handleSelectBuilding = (building) => {
+  if (building.key === "clanhall" && (buildingCounts[3] || 0) >= 1) {
+    toast.error("Clanhall Limit ( Max:1 )");
+    return;
+  }
+  if (building.key === "market" && (buildingCounts[6] || 0) >= 1) {
+    toast.error("Market Limit ( Max:1 )");
+    return;
+  }
+  setSelectedBuilding(building.image);
+};
+
+
 
 const handleSetClanFlag = async (tokenId) => {
 
@@ -3152,64 +3166,111 @@ useEffect(() => {
                 padding: '3px 0',
             }}
         >
-            {buildingTypes.map((building) => (
-                <div
-                    key={building.key}
-                    style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '3px',
-                        border: `2px solid ${
-                            selectedBuilding === building.image ? '#daccb0ff' : '#c4aa70'
-                        }`,
-                        borderRadius: '10px',
-                        cursor: 'pointer',
-                        backgroundColor: selectedBuilding === building.image ? '#575757ff' : '#3e3e3e',
-                        minWidth: '120px',
-                    }}
-                    onClick={() => {
-    // Check limits before selecting
-    if (building.key === "clanhall" && (buildingCounts[3] || 0) >= 1) {
-        toast.error("Clanhall Limit ( Max:1 )");
-        return;
-    }
-    if (building.key === "market" && (buildingCounts[6] || 0) >= 1) {
-        toast.error("Market Limit ( Max:1 )");
-        return;
-    }
+           
 
-    setSelectedBuilding(building.image);
-}}
+{/* DESKTOP: the original cards (unchanged) */}
+<div className="buildings-desktop">
+  <div
+    style={{
+      marginTop: '10px',
+      display: 'flex',
+      gap: '6px',
+      overflowX: 'auto',
+      padding: '3px 0',
+    }}
+  >
+    {buildingTypes.map((building) => (
+      <div
+        key={building.key}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '6px',
+          padding: '3px',
+          border: `2px solid ${selectedBuilding === building.image ? '#daccb0ff' : '#c4aa70'}`,
+          borderRadius: '10px',
+          cursor: 'pointer',
+          backgroundColor: selectedBuilding === building.image ? '#575757ff' : '#3e3e3e',
+          minWidth: '120px',
+        }}
+        onClick={() => handleSelectBuilding(building)}
+      >
+        <img
+          src={require(`./assets/buildings/${building.image}.png`)}
+          alt={building.label}
+          style={{ width: '60px', height: '60px' }}
+        />
+        {building.label}({buildingCounts[building.no] || 0})
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+            <img src={foodImage} alt="Food" style={{ width: '20px' }} />
+            <span>{building.cost.food}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+            <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
+            <span>{building.cost.wood}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+            <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
+            <span>{building.cost.stone}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+            <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
+            <span>{building.cost.iron}</span>
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
 
-                >
-                    <img
-                        src={require(`./assets/buildings/${building.image}.png`)}
-                        alt={building.label}
-                        style={{ width: '60px', height: '60px' }}
-                    />
-                    {building.label}({buildingCounts[building.no] || 0})
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                            <img src={foodImage} alt="Food" style={{ width: '20px' }} />
-                            <span>{building.cost.food}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                            <img src={woodImage} alt="Wood" style={{ width: '20px' }} />
-                            <span>{building.cost.wood}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                            <img src={stoneImage} alt="Stone" style={{ width: '20px' }} />
-                            <span>{building.cost.stone}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
-                            <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
-                            <span>{building.cost.iron}</span>
-                        </div>
-                    </div>
-                </div>
-            ))}
+{/* MOBILE: a compact lined table */}
+<div className="buildings-mobile">
+  <table className="buildings-table">
+    <thead>
+      <tr>
+        <th>Building</th>
+        <th>Req. Food</th>
+        <th>Req. Wood</th>
+        <th>Req. Stone</th>
+        <th>Req. Iron</th>
+        <th>Do</th>
+      </tr>
+    </thead>
+    <tbody>
+      {buildingTypes.map((b) => (
+        <tr key={b.key}>
+          <td className="bcell-name">
+            <div className="bcell-name__wrap">
+              <img
+                src={require(`./assets/buildings/${b.image}.png`)}
+                alt={b.label}
+                className="bimg"
+              />
+              <div className="btitle">
+                {b.label} ({buildingCounts[b.no] || 0})
+              </div>
+            </div>
+          </td>
+          <td>{b.cost.food}</td>
+          <td>{b.cost.wood}</td>
+          <td>{b.cost.stone}</td>
+          <td>{b.cost.iron}</td>
+          <td>
+            <button
+              className="card-button bselect"
+              onClick={() => handleSelectBuilding(b)}
+            >
+              Select
+            </button>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+
         </div>
     </>
 )}
@@ -4357,12 +4418,12 @@ className='fancy-input'
 
 
             <div
-                className="message-card"
+                className="message-cardT"
                 style={{
                     position: 'absolute',
                     top: 10,
-                    left: 10,
-                    padding: '15px',
+                    left: 1,
+                    padding: '6px',
                     backgroundColor: 'rgba(62, 62, 62, 0.95)',
                     borderRadius: '10px',
                     boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
@@ -4371,20 +4432,9 @@ className='fancy-input'
                     color: '#e0d8c3',
                 }}
             >
-                <strong >Info Box</strong>
                 <button
           onClick={() => window.location.reload()}
-          style={{
-            marginTop: '15px',
-            padding: '10px',
-            backgroundColor: '#6c757d',
-            color: 'white',
-            border: 'none',
-            borderRadius: '5px',
-            cursor: 'pointer',
-            width: '100%',
-            fontSize: '18px',
-          }}
+          className="info-box-button"
         >
           Back to Map
         </button>
@@ -4401,7 +4451,7 @@ className='fancy-input'
                 {tileCoords && (
         <>
             <p>
-                <strong>Land:</strong> X: {tileCoords.x}, Y: {tileCoords.y}
+                <strong>Land:</strong> <br/> X: {tileCoords.x}, Y: {tileCoords.y}
             </p>
 
 
@@ -4437,7 +4487,7 @@ className='fancy-input'
         <button
             style={{
                 marginTop: '10px',
-                padding: '8px',
+                padding: '6px',
                 backgroundColor: '#7a5e3c',
                 color: '#f3eacb',
                 border: '1px solid #c4aa70',
@@ -4449,7 +4499,7 @@ className='fancy-input'
             onClick={() => setShowNameInput(prev => !prev)}
 
         >
-            Name your Realm
+            Rename Realm
         </button>
 
         {showNameInput && (

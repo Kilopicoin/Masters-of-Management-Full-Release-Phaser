@@ -3770,7 +3770,9 @@ Land is Active
     }}
   >
     <p><strong>Referral Network</strong></p>
+    <button onClick={() => setShowReferralNetwork(false)} style={{ marginTop: '10px' }}>Close</button>
     <div>
+      
         <a
             href={`https://twitter.com`}
             target="_blank"
@@ -3792,7 +3794,7 @@ Land is Active
         <p>No referrals</p>
       )}
     </ul>
-    <button onClick={() => setShowReferralNetwork(false)} style={{ marginTop: '10px' }}>Close</button>
+    
   </div>
 )}
 
