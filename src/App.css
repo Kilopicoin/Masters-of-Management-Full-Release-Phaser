@@ -581,3 +581,104 @@ box-shadow: 0 0 6px rgba(196, 170, 112, 0.3);
   white-space: nowrap;
   font-size: 16px;
 }
+
+
+
+
+/* Mobile adjustments */
+@media (max-width: 768px) {
+  .message-card,
+  .interaction-menuA,
+  .journal-card,
+  .leaderboard-card {
+    font-size: 14px;
+    padding: 8px;
+    width: 90%;          /* shrink width */
+    left: 50%;
+
+  }
+
+  .card-title {
+    font-size: 16px;
+    margin-bottom: 6px;
+  }
+
+  .resource-cost {
+    font-size: 12px;
+    gap: 3px;
+  }
+
+  .fancy-input,
+  .fancy-inputX,
+  .medieval-select {
+    font-size: 14px;
+    padding: 6px;
+  }
+
+  .leaderboard-table {
+    font-size: 14px;
+  }
+
+  .rank-badge {
+    min-width: 28px;
+    height: 22px;
+    font-size: 12px;
+  }
+
+  .chip,
+  .clan-pill {
+    font-size: 12px;
+    padding: 1px 6px;
+  }
+
+
+
+
+ .message-card .card-button,
+  .message-card button {
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    min-width: 90px;
+  }
+
+
+
+
+}
+
+
+
+.info-box-button {
+  margin-top: 5px;
+  padding: 8px;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  width: 100%;
+  font-weight: 400;
+  font-size: 18px;
+  text-align: center;
+  display: block;
+}
+
+/* ✅ Mobile override */
+@media (max-width: 768px) {
+  .info-box-button {
+    width: 100%;        /* full-width on mobile */
+    margin: 6px 0;      /* stack with spacing */
+    font-size: 14px;
+    padding: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .info-box-button {
+    width: 100%;        /* full-width on mobile */
+    margin: 6px 0;      /* stack with spacing */
+    font-size: 14px;
+    padding: 6px;
+  }
+}

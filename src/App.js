@@ -3166,7 +3166,7 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
     zIndex: 100,
     width: '250px',
   }}
-><strong>Info Box</strong>
+>
 <div>
 <a
             href={`https://twitter.com`}
@@ -3221,18 +3221,7 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
 
 
         <button
-            style={{
-                marginTop: '5px',
-                padding: '8px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                width: '100%',
-                fontWeight: '400',
-                fontSize: '18px',
-            }}
+            className="info-box-button"
             onClick={() => setinteractionMenuTypeA("leaderboardX")}
         >
             Leaderboard
@@ -3240,18 +3229,7 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
 
 
         <button
-            style={{
-                marginTop: '5px',
-                padding: '8px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                width: '100%',
-                fontWeight: '400',
-                fontSize: '18px',
-            }}
+            className="info-box-button"
             onClick={() => setinteractionMenuTypeA("warlogsX")}
         >
             War Logs (World)
@@ -3275,18 +3253,7 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
     getAddress(metaMaskAccount) === tileCoords.occupant && (
       <div >
 <button
-            style={{
-                marginTop: '5px',
-                padding: '8px',
-                backgroundColor: '#6c757d',
-                color: 'white',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer',
-                width: '100%',
-                fontWeight: '400',
-                fontSize: '18px',
-            }}
+            className="info-box-button"
             onClick={() => setinteractionMenuTypeA("warlogsMine")}
         >
             My War Logs
@@ -3350,7 +3317,7 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
   {tileCoords.x !== null && tileCoords.y !== null && (
     <div>
       <p>
-        <strong>Land Coordinates</strong>:<br />
+        <strong>Land Coordinates</strong>:
         X: {tileCoords.x}, Y: {tileCoords.y}
       </p>
       {tileCoords.bonusType && (
