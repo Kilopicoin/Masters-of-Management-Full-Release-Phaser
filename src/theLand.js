@@ -3095,34 +3095,7 @@ useEffect(() => {
 
 {interactionMenuType === "buildings" && (
     <>
-        
-<div style={{
-                    marginBottom: '10px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '15px',
-                    justifyContent: 'center',
-                }}>
-                Select Building Type
-
-
-                <div>
-        <a
-            href={`https://twitter.com`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '16px' }}
-          >
-            Buildings Docs
-          </a>
-
-</div>
-
-
-                </div>
-
-
-                
+      
 
         {/* Current Tile Resources */}
         {tileData && (
@@ -3152,6 +3125,15 @@ useEffect(() => {
                     <img src={ironImage} alt="Iron" style={{ width: '20px' }} />
                     <span>{tileData.iron}</span>
                 </div>
+
+                <a
+            href={`https://twitter.com`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1DA1F2', textDecoration: 'underline', fontSize: '11px' }}
+          >
+            Buildings Docs
+          </a>
                 
             </div>
         )}

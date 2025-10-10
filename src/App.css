@@ -379,7 +379,8 @@ box-shadow: 0 0 6px rgba(196, 170, 112, 0.3);
   left: 50%;
   transform: translateX(-50%);
   z-index: 200;
-  width: min(920px, 92vw);
+  width: 920px;          /* fixed logical width */
+  max-width: 92vw; 
   padding: 14px 14px 10px;
   border: 2px solid #c4aa70;
   border-radius: 14px;
@@ -430,6 +431,7 @@ box-shadow: 0 0 6px rgba(196, 170, 112, 0.3);
   overflow-x: hidden;    /* hide horizontal */
   border: 1px solid rgba(196,170,112,0.25);
   border-radius: 10px;
+  scrollbar-gutter: stable both-edges;
 }
 
 
@@ -749,7 +751,7 @@ box-shadow: 0 0 6px rgba(196, 170, 112, 0.3);
   /* Scale the whole card down a touch and keep it centered */
   #interaction-menu {
     width: 75vw;
-    padding: 8px !important;
+    padding: 4px !important;
     font-size: 14px;
     transform: scale(0.9) !important;
     transform-origin: top left;
@@ -861,7 +863,7 @@ box-shadow: 0 0 6px rgba(196, 170, 112, 0.3);
 /* Smaller “Select” on mobile */
 @media (max-width: 968px) {
   .buildings-table { font-size: 11px; }
-  .buildings-table th, .buildings-table td { padding: 4px 3px; }
+  .buildings-table th, .buildings-table td { padding: 1px 3px; }
   .bselect { padding: 3px 6px; font-size: 10px; }
 }
 

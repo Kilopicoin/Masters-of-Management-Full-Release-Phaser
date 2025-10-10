@@ -275,9 +275,11 @@ const fetchMyWarLogsInRange = async () => {
     const fromTs = Math.floor(fromDate.getTime() / 1000);
     const toTs   = Math.floor(toDateEnd.getTime() / 1000);
 
-    const wars = await market.getTileWarsInRange(x, y, fromTs, toTs);
-
-const normalized = wars.map(normalizeWar);
+    const wars = await market.getTileWarsInRange(x, y, fromTs, 0); // superset: fromTs..now
+ const filtered = wars.filter(w =>
+   Number(w.timestamp) >= fromTs && Number(w.timestamp) <= toTs
+ );
+ const normalized = filtered.map(normalizeWar);
 const reversed = normalized.toReversed ? normalized.toReversed() : [...normalized].reverse();
 
 setWarLogsData(reversed);
@@ -325,21 +327,20 @@ const fetchWarLogsInRange = async () => {
     const toTs   = Math.floor(toDateEnd.getTime() / 1000);
 
     const market = await getMarketplaceSignerContract();
-    const [warsRaw, clansRaw] = await market.getWarHistoryWithClansInRange(fromTs, toTs);
+    const [warsRaw, clansRaw] = await market.getWarHistoryWithClansInRange(fromTs, 0);
 
-    // Ensure plain, writable arrays
-    const wars  = Array.from(warsRaw || []);
-    const clans = Array.from(clansRaw || []);
-
-    const combined = wars.map((w, i) => {
-      const ww = normalizeWar(w);
-      const c = clans[i] || {};
-      return {
-        ...ww,
-        attackerClanName: c.attackerClanNam === "" ? "None" : `${c.attackerClanNam}`,
-        defenderClanName: c.defenderClanNam === "" ? "None" : `${c.defenderClanNam}`,
-      };
-    });
+    const combinedAll = warsRaw.map((w, i) => {
+   const ww = normalizeWar(w); // has ww.timestamp
+   const c = clansRaw[i] || {};
+   return {
+     ...ww,
+     attackerClanName: c.attackerClanNam === "" ? "None" : `${c.attackerClanNam}`,
+     defenderClanName: c.defenderClanNam === "" ? "None" : `${c.defenderClanNam}`,
+   };
+ });
+ const combined = combinedAll.filter(
+   (row) => Number(row.timestamp) >= fromTs && Number(row.timestamp) <= toTs
+ );
 
     const reversed = combined.toReversed ? combined.toReversed() : [...combined].reverse();
     setWarLogsData(reversed);
