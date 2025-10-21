@@ -6,7 +6,7 @@ import oceanImage from './assets/ocean.png';
 import whiteflagImage from './assets/whiteFlag.png';
 import skyflagImage from './assets/skyFlag.png';
 import largemapImage from './assets/file.png';
-import getContract, { getSignerContract, contractAddress, RPC } from './contract';
+import getContract, { getSignerContract, contractAddress } from './contract';
 import getTokenContract, { getTokenSignerContract } from './Tokencontract';
 import { Circles } from 'react-loader-spinner';
 import './App.css';
@@ -3035,9 +3035,9 @@ const zone = this.add.zone(worldX - tileWidth / 2, worldY, tileWidth, visibleTil
     };
   
 
-     if (RPC !== 'https://api.s0.b.hmny.io') {
+
     setupEventListener();
-  }
+  
 
     // Cleanup listener on unmount
     return () => {
