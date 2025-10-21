@@ -8,9 +8,7 @@ export const MarketplacecontractAddress = '0xe8283D05c18A6ce129286B57C657e075404
 export const RPC_LIST = [
   'https://api.s0.t.hmny.io',
   'https://a.api.s0.t.hmny.io',
-  'https://harmony-0.drpc.org',
   'https://1rpc.io/one',
-  'https://endpoints.omniatech.io/v1/harmony/mainnet-0/public',
   'https://api.harmony.one', // original as extra fallback
 ];
 

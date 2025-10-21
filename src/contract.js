@@ -8,9 +8,7 @@ export const contractAddress = '0x399721e792E69F1393917F36e1EF561234AfF07c';
 export const RPC_LIST = [
   'https://api.s0.t.hmny.io',
   'https://a.api.s0.t.hmny.io',
-  'https://harmony-0.drpc.org',
   'https://1rpc.io/one',
-  'https://endpoints.omniatech.io/v1/harmony/mainnet-0/public',
   'https://api.harmony.one', // original as an extra fallback
 ];
 

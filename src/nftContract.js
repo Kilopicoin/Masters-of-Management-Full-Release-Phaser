@@ -8,9 +8,7 @@ export const nftContractAddress = '0x8136868E58e8F15B0B80BA6E573A3Fe6C149A978';
 export const RPC_LIST = [
   'https://api.s0.t.hmny.io',
   'https://a.api.s0.t.hmny.io',
-  'https://harmony-0.drpc.org',
   'https://1rpc.io/one',
-  'https://endpoints.omniatech.io/v1/harmony/mainnet-0/public',
   'https://api.harmony.one', // original as fallback
 ];
 

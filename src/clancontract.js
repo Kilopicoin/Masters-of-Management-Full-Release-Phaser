@@ -8,9 +8,7 @@ export const clancontractAddress = '0x20aF751C887729F48ac49450340e0249C958184A';
 export const RPC_LIST = [
   'https://api.s0.t.hmny.io',
   'https://a.api.s0.t.hmny.io',
-  'https://harmony-0.drpc.org',
   'https://1rpc.io/one',
-  'https://endpoints.omniatech.io/v1/harmony/mainnet-0/public',
   'https://api.harmony.one', // original as an extra fallback
 ];
 
